@@ -185,6 +185,6 @@ io.on('connection', function(socket){
 });
 /*TODO: Add console commands to give admin, ban, etc*/
 
-http.listen(3000, function(){
-  console.log('listening on *:3000');
+http.listen(process.argv[2], function(){
+  console.log('listening on *:'+process.argv[2]);
 });
