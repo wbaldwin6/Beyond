@@ -1,0 +1,225 @@
+<html>
+	<head>
+		<title>Beyond</title>
+		<style>
+			body {
+				background-color: black;
+				margin: 0 0 0 0;
+			}
+			div {
+				display: block;
+				float: left;
+				height: 100%;
+				width: 100%;
+				background-color: black;
+				color: white;
+			}
+			div.oocmessage {
+				height: auto;
+			}
+			div.OOCbox{
+				overflow-y: auto;
+			}
+			div.ICbox{
+				overflow-y: auto;
+			}
+			input {
+				background-color: black;
+				color: white;
+				border-color: black;
+			}
+			input.OOCbar {
+				background-color: red;
+				color: black;
+			}
+			input.OOCbar:focus {
+				outline-width: 0;
+			}
+			.gutter {
+				background-color: #d3d3d3;
+			}
+			.modal {
+				z-index: 1;
+				position: fixed;
+				display: none;
+				width: 100%;
+				height: 100%;
+				overflow: auto;
+				background-color: rgb(0,0,0);
+				background-color: rgba(0,0,0,0.4);
+			}
+		</style>
+	</head>
+	<body>
+		<div id="main"></div>
+
+		<script src="/socket.io/socket.io.js"></script>
+		<script src="http://www.myersdaily.org/joseph/javascript/md5.js"></script>
+		<script src="http://nathancahill.github.io/Split.js/split.js"></script>
+		<script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
+		<script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
+		<script src="https://unpkg.com/babel-core@5.8.38/browser.min.js"></script>
+		<script type="text/babel">
+
+		var socket = io();
+
+		var Outercontainer = React.createClass({
+
+			componentDidMount: function(){
+				var that = this;
+				Split(['#left', '#OI'], {
+				});
+				Split(['#IC', '#OOC'], {
+					direction: 'vertical'
+				});
+				//Admittedly a bit of a cheesey workaround, but Split.js gives me a lot of useful functionality and until it fixes the fact that it sets them to static pixel values when I use sizes: [20, 80] I gotta do it SOMEHOW.
+				//If split.js ever breaks on me I'll probably code the sliders based on it instead of dealing with it including that bug, but it isn't worth the effort right now.
+				document.getElementById('left').style.width = "calc(25% - 5px)";
+				document.getElementById('OI').style.width = "calc(75% - 5px)";
+			},
+
+			handleEnter: function(e){
+				if(e.key === 'Enter'){
+					//placeholder test function, will be added to the options menu later.
+					if(this.refs.OOCbar.value.startsWith("/setcolor ")){
+						var set = this.state.settings;
+						set.textcolor = this.refs.OOCbar.value.split(" ")[1];
+						this.setState({settings: set});
+					}
+					this.props.socket.emit('OOCmessage', this.refs.OOCbar.value, this.state.settings.textcolor);
+					this.refs.OOCbar.value = '';
+				}
+			},
+
+			handleSettings: function(data){
+				this.setState({settings: data.settings, characters: data.characters});
+			},
+
+			render: function(){//whenever I need bottom space I can tell left and IO to have their height as 100% - (however many pixels)
+				return (
+					<div style={{height: "calc(100% - 15px)"}}>
+						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings}/>
+						<div id="left">
+						</div>
+						<div id="OI">
+							<div id="IC">
+								<IChandler socket={this.props.socket}/>
+							</div>
+							<div id="OOC">
+								<OOChandler socket={this.props.socket}/>
+							</div>
+						</div>
+						<input className="OOCbar" style={{width: '100%', padding: '0 0 0 0', border: '0'}} type="text" ref="OOCbar" placeholder="Input an OOC message" onKeyPress={this.handleEnter}/>
+					</div>
+				);
+			}
+		});
+		var ModalHandler = React.createClass({
+			getInitialState: function(){
+				return {loginmessage: "Please input a username and password of at least 6 characters."};
+			},
+
+			handleLogin: function (e){
+				e.preventDefault();
+				this.submission('login');
+			},
+
+			handleRegister: function (e){
+				e.preventDefault();
+				this.submission('register');
+			},
+
+			submission: function (type){
+				var that=this;
+				var username = this.refs.username.value;
+				var password = this.refs.password.value;
+				if(username.length >= 6 && password.length >= 6){
+					this.props.socket.emit(type, username, md5(password), function (response){
+						if(response.settings){
+							that.props.handleSettings(response);
+							that.setState({loginmessage: null});
+						} else {
+							that.setState({loginmessage: response});
+						}
+					});
+				}
+			},
+
+			render: function(){
+				var modalstate = 'none';
+				if(this.state.loginmessage){//and various other checks, some of which should modify the return to provide other setting options.
+					modalstate = 'block'
+				}//can add margin auto for centering, margin x y as whatever percent and alter the width and height as desired.
+				return (
+					<div className="modal" style={{display: modalstate}}>
+						<input type="text" name="username" ref="username" placeholder="Username" required /><br/>
+						<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
+						<button type="submit" onClick={this.handleLogin}>Login</button>
+						<button type="submit" onClick={this.handleRegister}>Register</button><br/>
+						<b>{this.state.loginmessage}</b>
+					</div>
+				);
+			}
+		});
+		var IChandler = React.createClass({
+			getInitialState: function(){
+				//normally messages would be empty but I want to test this out.
+				return {messages: []};
+			},
+
+			componentDidMount: function(){
+				var that = this;
+				this.props.socket.on('ICmessage', function(message){
+					//TODO: Handle message formatting for say and action.
+					/*var newm = this.state.messages.slice();
+					newm.push(message);
+					that.setState({messages: newm});*/
+				});
+			},
+
+			render: function(){
+				return (
+					<div className='ICbox'>
+						{this.state.messages}
+					</div>
+				);
+			}
+		});
+		var OOChandler = React.createClass({
+			getInitialState: function(){
+				return {messages: []};
+			},
+//format: {username: string, post: string, color: string}
+//for character messages: {username: string, post: string, color: string, character: string, icon: string, nameColor: string fontStyle: string}
+//Can just check if message.character to verify, probably need more granularity for omit say/action
+			componentDidMount: function(){
+				var that = this;
+				this.props.socket.on('OOCmessage', function(message){
+					var newm = that.state.messages.slice();
+					//TODO: add message formatting to differentiate between say and action.
+					if(message.character){//omit message
+						newm.push(<div key={newm.length} className='OOComit'><img src={message.icon}/><font fontWeight='bold' color={message.nameColor} fontFamily={message.fontStyle}>{message.character+' '}</font><font color={message.color} fontWeight='bold'>{message.post + ' (Omit)'}</font></div>);
+					} else if(message.username){//OOC message
+						newm.push(<div key={newm.length} className='OOCmessage'>( <b>{message.username+': '}</b><font color={message.color}>{message.post}</font> )</div>);
+					} else {//TODO: system message
+
+					}
+					that.setState({messages: newm});
+				});				
+			},
+
+			render: function(){
+				return (
+					<div className='OOCbox'>
+						{this.state.messages}
+					</div>
+				);
+			}
+		});
+		ReactDOM.render(
+			<Outercontainer socket={socket}/>,
+			document.getElementById('main')
+		);
+		</script>
+	</body>
+</html>
