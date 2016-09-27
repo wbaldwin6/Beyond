@@ -1,6 +1,7 @@
 <html>
 	<head>
 		<title>Beyond</title>
+		<link rel="shortcut icon" href="">
 		<style>
 			body {
 				background-color: black;
@@ -13,6 +14,25 @@
 				width: 100%;
 				background-color: black;
 				color: white;
+			}
+			div.options{
+				overflow: hidden;
+			}
+			div.charlist{
+				overflow-y: auto;
+			}
+			div.character{
+				padding-bottom: 5px;
+				height:auto;
+				line-height: 50px;
+			}
+			div.character span{
+				margin: 0;
+				border: 0;
+				color: white;
+				display: inline-block;
+				vertical-align: middle;
+				line-height: normal;
 			}
 			div.message {
 				height: auto;
@@ -44,18 +64,78 @@
 			input.OOCbar:focus {
 				outline-width: 0;
 			}
+			ul.tab{
+			    list-style-type: none;
+			    margin: 0;
+			    padding: 0;
+			    overflow: hidden;
+			    background-color: black;	
+			}
+			ul.tab li {
+				float:left;
+				padding: 0px 5px;
+				border: 1px solid #333;
+				transition: 0.3s;
+			}
+			ul.tab li:hover{background-color: #555;}
+			ul.tab li div{
+				cursor: default;
+				font-size: 10pt;
+				height: auto;
+				display: inline-block;
+				color: white;
+				text-align: center;
+				transition: 0.3s;
+				background-color: black;
+				-webkit-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+			ul.tab li div:hover{background-color: #555;}
 			.gutter {
 				background-color: #d3d3d3;
 			}
+			.gutter.gutter-horizontal{
+				cursor: ew-resize;
+			}
+			.gutter.gutter-vertical{
+				cursor: ns-resize;
+			}
+			.modalContainer{
+				z-index: 1;
+				position: fixed;
+				pointer-events: none;
+				background: none;
+			}
 			.modal {
+				pointer-events: auto;
 				z-index: 1;
 				position: fixed;
 				display: none;
-				width: 100%;
-				height: 100%;
+				width: auto;
+				height: auto;
 				overflow: auto;
 				background-color: rgb(0,0,0);
-				background-color: rgba(0,0,0,0.4);
+				background-color: rgba(50,50,50,0.8);
+			}
+			div.contextMenu{
+				z-index: 1000;
+				position: fixed;
+				width: auto;
+				height: auto;
+			}
+			div.contextOption{
+				border: 1px solid #333;
+				transition: 0.3s;
+				cursor: default;
+				webkit-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+			div.contextOption:hover{
+				background-color: #555;
 			}
 		</style>
 	</head>
@@ -73,6 +153,9 @@
 		var socket = io();
 
 		var Outercontainer = React.createClass({
+			getInitialState: function(){
+				return {settings: {}, characters: [], modal: [{type: 'login', loginmessage: 'Please input a username and password of at least 6 characters.'}]};
+			},
 
 			componentDidMount: function(){
 				var that = this;
@@ -85,6 +168,12 @@
 				//If split.js ever breaks on me I'll probably code the sliders based on it instead of dealing with it including that bug, but it isn't worth the effort right now.
 				document.getElementById('left').style.width = "calc(25% - 5px)";
 				document.getElementById('OI').style.width = "calc(75% - 5px)";
+			},
+
+			closeModal: function(n){
+				var modal = this.state.modal;
+				modal[n] = undefined;
+				this.setState({modal: modal});
 			},
 
 			handleEnter: function(e){
@@ -100,15 +189,53 @@
 				}
 			},
 
-			handleSettings: function(data){
-				this.setState({settings: data.settings, characters: data.characters});
+			handleSettings: function(settings, characters){
+				this.setState({settings: settings, characters: characters});
+			},
+
+			loginMessage: function(response, n){
+				var modal = this.state.modal;
+				modal[n].loginmessage = response;
+				this.setState({modal: modal});
+			},
+
+			contextMenu: function(e){
+				e.preventDefault();
+				var options = e.target.getAttribute('data');
+				if(options){
+					var position = {x: e.nativeEvent.clientX, y: e.nativeEvent.clientY};
+					options = options.split(",");
+					this.setState({context: {position: position, options: options, target: e.target}});
+				}
+			},
+
+			handleContext: function(e){
+				console.log(e.target.textContent);
+
+
+			},
+
+			closeContext: function(e){
+				//this function just tells the context menu to close if you click literally anything.
+				this.setState({context: null});
 			},
 
 			render: function(){//whenever I need bottom space I can tell left and IO to have their height as 100% - (however many pixels)
+				var context = <div className='contextMenu' style={{display: 'none'}}></div>;
+				if(this.state.context){
+					var that = this;
+					var options = this.state.context.options.map(function(op, i){
+						return(<div key={i} className='contextOption' onClick={that.handleContext}>{op}</div>);
+					});
+					context = (<div className='contextMenu' style={{left: this.state.context.position.x+'px', top:this.state.context.position.y+'px'}}>{options}</div>);
+				}
+
 				return (
-					<div style={{height: "calc(100% - 15px)"}}>
-						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings}/>
+					<div style={{height: "calc(100% - 15px)"}} onContextMenu={this.contextMenu} onClick={this.closeContext}>
+						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} modal={this.state.modal} closeModal={this.closeModal} loginMessage={this.loginMessage}/>
+						{context}
 						<div id="left">
+							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters}/>
 						</div>
 						<div id="OI">
 							<div id="IC">
@@ -123,53 +250,138 @@
 				);
 			}
 		});
+
 		var ModalHandler = React.createClass({
 			getInitialState: function(){
-				return {loginmessage: "Please input a username and password of at least 6 characters."};
+				return {positions: [], currentDrag: null};
 			},
 
-			handleLogin: function (e){
+			submission: function (e){
+				var type = e.target.getAttribute('id');
 				e.preventDefault();
-				this.submission('login');
-			},
-
-			handleRegister: function (e){
-				e.preventDefault();
-				this.submission('register');
-			},
-
-			submission: function (type){
 				var that=this;
 				var username = this.refs.username.value;
 				var password = this.refs.password.value;
 				if(username.length >= 6 && password.length >= 6){
+					var ind = e.target.parentNode.getAttribute('id');
 					this.props.socket.emit(type, username, md5(password), function (response){
 						if(response.settings){
-							that.props.handleSettings(response);
-							that.setState({loginmessage: null});
+							that.props.handleSettings(response.settings, response.characters);
+							that.props.closeModal(ind);
 						} else {
-							that.setState({loginmessage: response});
+							that.props.loginMessage(response, ind);
 						}
 					});
 				}
 			},
 
+			startDrag: function(e){
+				e.stopPropagation();
+				e.preventDefault();
+				this.setState({currentDrag: e.target.getAttribute('id'), initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+			},
+
+			drag: function(e){
+				e.stopPropagation();
+				e.preventDefault();
+				var pos = this.state.positions;
+				var initpos = this.state.initialposition;
+				pos[this.state.currentDrag] = {x: e.clientX-initpos.x, y: e.clientY-initpos.y};
+				this.setState({positions: pos});
+			},
+
+			stopDrag: function(e){
+				e.stopPropagation();
+				e.preventDefault();
+				this.setState({currentDrag: null});
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+			},
+
 			render: function(){
-				var modalstate = 'none';
-				if(this.state.loginmessage){//and various other checks, some of which should modify the return to provide other setting options.
-					modalstate = 'block'
-				}//can add margin auto for centering, margin x y as whatever percent and alter the width and height as desired.
+				var that = this;
+				var modals=this.props.modal.map(function (modal, index){
+					if(modal){
+						var x = '25%';
+						var y = '25%';
+						if(that.state.positions[index]){
+							x = that.state.positions[index].x+'px';
+							y = that.state.positions[index].y+'px';
+						}
+						switch(modal.type){//only two right now but I'm certain I'll need more later, hence using switch.
+							case 'login'://basically hardcoded and single-purpose.
+								return(
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>
+										<input type="text" name="username" ref="username" placeholder="Username" required /><br/>
+										<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
+										<button type="submit" id="login" onClick={that.submission}>Login</button>
+										<button type="submit" id="register" onClick={that.submission}>Register</button><br/>
+										<b>{modal.loginmessage}</b>
+									</div>);
+								break;
+							case 'character':
+								break;
+						}
+					} else {
+						return(<div key={index} className="modal" style={{display:'none'}}></div>);
+					}
+				});
 				return (
-					<div className="modal" style={{display: modalstate}}>
-						<input type="text" name="username" ref="username" placeholder="Username" required /><br/>
-						<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
-						<button type="submit" onClick={this.handleLogin}>Login</button>
-						<button type="submit" onClick={this.handleRegister}>Register</button><br/>
-						<b>{this.state.loginmessage}</b>
+					<div className="modalContainer" style={{width:'100%', height:'100%'}}>{modals}</div>
+				);
+			}
+		});
+
+		var ChartabHandler = React.createClass({
+			getInitialState: function(){
+				return {tab: 'Characters'};
+			},//tabs: characters, players, commands, admin, server
+
+			shiftTab: function(e){//It's both a relevant name and a terrible pun!
+				this.setState({tab: e.target.getAttribute('id')});
+			},
+
+//character {name: string, icon: string, }
+//The character creation box should definitely be modal. Experiment with z-index and position a bit.
+//I can center it with position: fixed, so that's good news, as is the fact that it means I can make the modal _anywhere_.
+//Don't worry about format right now, just function. That said, making the modal box appear over the normal is part of 'function' right now.
+//can use .value on input type="file" to determine that it's actually .jpg or .png before proceeding
+			render: function(){
+				var currenttab = null;
+				switch(this.state.tab){//use this to acquire the jsx for each tab
+					case 'characters'://case for the characters tab
+						var charlist = this.props.characters.map(function(chr, i){
+							return(<div key={i} className="character"><img src={'/faceicons/'+chr.icon}/><span>{chr.name}</span></div>);
+						});
+						currenttab = (<div data={['New Character', 'Test']} className="charlist">
+							{charlist}
+							</div>);
+						break;
+					case 'players'://case for the players online tab
+						break;
+					case 'commands'://case for player commands tab
+						break;
+					case 'admin'://case for the administrative commands tab
+						break;
+					case 'server'://case for server control tab
+						break;
+				}
+
+				return (
+					<div className="options">
+						<ul className="tab" style={{listStyleType:'none'}}>
+							<li><div className="tablink" id="characters" onClick={this.shiftTab}>Characters</div></li>
+							<li><div className="tablink" id="players" onClick={this.shiftTab}>Players Online</div></li>
+							<li><div className="tablink" id="commands" onClick={this.shiftTab}>Player Commands</div></li>
+						</ul>
+						{currenttab}
 					</div>
 				);
 			}
 		});
+
 		var IChandler = React.createClass({
 			getInitialState: function(){
 				//normally messages would be empty but I want to test this out.
@@ -194,6 +406,7 @@
 				);
 			}
 		});
+
 		var OOChandler = React.createClass({
 			getInitialState: function(){
 				return {messages: []};
@@ -228,6 +441,7 @@
 				);
 			}
 		});
+
 		ReactDOM.render(
 			<Outercontainer socket={socket}/>,
 			document.getElementById('main')

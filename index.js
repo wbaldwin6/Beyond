@@ -64,9 +64,8 @@ var userdefaults = {
 	settings: {
 		textcolor: 'blue'
 	},
-	characters: {
-
-	}
+	
+	characters: []
 };
 
 toLog = function (message){
