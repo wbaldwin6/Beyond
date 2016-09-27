@@ -56,7 +56,7 @@ openLog = function (logfile){//takes in a Date object
 };
 //initial opening when the server is activated
 var today = new Date();
-var logfile = __dirname+'/logs/'+today.getFullYear()+"_"+today.getDate()+'.html';
+var logfile = __dirname+'/logs/'+today.getFullYear()+"_"+today.getMonth()+"_"+today.getDate()+'.html';
 var htm = null;
 openLog(logfile);
 
@@ -71,8 +71,8 @@ var userdefaults = {
 
 toLog = function (message){
 	var today = new Date();
-	if(__dirname+'/logs/'+today.getFullYear()+"_"+today.getDate()+'.html' != logfile){//new day
-		logfile = __dirname+'/logs/'+today.getFullYear()+"_"+today.getDate()+'.html';
+	if(__dirname+'/logs/'+today.getFullYear()+"_"+today.getMonth()+"_"+today.getDate()+'.html' != logfile){//new day
+		logfile = __dirname+'/logs/'+today.getFullYear()+"_"+today.getMonth()+"_"+today.getDate()+'.html';
 		openLog(logfile);
 		//NOW proceed using htm
 		//I'll need to make this into a callback to make it work later, but it only comes up at midnight.
@@ -115,6 +115,7 @@ io.on('connection', function(socket){
 	console.log('a user connected');
 	socket.on('disconnect', function(){
 		console.log(sessions[socket.id]+' disconnected');
+		//TODO: emit logout message
 		//handle other logoff things if there was a login
 		sessions[socket.id] = undefined;
 	})
@@ -123,13 +124,14 @@ io.on('connection', function(socket){
 			if(err){callback(err);} else {
 				logins = JSON.parse(logins);
 				if(logins[username]){//valid username
-					if(logins[username] == password){//valid login
-						console.log(socket.id+" has logged in as "+username);
+					if(logins[username] == password){//valid login	
 						sessions[socket.id] = username;
 						//pull up user info
 						fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
 							if(err){callback(err);} else {
 								callback(JSON.parse(info));
+								console.log(socket.id+" has logged in as "+username);
+								//TODO: Emit login message
 							}
 						});
 					} else {//invalid login
@@ -151,12 +153,13 @@ io.on('connection', function(socket){
 				//something about linking the sessionid too probably
 				fs.writeFile('logins.json', JSON.stringify(logins), function(err){
 					if(!err){
-						console.log(socket.id+" has logged in as "+username);
 						sessions[socket.id] = username;
 						//create new user info
 						fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
 							if(err){callback(err);} else {
 								callback(userdefaults);
+								console.log(socket.id+" has logged in as "+username);
+								//TODO: Emit login message
 							}
 						});
 					} else {callback(err);}
@@ -184,7 +187,12 @@ io.on('connection', function(socket){
 	});
 });
 /*TODO: Add console commands to give admin, ban, etc*/
-
-http.listen(process.argv[2], function(){
-  console.log('listening on *:'+process.argv[2]);
-});
+if(process.argv[2]){
+	http.listen(process.argv[2], function(){
+	  console.log('listening on *:'+process.argv[2]);
+	});
+} else {
+	http.listen(0, function(){
+	  console.log('listening on *:'+http.address().port);
+	});
+}
