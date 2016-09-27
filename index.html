@@ -14,8 +14,17 @@
 				background-color: black;
 				color: white;
 			}
-			div.oocmessage {
+			div.message {
 				height: auto;
+			}
+			div.action {
+				font-weight: bold;
+			}
+			div.log {
+				font-weight: bold;
+			}
+			div.system {
+
 			}
 			div.OOCbox{
 				overflow-y: auto;
@@ -192,17 +201,20 @@
 //format: {username: string, post: string, color: string}
 //for character messages: {username: string, post: string, color: string, character: string, icon: string, nameColor: string fontStyle: string}
 //Can just check if message.character to verify, probably need more granularity for omit say/action
+//OOC say message, OOC action message, OOC message, OOC log message
 			componentDidMount: function(){
 				var that = this;
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
-					//TODO: add message formatting to differentiate between say and action.
-					if(message.character){//omit message
-						newm.push(<div key={newm.length} className='OOComit'><img src={message.icon}/><font fontWeight='bold' color={message.nameColor} fontFamily={message.fontStyle}>{message.character+' '}</font><font color={message.color} fontWeight='bold'>{message.post + ' (Omit)'}</font></div>);
-					} else if(message.username){//OOC message
-						newm.push(<div key={newm.length} className='OOCmessage'>( <b>{message.username+': '}</b><font color={message.color}>{message.post}</font> )</div>);
-					} else {//TODO: system message
-
+					var classparam = message.className.split(" ")[1];
+					if(classparam == "action"){//OOC action message
+						newm.push(<div key={newm.length} className={message.className}><img src={'/faceicons/'+message.icon}/><font color={message.nameColor} style={{fontFamily: message.fontStyle}}>{message.character+' '}</font><font color={message.color}>{message.post + ' (Omit)'}</font></div>);
+					} else if(classparam == "say"){//OOC say message
+						newm.push(<div key={newm.length} className={message.className}><img src={'/faceicons/'+message.icon}/><font color={message.nameColor} style={{fontFamily: message.fontStyle, fontWeight: 'bold'}}>{message.character+': '}</font><font color={message.color}>{'"'+message.post+'"'} <b>(Omit)</b></font></div>);
+					} else if(classparam == "message"){//OOC message
+						newm.push(<div key={newm.length} className={message.className}>( <b>{message.username+': '}</b><font color={message.color}>{message.post}</font> )</div>);
+					} else if(classparam == "log") {//OOC log message
+						newm.push(<div key={newm.length} className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
 					}
 					that.setState({messages: newm});
 				});				

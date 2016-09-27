@@ -84,10 +84,13 @@ toLog = function (message){
 	ts.setAttribute("class", "timestamp");
 	ts.textContent = '['+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 	logmsg.appendChild(ts);
-	//switch based on message.className probably I guess?
-	//Assume we're in the section for OOCmessage.
+	var classparam = message.className.split(" ")[1];
+	if(classparam == 'message'){
+		generateOOCmessage(logmsg, message.username, message.post, message.color);
+	} else if(classparam == 'log'){
+		generateOOClog(logmsg, message.username, message.post);
+	}
 	//add different message types later as you set them up.
-	generateOOCmessage(logmsg, message.username, message.post, message.color);
 	htm.document.body.appendChild(logmsg);
 	fs.writeFile(logfile, htm.document.documentElement.outerHTML, function(error){
 		if(error) throw error;
@@ -111,13 +114,22 @@ generateOOCmessage = function (message, username, post, color){
 	message.appendChild(cur);
 };
 
+generateOOClog = function (message, username, post){
+	var cur = htm.document.createTextNode("| "+username+" "+post+" |");
+	message.appendChild(cur);
+};
+
 io.on('connection', function(socket){
 	console.log('a user connected');
 	socket.on('disconnect', function(){
 		console.log(sessions[socket.id]+' disconnected');
-		//TODO: emit logout message
 		//handle other logoff things if there was a login
-		sessions[socket.id] = undefined;
+		if(sessions[socket.id]){
+			var msg = {className: 'OOC log message', username: sessions[socket.id], post: "has logged off"}
+			io.emit('OOCmessage', msg);
+			toLog(msg);
+			sessions[socket.id] = undefined;
+		}
 	})
 	socket.on('login', function(username, password, callback){
 		fs.readFile('logins.json', 'utf8', function(err, logins){
@@ -131,7 +143,9 @@ io.on('connection', function(socket){
 							if(err){callback(err);} else {
 								callback(JSON.parse(info));
 								console.log(socket.id+" has logged in as "+username);
-								//TODO: Emit login message
+								var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+								io.emit('OOCmessage', msg);
+								toLog(msg);
 							}
 						});
 					} else {//invalid login
@@ -159,7 +173,9 @@ io.on('connection', function(socket){
 							if(err){callback(err);} else {
 								callback(userdefaults);
 								console.log(socket.id+" has logged in as "+username);
-								//TODO: Emit login message
+								var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+								io.emit('OOCmessage', msg);
+								toLog(msg);
 							}
 						});
 					} else {callback(err);}
@@ -180,8 +196,9 @@ io.on('connection', function(socket){
 					}
 				});
 			} else {
-				io.emit('OOCmessage', {username: username, post: message, color: color});
-				toLog({className: 'OOCmessage', username: username, post: message, color: color});
+				var msg = {className: 'OOC message', username: username, post: message, color: color};
+				io.emit('OOCmessage', msg);
+				toLog(msg);
 			}
 		}
 	});
