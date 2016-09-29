@@ -10,23 +10,20 @@
 			div {
 				display: block;
 				float: left;
-				height: 100%;
+				height: auto;
 				width: 100%;
 				background-color: black;
 				color: white;
 			}
 			div.options{
-				overflow: hidden;
+				height: 100%;
+				display: flex;
+				flex-direction: column;
 			}
 			div.charlist{
+				flex-grow: 1;
 				overflow-y: auto;
 				height: calc(100% - 54px);
-			}
-			div.chargroup{
-				height:auto;
-			}
-			div.character{
-				height:auto;
 			}
 			div.character span{
 				cursor: default;
@@ -48,9 +45,6 @@
 				display: inline-block;
 				vertical-align: middle;
 				line-height: normal;
-			}
-			div.message {
-				height: auto;
 			}
 			div.action {
 				font-weight: bold;
@@ -96,7 +90,6 @@
 			ul.tab li div{
 				cursor: default;
 				font-size: 10pt;
-				height: auto;
 				display: inline-block;
 				color: white;
 				text-align: center;
@@ -112,6 +105,7 @@
 				background-color: #d3d3d3;
 			}
 			.gutter.gutter-horizontal{
+				height: 100%;
 				cursor: ew-resize;
 			}
 			.gutter.gutter-vertical{
@@ -129,7 +123,6 @@
 				position: fixed;
 				display: none;
 				width: auto;
-				height: auto;
 				overflow: auto;
 				background-color: rgb(0,0,0);
 				background-color: rgba(50,50,50,0.8);
@@ -138,7 +131,6 @@
 				z-index: 1000;
 				position: fixed;
 				width: auto;
-				height: auto;
 			}
 			div.contextOption{
 				border: 1px solid #333;
@@ -160,6 +152,7 @@
 		<script src="/socket.io/socket.io.js"></script>
 		<script src="http://www.myersdaily.org/joseph/javascript/md5.js"></script>
 		<script src="http://nathancahill.github.io/Split.js/split.js"></script>
+		<script src="https://cdn.rawgit.com/viliusle/Hermite-resize/master/dist/hermite.js"></script>
 		<script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
 		<script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
 		<script src="https://unpkg.com/babel-core@5.8.38/browser.min.js"></script>
@@ -395,13 +388,25 @@
 				var icons = this.refs['faceicons'+id].children;
 				if(name || this.props.modal[id].id.length > 1){//do nothing if they didn't put a name in unless it's an edit.
 					var canvas = this.refs['canvas'+id];
-					canvas.width=50; canvas.height=50;
+					//canvas.width=50; canvas.height=50;
 					var ctx = canvas.getContext('2d');
 					var convertedicons = [];
+					var hermi = true;
+					try{
+						var hermite = new Hermite_class();
+					} catch(e){
+						hermi = false;
+					}
 					for(var i=0; i < icons.length; i++){
-						//TODO: make this resize in steps for big images
-						//100 only needs one step, 200 would be good with two, 150 definitely needs an extra step...
-						ctx.drawImage(icons[i], 0, 0, 50, 50);
+						if(hermi){
+							var h = icons[i].naturalHeight;
+							var w = icons[i].naturalWidth;
+							canvas.width = w; canvas.height=h;
+							ctx.drawImage(icons[i], 0, 0);
+							hermite.resample_single(canvas, 50, 50, true);					
+						} else {
+							ctx.drawImage(icons[i], 0, 0, 50, 50);
+						}
 						convertedicons.push(canvas.toDataURL("image/png"));
 					}
 					var that=this;
@@ -608,10 +613,14 @@
 			componentDidMount: function(){
 				var that = this;
 				this.props.socket.on('ICmessage', function(message){
-					//TODO: Handle message formatting for say and action.
-					/*var newm = this.state.messages.slice();
-					newm.push(message);
-					that.setState({messages: newm});*/
+					var newm = that.state.messages.slice();
+					var classparam = message.className.split(" ")[1];
+					if(classparam == "action"){//IC action message
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span style={{color: message.nameColor}}>{message.name+' '}</span><span style={{color: message.color}}>{message.post}</span></div>);
+					} else if(classparam == "say"){//IC say message
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span style={{fontWeight: 'bold', color: message.nameColor}}>{message.name+': '}</span><span style={{color: message.color}}>{'"'+message.post+'"'}</span></div>);
+					}
+					that.setState({messages: newm});
 				});
 			},
 
@@ -638,11 +647,11 @@
 					var newm = that.state.messages.slice();
 					var classparam = message.className.split(" ")[1];
 					if(classparam == "action"){//OOC action message
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span color={message.nameColor}>{message.name+' '}</span><span color={message.color}>{message.post + ' (Omit)'}</span></div>);
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span style={{color: message.nameColor}}>{message.name+' '}</span><span style={{color: message.color}}>{message.post + ' (Omit)'}</span></div>);
 					} else if(classparam == "say"){//OOC say message
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span color={message.nameColor} style={{fontWeight: 'bold'}}>{message.name+': '}</span><span color={message.color}>{'"'+message.post+'"'} <b>(Omit)</b></span></div>);
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span style={{fontWeight: 'bold', color: message.nameColor}}>{message.name+': '}</span><span style={{color: message.color}}>{'"'+message.post+'"'} <b>(Omit)</b></span></div>);
 					} else if(classparam == "message"){//OOC message
-						newm.push(<div key={newm.length} className={message.className}>( <b>{message.username+': '}</b><span color={message.color}>{message.post}</span> )</div>);
+						newm.push(<div key={newm.length} className={message.className}>( <b>{message.username+': '}</b><span style={{color: message.color}}>{message.post}</span> )</div>);
 					} else if(classparam == "log") {//OOC log message
 						newm.push(<div key={newm.length} className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
 					}

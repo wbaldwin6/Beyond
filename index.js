@@ -26,7 +26,7 @@ try{//make the faceicons folder if it doesn't exist BEFORE proceeding.
 } catch(e){//do nothing if it already exists.
 	if(e.code != 'EEXIST'){throw e;} else {
 		fs.readFile(__dirname+'/faceicons/'+'num.txt', 'utf8', function(err, num){
-			iconnum = 0+num;
+			iconnum = +num;
 		});
 	}
 }
@@ -119,7 +119,7 @@ generateOOCmessage = function (message, username, post, color){
 	message.appendChild(cur);
 
 	cur = htm.document.createElement('span');//create post
-	cur.setAttribute("color", color);
+	cur.style.color = color;
 	cur.textContent = post;
 	message.appendChild(cur);
 
