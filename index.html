@@ -20,13 +20,28 @@
 			}
 			div.charlist{
 				overflow-y: auto;
+				height: calc(100% - 54px);
+			}
+			div.chargroup{
+				height:auto;
 			}
 			div.character{
-				padding-bottom: 5px;
 				height:auto;
-				line-height: 50px;
 			}
 			div.character span{
+				cursor: default;
+				-webkit-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+			div.derivative{
+				padding-bottom: 5px;
+				height:50px;
+				line-height: 50px;
+			}			
+			div.derivative span{
+				height:50px;
 				margin: 0;
 				border: 0;
 				color: white;
@@ -191,6 +206,7 @@
 
 			handleSettings: function(settings, characters){
 				this.setState({settings: settings, characters: characters});
+				this.props.socket.emit('save', JSON.stringify({settings: settings, characters: characters}));
 			},
 
 			loginMessage: function(response, n){
@@ -200,19 +216,42 @@
 			},
 
 			contextMenu: function(e){
+				var target = e.target;
 				e.preventDefault();
-				var options = e.target.getAttribute('data');
+				e.stopPropagation();
+				//TODO: see if you can somehow combine the context menus to show all relevant options for a given rightclick and link them properly to their targets.
+				var options = target.getAttribute('data');
+				while(!options && target.parentNode.getAttribute('id') != 'main'){
+					target = target.parentNode;
+					options = target.getAttribute('data');
+				}
 				if(options){
 					var position = {x: e.nativeEvent.clientX, y: e.nativeEvent.clientY};
 					options = options.split(",");
-					this.setState({context: {position: position, options: options, target: e.target}});
+					this.setState({context: {position: position, options: options, target: target}});
 				}
 			},
-
+//Names: New/Edit/Delete Group/Character/Derivative, but these aren't directly linked to the sort of ID we need. For instance, New Character only takes a group, while Edit Character or Delete Character takes a character.
 			handleContext: function(e){
-				console.log(e.target.textContent);
+				var mod = this.state.modal;
+				var name = e.target.textContent;
+				var id = this.state.context.target.getAttribute('id').split(',');
+				if(name.startsWith('Delete')){
+					this.modalpush(mod, {type:'delete', id: id, name: name});
+				} else if(name.endsWith("Character") || name.endsWith("Derivative")){
+					this.modalpush(mod, {type:'character', id: id, name: name});
+				} else if(name.endsWith("Group")){
+					this.modalpush(mod, {type:'group', id: id, name: name});
+				}
+				this.setState({modal: mod});//if mod isn't changed it probably won't even update, and if it does the difference will be irrelevant.
+			},
 
-
+			modalpush: function(mod, data){//helper for putting new modals in.
+				var i=0;
+				while(mod[i]){//until we find one that's undefined
+					i++;
+				}//we leave the loop when mod[i] is undefined, so...
+				mod[i] = data;
 			},
 
 			closeContext: function(e){
@@ -232,7 +271,7 @@
 
 				return (
 					<div style={{height: "calc(100% - 15px)"}} onContextMenu={this.contextMenu} onClick={this.closeContext}>
-						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} modal={this.state.modal} closeModal={this.closeModal} loginMessage={this.loginMessage}/>
+						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} modal={this.state.modal} closeModal={this.closeModal} loginMessage={this.loginMessage} characters={this.state.characters} settings={this.state.settings}/>
 						{context}
 						<div id="left">
 							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters}/>
@@ -276,11 +315,13 @@
 			},
 
 			startDrag: function(e){
-				e.stopPropagation();
-				e.preventDefault();
-				this.setState({currentDrag: e.target.getAttribute('id'), initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
+				if(e.target.getAttribute('class') == "modal"){//only START for the modal containers.
+					e.stopPropagation();
+					e.preventDefault();
+					this.setState({currentDrag: e.target.getAttribute('id'), initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+					document.addEventListener('mousemove', this.drag);
+					document.addEventListener('mouseup', this.stopDrag);
+				}
 			},
 
 			drag: function(e){
@@ -300,6 +341,105 @@
 				document.removeEventListener('mouseup', this.stopDrag);
 			},
 
+			handleFIs: function(e){
+				var list = e.target.files;
+				var id = e.target.parentNode.getAttribute('id');//current index
+				/*var canvas = this.refs['canvas'+e.target.parentNode.getAttribute('id')];
+				var ctx = canvas.getContext('2d');*/
+				var img = [];
+				for(var i=0; i<list.length; i++){
+					if (list[i].type.match(/image.*/)) {
+						img.push(window.URL.createObjectURL(list[i]));
+					};
+				}
+				var images = this.state.images || [];
+				images[id] = img;
+				this.setState({images: images});
+			},
+
+			closeChar: function(id){
+				var images = this.state.images;
+				if(images){
+					images[id] = null;
+					this.setState({images: images});
+				}
+				this.props.closeModal(id);
+			},
+
+			charDelete: function(e){
+				var modal = e.target.parentNode;
+				var id = modal.getAttribute('id');
+				var modata = this.props.modal[id];
+				//modata.id contains the ids involved.
+				var characters = this.props.characters;
+				if(modata.id.length === 1){//group delete
+					//TODO: Make sure this works after making group options.
+					var salvage = characters.splice(modata.id[0], 1);
+					characters[0].push(salvage);//add the characters to the ungrouped section.
+				} else if(modata.id.length === 2 || characters[modata.id[0]][modata.id[1]].length == 1){//character delete
+					characters[modata.id[0]].splice(modata.id[1], 1);
+				} else {
+					if(modata.id[2] == 0){//deleting what contains the ID but not the character.
+						characters[modata.id[0]][modata.id[1]][1].id = characters[modata.id[0]][modata.id[1]][0].id;
+					}
+					characters[modata.id[0]][modata.id[1]].splice(modata.id[2], 1);
+				}
+				this.props.handleSettings(this.props.settings, characters);
+				this.props.closeModal(id);
+			},
+
+			charEdit: function(e){
+				var modal = e.target.parentNode;//the modal containing the save button
+				var id = modal.getAttribute('id');//I'll be using this frequently, so I'd best.
+				var name = this.refs['name'+id].value;
+				var icons = this.refs['faceicons'+id].children;
+				if(name || this.props.modal[id].id.length > 1){//do nothing if they didn't put a name in unless it's an edit.
+					var canvas = this.refs['canvas'+id];
+					canvas.width=50; canvas.height=50;
+					var ctx = canvas.getContext('2d');
+					var convertedicons = [];
+					for(var i=0; i < icons.length; i++){
+						//TODO: make this resize in steps for big images
+						//100 only needs one step, 200 would be good with two, 150 definitely needs an extra step...
+						ctx.drawImage(icons[i], 0, 0, 50, 50);
+						convertedicons.push(canvas.toDataURL("image/png"));
+					}
+					var that=this;
+
+					this.props.socket.emit('sendimage', convertedicons, function(response, un){
+						var modata = that.props.modal[id];
+						var settings = that.props.settings;
+						var characters = that.props.characters;
+						var character;
+						if(modata.id.length === 1){//new char only
+							modata.id.push(characters[modata.id[0]].length);//put it at the end of the group
+							character = [];
+						} else {//i1 is group, i2 is character
+							character = characters[modata.id[0]][modata.id[1]];
+						}
+						if(modata.id[2]){//only in the edit case (we have a deriv) do we NOT add.
+							//TODO: add other aspects like color
+							var deriv = character[modata.id[2]];
+							character[modata.id[2]] = {id: deriv.id, name: name || deriv.name, icon: response[0] || deriv.icon};//preserve the ID if present
+						} else {
+							for(i=0; i<response.length; i++){
+								//TODO: add other aspects like color
+								if(!character.length){
+									character.push({id: un+settings.characterIDs++, name: name, icon: response[i]});
+								} else {
+									var base = character[0];
+									character.push({name: name || base.name, icon: response[i]});
+								}
+							}
+						}//now we've added all the new derivatives or just modified the one.
+						characters[modata.id[0]][modata.id[1]] = character;//adds new if new, otherwise overwrites
+						that.props.handleSettings(settings, characters);
+						that.closeChar(id);
+					});
+				}
+				
+			},
+
 			render: function(){
 				var that = this;
 				var modals=this.props.modal.map(function (modal, index){
@@ -310,7 +450,7 @@
 							x = that.state.positions[index].x+'px';
 							y = that.state.positions[index].y+'px';
 						}
-						switch(modal.type){//only two right now but I'm certain I'll need more later, hence using switch.
+						switch(modal.type){
 							case 'login'://basically hardcoded and single-purpose.
 								return(
 									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>
@@ -321,7 +461,32 @@
 										<b>{modal.loginmessage}</b>
 									</div>);
 								break;
-							case 'character':
+							case 'character'://character creation/edit modal.
+								var groupdropdown = null;
+								var FIs = (<input type='file' ref={'FIs'+index} multiple onChange={that.handleFIs}/>);//by default it allows multiple
+								if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
+									FIs = <input type='file' ref={'FIs'+index} onChange={that.handleFIs}/>;
+								} else if(modal.id.length == 1){//new character
+									groupdropdown = null;
+								}
+								var previews = null;
+								var im = that.state.images;
+								if(im && im[index]){
+									previews = im[index].map(function(img, index){
+										return(<img src={img} key={index} width='50px' height='50px'/>);
+									});
+								}
+								return(
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>{FIs}<br/><span ref={'faceicons'+index}>{previews}</span><canvas ref={'canvas'+index} width='0' height='0'></canvas><br/><input type="text" ref={'name'+index} placeholder="Character Name" required/><br/>{groupdropdown}<br/><button type="submit" id="save" onClick={that.charEdit}>Save</button>
+										<button type="submit" id="cancel" onClick={that.closeChar.bind(null, index)}>Cancel</button></div>
+								);
+								break;
+							case 'group'://group creation/edit modal.
+								break;
+							case 'delete'://'are you sure?'
+								return(
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>No</button></div>
+								);
 								break;
 						}
 					} else {
@@ -335,14 +500,44 @@
 		});
 
 		var ChartabHandler = React.createClass({
-			getInitialState: function(){
-				return {tab: 'Characters'};
-			},//tabs: characters, players, commands, admin, server
+			getInitialState: function(){//open.characters[ID] will be true if we need to open derivs
+				return {tab: 'Characters', open:{groups: {}, characters: {}}};
+			},
 
 			shiftTab: function(e){//It's both a relevant name and a terrible pun!
 				this.setState({tab: e.target.getAttribute('id')});
 			},
 
+
+			openGroup: function(e){
+				var op = this.state.open;
+				var name = this.props.characters[e.target.getAttribute('id')].name;
+				op.groups[name] = true;//add group to open list
+				this.setState({open: op});
+			},
+
+			closeGroup: function(e){
+				var op = this.state.open;
+				var name = this.props.characters[e.target.getAttribute('id')].name;
+				op.groups[name] = false;
+				this.setState({open: op});
+			},
+
+			openChar: function(e){
+				var id = e.target.getAttribute('id').split(',');
+				var op = this.state.open;
+				var name = this.props.characters[id[0]][id[1]][0].id;//characters[0][2][0] for instance.
+				op.characters[name] = true;
+				this.setState({open: op});
+			},
+
+			closeChar: function(e){
+				var id = e.target.getAttribute('id').split(',');
+				var op = this.state.open;
+				var name = this.props.characters[id[0]][id[1]][0].id;
+				op.characters[name] = false;
+				this.setState({open: op});
+			},
 //character {name: string, icon: string, }
 //The character creation box should definitely be modal. Experiment with z-index and position a bit.
 //I can center it with position: fixed, so that's good news, as is the fact that it means I can make the modal _anywhere_.
@@ -350,12 +545,34 @@
 //can use .value on input type="file" to determine that it's actually .jpg or .png before proceeding
 			render: function(){
 				var currenttab = null;
+				var that=this;
 				switch(this.state.tab){//use this to acquire the jsx for each tab
 					case 'characters'://case for the characters tab
-						var charlist = this.props.characters.map(function(chr, i){
-							return(<div key={i} className="character"><img src={'/faceicons/'+chr.icon}/><span>{chr.name}</span></div>);
+						//TODO: Consider making the [+] and [-] float right or something.
+						var characters = this.props.characters;
+						var charlist = characters.map(function(group, i){//groups loop
+							if(i==0 || that.state.open.groups[group.name]){//open group
+								var chars = characters[i].map(function(chr, i2){//characters loop
+									//contemplate making character headers like group headers and only showing the derivatives as individual.
+									if(that.state.open.characters[chr[0].id]){//open derivative list
+										var derivs = characters[i][i2].map(function(deriv, i3){
+											return(<div data={['Edit Derivative', 'Delete Derivative']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src={'/faceicons/'+deriv.icon+'.png'}/><span>{deriv.name}</span></div>);
+										});
+										return(<div data={['Create Derivative', 'Delete Character']} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.closeChar}>{chr[0].name} [-]</span>{derivs}</div>);
+									} else {//closed derivative list
+										return(<div data={['Create Derivative', 'Delete Character']} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.openChar}>{chr[0].name} [+]</span></div>);
+									}
+								});
+								if(group.name){//actual group
+									return(<div data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span id={i} onClick={that.closeGroup}>{group.name} [-]</span>{chars}</div>);
+								} else {//ungrouped
+									return(<div id={0} data={['New Character', 'New Group']} key={i} className="chargroup ungrouped">{chars}</div>);
+								}
+							} else {//closed group
+								return(<div data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span id={i} onClick={that.openGroup}>{group.name} [+]</span></div>);
+							}
 						});
-						currenttab = (<div data={['New Character', 'Test']} className="charlist">
+						currenttab = (<div id={0} data={['New Character', 'New Group']} className="charlist">
 							{charlist}
 							</div>);
 						break;
@@ -412,7 +629,7 @@
 				return {messages: []};
 			},
 //format: {username: string, post: string, color: string}
-//for character messages: {username: string, post: string, color: string, character: string, icon: string, nameColor: string fontStyle: string}
+//for character messages: {username: string, post: string, color: string, name: string, icon: string, nameColor: string fontStyle: string}
 //Can just check if message.character to verify, probably need more granularity for omit say/action
 //OOC say message, OOC action message, OOC message, OOC log message
 			componentDidMount: function(){
@@ -421,11 +638,11 @@
 					var newm = that.state.messages.slice();
 					var classparam = message.className.split(" ")[1];
 					if(classparam == "action"){//OOC action message
-						newm.push(<div key={newm.length} className={message.className}><img src={'/faceicons/'+message.icon}/><font color={message.nameColor} style={{fontFamily: message.fontStyle}}>{message.character+' '}</font><font color={message.color}>{message.post + ' (Omit)'}</font></div>);
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span color={message.nameColor}>{message.name+' '}</span><span color={message.color}>{message.post + ' (Omit)'}</span></div>);
 					} else if(classparam == "say"){//OOC say message
-						newm.push(<div key={newm.length} className={message.className}><img src={'/faceicons/'+message.icon}/><font color={message.nameColor} style={{fontFamily: message.fontStyle, fontWeight: 'bold'}}>{message.character+': '}</font><font color={message.color}>{'"'+message.post+'"'} <b>(Omit)</b></font></div>);
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span color={message.nameColor} style={{fontWeight: 'bold'}}>{message.name+': '}</span><span color={message.color}>{'"'+message.post+'"'} <b>(Omit)</b></span></div>);
 					} else if(classparam == "message"){//OOC message
-						newm.push(<div key={newm.length} className={message.className}>( <b>{message.username+': '}</b><font color={message.color}>{message.post}</font> )</div>);
+						newm.push(<div key={newm.length} className={message.className}>( <b>{message.username+': '}</b><span color={message.color}>{message.post}</span> )</div>);
 					} else if(classparam == "log") {//OOC log message
 						newm.push(<div key={newm.length} className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
 					}

@@ -19,6 +19,18 @@ try{//make the logs folder if it doesn't exist BEFORE proceeding.
 	if(e.code != 'EEXIST'){throw e;}
 }
 
+var iconnum = 0;
+try{//make the faceicons folder if it doesn't exist BEFORE proceeding.
+	fs.mkdirSync(__dirname+'/faceicons');
+	fs.writeFile(__dirname+'/faceicons/'+'num.txt', 0);	
+} catch(e){//do nothing if it already exists.
+	if(e.code != 'EEXIST'){throw e;} else {
+		fs.readFile(__dirname+'/faceicons/'+'num.txt', 'utf8', function(err, num){
+			iconnum = 0+num;
+		});
+	}
+}
+
 try{//make the saves folder if it doesn't exist BEFORE proceeding.
 	fs.mkdirSync(__dirname+'/saves');
 } catch(e){//do nothing if it already exists.
@@ -62,10 +74,12 @@ openLog(logfile);
 
 var userdefaults = {
 	settings: {
-		textcolor: 'blue'
+		textcolor: 'white',
+		characterIDs: 0
 	},
-	
-	characters: []
+	characters: [
+		[]//where ungrouped characters go, this should always exist.
+	]
 };
 
 toLog = function (message){
@@ -104,7 +118,7 @@ generateOOCmessage = function (message, username, post, color){
 	cur.textContent = username+': ';
 	message.appendChild(cur);
 
-	cur = htm.document.createElement('font');//create post
+	cur = htm.document.createElement('span');//create post
 	cur.setAttribute("color", color);
 	cur.textContent = post;
 	message.appendChild(cur);
@@ -168,15 +182,11 @@ io.on('connection', function(socket){
 					if(!err){
 						sessions[socket.id] = username;
 						//create new user info
-						fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
-							if(err){callback(err);} else {
-								callback(userdefaults);
-								console.log(socket.id+" has logged in as "+username);
-								var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-								io.emit('OOCmessage', msg);
-								toLog(msg);
-							}
-						});
+						callback(userdefaults);
+						console.log(socket.id+" has logged in as "+username);
+						var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+						io.emit('OOCmessage', msg);
+						toLog(msg);
 					} else {callback(err);}
 				});
 			}
@@ -199,6 +209,28 @@ io.on('connection', function(socket){
 				io.emit('OOCmessage', msg);
 				toLog(msg);
 			}
+		}
+	});
+	socket.on('save', function(settings){
+		var username = sessions[socket.id];
+		if(username){
+			fs.writeFile(__dirname+'/saves/'+username+'.json', settings, function(err){
+				if(!err){
+				}
+			});
+		}
+	});
+	socket.on('sendimage', function(icons, callback){
+		var username = sessions[socket.id];
+		if(username){
+			var ids = [];
+			for(var i=0; i<icons.length; i++){
+				var data = icons[i].replace(/^data:image\/png;base64,/, "");
+				fs.writeFileSync(__dirname+'/faceicons/'+iconnum+'.png', data, 'base64');
+				ids.push(iconnum++);
+			}
+			fs.writeFile(__dirname+'/faceicons/'+'num.txt', iconnum);//update this
+			callback(ids, username);
 		}
 	});
 });
