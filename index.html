@@ -153,6 +153,7 @@
 		<script src="http://www.myersdaily.org/joseph/javascript/md5.js"></script>
 		<script src="http://nathancahill.github.io/Split.js/split.js"></script>
 		<script src="https://cdn.rawgit.com/viliusle/Hermite-resize/master/dist/hermite.js"></script>
+		<script src="http://www.lalit.org/wordpress/wp-content/uploads/2008/05/fontdetect.js"></script>
 		<script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
 		<script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
 		<script src="https://unpkg.com/babel-core@5.8.38/browser.min.js"></script>
@@ -229,13 +230,17 @@
 				var mod = this.state.modal;
 				var name = e.target.textContent;
 				var id = this.state.context.target.getAttribute('id').split(',');
+				var newmodal = {id: id, name: name};
 				if(name.startsWith('Delete')){
-					this.modalpush(mod, {type:'delete', id: id, name: name});
+					newmodal.type = 'delete';
 				} else if(name.endsWith("Character") || name.endsWith("Derivative")){
-					this.modalpush(mod, {type:'character', id: id, name: name});
+					newmodal.type = 'character';
 				} else if(name.endsWith("Group")){
-					this.modalpush(mod, {type:'group', id: id, name: name});
+					newmodal.type = 'group';
+				} else if(name.endsWith("Action") || name.endsWith("Say")){
+					newmodal.type = 'action';
 				}
+				this.modalpush(mod, newmodal);
 				this.setState({modal: mod});//if mod isn't changed it probably won't even update, and if it does the difference will be irrelevant.
 			},
 
@@ -259,7 +264,11 @@
 					var options = this.state.context.options.map(function(op, i){
 						return(<div key={i} className='contextOption' onClick={that.handleContext}>{op}</div>);
 					});
-					context = (<div className='contextMenu' style={{left: this.state.context.position.x+'px', top:this.state.context.position.y+'px'}}>{options}</div>);
+					if(this.state.context.position.y > (0.75*window.innerHeight)){
+						context = (<div className='contextMenu' style={{left: this.state.context.position.x+'px', bottom:(window.innerHeight-this.state.context.position.y)+'px'}}>{options}</div>);
+					} else {
+						context = (<div className='contextMenu' style={{left: this.state.context.position.x+'px', top:this.state.context.position.y+'px'}}>{options}</div>);
+					}
 				}
 
 				return (
@@ -350,6 +359,52 @@
 				this.setState({images: images});
 			},
 
+			enterCheck: function(e){
+				if(e.keyCode == 13 && e.ctrlKey){//hit enter
+					this.post(e);
+				}
+			},
+
+			post: function(e){
+				var modal = e.target.parentNode;
+				var id = modal.getAttribute('id');
+				var modata = this.props.modal[id];
+				var deriv = this.props.characters[modata.id[0]][modata.id[1]][modata.id[2]];
+				var post = this.refs['text'+id].value;
+				//base what type of post it is on modata.name
+				this.props.socket.emit('characterPost', post, deriv, modata.name);
+				this.props.closeModal(id);
+			},
+
+			testFont: function(e){
+				try{
+					var d = new Detector();
+					if(!e.target.value){
+						e.target.style['outline-color'] = '#777'
+					} else {
+						if(d.detect(e.target.value)){
+							e.target.style['outline-color'] = '#0f0';
+							e.target.style.fontFamily = e.target.value;
+						} else {
+							e.target.style['outline-color'] = '#f00';
+						}
+					}
+				} catch(err){
+					e.target.style['outline-color'] = '#777';
+				}
+			},
+
+			fontTest: function(e){
+				if(e.ctrlKey && e.keyCode == 66){
+					if(e.target.style.fontWeight == 'bold'){
+						e.target.style.fontWeight = 'normal';
+					} else {
+						e.target.style.fontWeight = 'bold';
+					}
+					
+				}
+			},
+
 			closeChar: function(id){
 				var images = this.state.images;
 				if(images){
@@ -372,9 +427,6 @@
 				} else if(modata.id.length === 2 || characters[modata.id[0]][modata.id[1]].length == 1){//character delete
 					characters[modata.id[0]].splice(modata.id[1], 1);
 				} else {
-					if(modata.id[2] == 0){//deleting what contains the ID but not the character.
-						characters[modata.id[0]][modata.id[1]][1].id = characters[modata.id[0]][modata.id[1]][0].id;
-					}
 					characters[modata.id[0]][modata.id[1]].splice(modata.id[2], 1);
 				}
 				this.props.handleSettings(this.props.settings, characters);
@@ -386,7 +438,10 @@
 				var id = modal.getAttribute('id');//I'll be using this frequently, so I'd best.
 				var name = this.refs['name'+id].value;
 				var icons = this.refs['faceicons'+id].children;
-				if(name || this.props.modal[id].id.length > 1){//do nothing if they didn't put a name in unless it's an edit.
+				if(name || this.props.modal[id].id.length > 1){//do nothing if they didn't put a name in if it's new
+					var fontStyle = this.refs['font'+id].value;
+					var nameColor = this.refs['nameColor'+id].value;
+					var color = this.refs['color'+id].value;
 					var canvas = this.refs['canvas'+id];
 					//canvas.width=50; canvas.height=50;
 					var ctx = canvas.getContext('2d');
@@ -394,7 +449,7 @@
 					var hermi = true;
 					try{
 						var hermite = new Hermite_class();
-					} catch(e){
+					} catch(err){
 						hermi = false;
 					}
 					for(var i=0; i < icons.length; i++){
@@ -423,18 +478,11 @@
 							character = characters[modata.id[0]][modata.id[1]];
 						}
 						if(modata.id[2]){//only in the edit case (we have a deriv) do we NOT add.
-							//TODO: add other aspects like color
 							var deriv = character[modata.id[2]];
-							character[modata.id[2]] = {id: deriv.id, name: name || deriv.name, icon: response[0] || deriv.icon};//preserve the ID if present
+							character[modata.id[2]] = {id: deriv.id, name: name || deriv.name, icon: response[0] || deriv.icon, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle};
 						} else {
 							for(i=0; i<response.length; i++){
-								//TODO: add other aspects like color
-								if(!character.length){
-									character.push({id: un+settings.characterIDs++, name: name, icon: response[i]});
-								} else {
-									var base = character[0];
-									character.push({name: name || base.name, icon: response[i]});
-								}
+								character.push({id: un+settings.characterIDs++, name: name, icon: response[i], nameColor: nameColor, color: color, fontStyle: fontStyle});
 							}
 						}//now we've added all the new derivatives or just modified the one.
 						characters[modata.id[0]][modata.id[1]] = character;//adds new if new, otherwise overwrites
@@ -469,10 +517,24 @@
 							case 'character'://character creation/edit modal.
 								var groupdropdown = null;
 								var FIs = (<input type='file' ref={'FIs'+index} multiple onChange={that.handleFIs}/>);//by default it allows multiple
+								var nameColor; var color; var fontStyle;
+								var character;
+								if(modal.id.length == 1){//new character
+									nameColor = '#ffffff';
+									color = '#ffffff';
+									fontStyle = 'Times New Roman';
+									groupdropdown = null;//TODO: Implement dropdown
+								} else {
+									character = that.props.characters[modal.id[0]][modal.id[1]];
+									nameColor = character[0].nameColor;
+									color = character[0].color;
+									fontStyle = character[0].fontStyle;
+								}
 								if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
 									FIs = <input type='file' ref={'FIs'+index} onChange={that.handleFIs}/>;
-								} else if(modal.id.length == 1){//new character
-									groupdropdown = null;
+									color = character[modal.id[2]].color || color;
+									nameColor = character[modal.id[2]].nameColor || nameColor;
+									fontStyle = character[modal.id[2]].fontStyle || fontStyle;
 								}
 								var previews = null;
 								var im = that.state.images;
@@ -482,7 +544,14 @@
 									});
 								}
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>{FIs}<br/><span ref={'faceicons'+index}>{previews}</span><canvas ref={'canvas'+index} width='0' height='0'></canvas><br/><input type="text" ref={'name'+index} placeholder="Character Name" required/><br/>{groupdropdown}<br/><button type="submit" id="save" onClick={that.charEdit}>Save</button>
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>{FIs}<br/>
+									<span ref={'faceicons'+index}>{previews}</span><canvas ref={'canvas'+index} width='0' height='0'></canvas><br/>
+									<input type="text" ref={'name'+index} placeholder="Character Name" required/><br/>
+									Name Color: <input type="color" ref={'nameColor'+index} defaultValue={nameColor}/><br/>
+									Text Color: <input type="color" ref={'color'+index} defaultValue={color}/><br/>
+									<input type="text" ref={'font'+index} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={that.testFont} onKeyDown={that.fontTest}/><br/>
+									{groupdropdown}<br/>
+									<button type="submit" id="save" onClick={that.charEdit}>Save</button>
 										<button type="submit" id="cancel" onClick={that.closeChar.bind(null, index)}>Cancel</button></div>
 								);
 								break;
@@ -491,6 +560,11 @@
 							case 'delete'://'are you sure?'
 								return(
 									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>No</button></div>
+								);
+								break;
+							case 'action':
+								return(
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><textarea rows='4' cols='40' ref={'text'+index} onKeyDown={that.enterCheck}></textarea><br/><button type="submit" onClick={that.post}>OK</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>Cancel</button></div>
 								);
 								break;
 						}
@@ -561,7 +635,7 @@
 									//contemplate making character headers like group headers and only showing the derivatives as individual.
 									if(that.state.open.characters[chr[0].id]){//open derivative list
 										var derivs = characters[i][i2].map(function(deriv, i3){
-											return(<div data={['Edit Derivative', 'Delete Derivative']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src={'/faceicons/'+deriv.icon+'.png'}/><span>{deriv.name}</span></div>);
+											return(<div data={['Edit Derivative', 'Delete Derivative', 'Say', 'Action', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src={'/faceicons/'+deriv.icon+'.png'}/><span>{deriv.name}</span></div>);
 										});
 										return(<div data={['Create Derivative', 'Delete Character']} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.closeChar}>{chr[0].name} [-]</span>{derivs}</div>);
 									} else {//closed derivative list
@@ -615,10 +689,11 @@
 				this.props.socket.on('ICmessage', function(message){
 					var newm = that.state.messages.slice();
 					var classparam = message.className.split(" ")[1];
+					var character = message.character;
 					if(classparam == "action"){//IC action message
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span style={{color: message.nameColor}}>{message.name+' '}</span><span style={{color: message.color}}>{message.post}</span></div>);
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span style={{color: character.color}}>{message.post}</span></div>);
 					} else if(classparam == "say"){//IC say message
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span style={{fontWeight: 'bold', color: message.nameColor}}>{message.name+': '}</span><span style={{color: message.color}}>{'"'+message.post+'"'}</span></div>);
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span style={{color: character.color}}>{'"'+message.post+'"'}</span></div>);
 					}
 					that.setState({messages: newm});
 				});
@@ -646,10 +721,13 @@
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
 					var classparam = message.className.split(" ")[1];
+					var character;
 					if(classparam == "action"){//OOC action message
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span style={{color: message.nameColor}}>{message.name+' '}</span><span style={{color: message.color}}>{message.post + ' (Omit)'}</span></div>);
+						character = message.character;
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span style={{color: character.color}}>{message.post + ' (Omit)'}</span></div>);
 					} else if(classparam == "say"){//OOC say message
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: message.fontStyle}}><img src={'/faceicons/'+message.icon+'.png'}/><span style={{fontWeight: 'bold', color: message.nameColor}}>{message.name+': '}</span><span style={{color: message.color}}>{'"'+message.post+'"'} <b>(Omit)</b></span></div>);
+						character = message.character;
+						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span style={{color: character.color}}>{'"'+message.post+'"'} <b>(Omit)</b></span></div>);
 					} else if(classparam == "message"){//OOC message
 						newm.push(<div key={newm.length} className={message.className}>( <b>{message.username+': '}</b><span style={{color: message.color}}>{message.post}</span> )</div>);
 					} else if(classparam == "log") {//OOC log message

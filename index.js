@@ -53,11 +53,14 @@ openLog = function (logfile){//takes in a Date object
 			if(!err){
 				htm = wind;
 			}
-		});
+		});//display: initial is your friend!
 	} catch(e){//today's logs don't exist, make them!
 		//this won't change, so just making it a static string (albeit a long one) is more effiicient.
+		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action{font-weight: bold;} div.log{font-weight: bold} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} div.IC{} div.OOC{}</style>';
+		var script = '<script>function OOC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[5].style.display = "none"; x[6].style.display = "initial";} function IC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "none"; x[5].style.display = "initial";}function Both(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[5].style.display = "initial"; x[6].style.display = "initial";}</script>'
+		var body = '<body><div class="buttons" style="width: auto; position:fixed; bottom: 0; right: 0;"><button onclick="OOC()">OOC Only</button><button onclick="IC()">IC Only</button><button onclick="Both()">Both</button></div>'+script+'</body>';
 		var initialhtml = '<html><head><title>Logs for '+new Date().toLocaleString('en-us', {month: "long", day:"2-digit"})+
-		'</title><style>body {background-color: black;margin: 0 0 0 0;overflow-y: auto;color:white} .timestamp {float: left; color:#d3d3d3}</style></head><body></body></html>';
+		'</title>'+style+'</head>'+body+'</html>';
 		fs.writeFileSync(logfile, initialhtml);
 		jsdom.env(initialhtml, function(err, wind){
 			if(!err){
@@ -88,22 +91,30 @@ toLog = function (message){
 		logfile = __dirname+'/logs/'+today.getFullYear()+"_"+today.getMonth()+"_"+today.getDate()+'.html';
 		openLog(logfile);
 		//NOW proceed using htm
-		//I'll need to make this into a callback to make it work later, but it only comes up at midnight.
-	}//Definitely needs a fix, but low priority.
+	}//worst case scenario the dom updates while it's still trying to make htm calls and that breaks something
+	//most likely scenario is that it ends up on one day or the other, just see what happens and fix it later.
 	var logmsg = htm.document.createElement('div');
 	logmsg.setAttribute("class", message.className);
 	//the time stamp is added in all cases.
-	var ts=htm.document.createElement('div');
+	var ts=htm.document.createElement('span');
 	ts.setAttribute("class", "timestamp");
 	ts.textContent = '['+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 	logmsg.appendChild(ts);
 	var classparam = message.className.split(" ")[1];
-	if(classparam == 'message'){
-		generateOOCmessage(logmsg, message.username, message.post, message.color);
-	} else if(classparam == 'log'){
-		generateOOClog(logmsg, message.username, message.post);
+	switch(classparam){
+		case 'message':
+			generateOOCmessage(logmsg, message.username, message.post, message.color);
+			break;
+		case 'log':
+			generateOOClog(logmsg, message.username, message.post);
+			break;
+		case 'say':
+			generateSay(logmsg, message.username, message.post, message.character, message.className.startsWith('O'));
+			break;
+		case 'action':
+			generateAction(logmsg, message.username, message.post, message.character, message.className.startsWith('O'));
+			break;
 	}
-	//add different message types later as you set them up.
 	htm.document.body.appendChild(logmsg);
 	fs.writeFile(logfile, htm.document.documentElement.outerHTML, function(error){
 		if(error) throw error;
@@ -129,6 +140,49 @@ generateOOCmessage = function (message, username, post, color){
 
 generateOOClog = function (message, username, post){
 	var cur = htm.document.createTextNode("| "+username+" "+post+" |");
+	message.appendChild(cur);
+};
+
+generateSay = function (message, username, post, character, omit){
+	message.style.fontFamily = character.fontStyle;
+	var cur = htm.document.createElement('img');
+	cur.src = '/faceicons/'+character.icon+'.png';
+	message.appendChild(cur);
+
+	cur = htm.document.createElement('span');
+	cur.style.color = character.nameColor;
+	cur.style.fontWeight = 'bold';
+	cur.textContent = character.name+': ';
+	message.appendChild(cur);
+
+	cur = htm.document.createElement('span');
+	cur.style.color = character.color;
+	cur.textContent = '"'+post+'"';
+	if(omit){
+		var om = htm.document.createElement('b');
+		om.textContent = ' (Omit)';
+		cur.appendChild(om);
+	}
+	message.appendChild(cur);
+};
+
+generateAction = function (message, username, post, character, omit){
+	message.style.fontFamily = character.fontStyle;
+	var cur = htm.document.createElement('img');
+	cur.src = '/faceicons/'+character.icon+'.png';
+	message.appendChild(cur);
+
+	cur = htm.document.createElement('span');
+	cur.style.color = character.nameColor;
+	cur.textContent = character.name+' ';
+	message.appendChild(cur);
+
+	cur = htm.document.createElement('span');
+	cur.style.color = character.color;
+	cur.textContent = post;
+	if(omit){
+		cur.textContent +=' (Omit)';
+	}
 	message.appendChild(cur);
 };
 
@@ -207,6 +261,32 @@ io.on('connection', function(socket){
 			} else {
 				var msg = {className: 'OOC message', username: username, post: message, color: color};
 				io.emit('OOCmessage', msg);
+				toLog(msg);
+			}
+		}
+	});
+	socket.on('characterPost', function(message, character, type){
+		var username = sessions[socket.id];
+		if(username){
+			var className = 'message'; var call;
+			if(type.endsWith('Say')){
+				className = 'say ' + className;
+			} else if(type.endsWith('Action')){
+				className = 'action ' + className;
+			}
+			if(type.startsWith('O') || type.startsWith('T')){//omit say or omit action
+				className = 'OOC ' + className;
+				call = 'OOCmessage';
+			} else {
+				className = 'IC ' + className;
+				call = 'ICmessage';
+			}
+			var msg = {className: className, character: character, post: message};
+			if(type.startsWith('Test')){
+				msg.post += ' (Test)';
+				socket.emit(call, msg);
+			} else {
+				io.emit(call, msg);
 				toLog(msg);
 			}
 		}
