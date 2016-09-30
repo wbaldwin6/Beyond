@@ -109,10 +109,10 @@ toLog = function (message){
 			generateOOClog(logmsg, message.username, message.post);
 			break;
 		case 'say':
-			generateSay(logmsg, message.username, message.post, message.character, message.className.startsWith('O'));
+			generatePost(logmsg, message.username, message.post, message.character, true, message.className.startsWith('O'));
 			break;
 		case 'action':
-			generateAction(logmsg, message.username, message.post, message.character, message.className.startsWith('O'));
+			generatePost(logmsg, message.username, message.post, message.character, false, message.className.startsWith('O'));
 			break;
 	}
 	htm.document.body.appendChild(logmsg);
@@ -143,7 +143,7 @@ generateOOClog = function (message, username, post){
 	message.appendChild(cur);
 };
 
-generateSay = function (message, username, post, character, omit){
+generatePost = function (message, username, post, character, say, omit){
 	message.style.fontFamily = character.fontStyle;
 	var cur = htm.document.createElement('img');
 	cur.src = '/faceicons/'+character.icon+'.png';
@@ -151,13 +151,21 @@ generateSay = function (message, username, post, character, omit){
 
 	cur = htm.document.createElement('span');
 	cur.style.color = character.nameColor;
-	cur.style.fontWeight = 'bold';
-	cur.textContent = character.name+': ';
+	if(say){
+		cur.style.fontWeight = 'bold';
+		cur.textContent = character.name+': ';
+	} else {
+		cur.textContent = character.name+' ';
+	}
 	message.appendChild(cur);
 
 	cur = htm.document.createElement('span');
 	cur.style.color = character.color;
-	cur.textContent = '"'+post+'"';
+	if(say){
+		cur.textContent = '"'+post+'"';
+	} else {
+		cur.textContent = post;
+	}
 	if(omit){
 		var om = htm.document.createElement('b');
 		om.textContent = ' (Omit)';
@@ -166,7 +174,7 @@ generateSay = function (message, username, post, character, omit){
 	message.appendChild(cur);
 };
 
-generateAction = function (message, username, post, character, omit){
+/*generateAction = function (message, username, post, character, omit){
 	message.style.fontFamily = character.fontStyle;
 	var cur = htm.document.createElement('img');
 	cur.src = '/faceicons/'+character.icon+'.png';
@@ -184,7 +192,7 @@ generateAction = function (message, username, post, character, omit){
 		cur.textContent +=' (Omit)';
 	}
 	message.appendChild(cur);
-};
+};*/
 
 io.on('connection', function(socket){
 	console.log('a user connected');
