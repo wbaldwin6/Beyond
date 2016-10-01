@@ -36,7 +36,7 @@
 				padding-bottom: 5px;
 				height:50px;
 				line-height: 50px;
-			}			
+			}
 			div.derivative span{
 				height:50px;
 				margin: 0;
@@ -55,10 +55,13 @@
 			div.system {
 
 			}
-			div.OOCbox{
+			div#IO{
+				height: 100%;
+			}
+			div#OOC{
 				overflow-y: auto;
 			}
-			div.ICbox{
+			div#IC{
 				overflow-y: auto;
 			}
 			input {
@@ -81,18 +84,16 @@
 			    background-color: black;	
 			}
 			ul.tab li {
-				float:left;
-				padding: 0px 5px;
-				border: 1px solid #333;
 				transition: 0.3s;
 			}
 			ul.tab li:hover{background-color: #555;}
 			ul.tab li div{
+				text-align: center;
+				border: 1px solid #333;
 				cursor: default;
 				font-size: 10pt;
 				display: inline-block;
 				color: white;
-				text-align: center;
 				transition: 0.3s;
 				background-color: black;
 				-webkit-user-select: none;
@@ -135,8 +136,11 @@
 			div.contextOption{
 				border: 1px solid #333;
 				transition: 0.3s;
+				padding: 0 5;
+				float: none;
 				cursor: default;
-				webkit-user-select: none;
+				width: auto;
+				-webkit-user-select: none;
 				-moz-user-select: none;
 				-ms-user-select: none;
 				user-select: none;
@@ -163,7 +167,7 @@
 
 		var Outercontainer = React.createClass({
 			getInitialState: function(){
-				return {settings: {}, characters: [], modal: [{type: 'login', loginmessage: 'Please input a username and password of at least 6 characters.'}]};
+				return {settings: {}, characters: [], modal: [{type: 'login'}], isadmin: false, username: ''};
 			},
 
 			componentDidMount: function(){
@@ -203,10 +207,8 @@
 				this.props.socket.emit('save', JSON.stringify({settings: settings, characters: characters}));
 			},
 
-			loginMessage: function(response, n){
-				var modal = this.state.modal;
-				modal[n].loginmessage = response;
-				this.setState({modal: modal});
+			setUser: function(name){
+				this.setState({username: name});
 			},
 
 			contextMenu: function(e){
@@ -221,11 +223,28 @@
 				}
 				if(options){
 					var position = {x: e.nativeEvent.clientX, y: e.nativeEvent.clientY};
-					options = options.split(",");
-					this.setState({context: {position: position, options: options, target: target}});
+					options = options.split(",");//a list of the option names
+					var processed = [];
+					var that=this;
+					options.forEach(function(option, index){
+						var check = option.split('*');
+						var ret = check.shift();
+						check = check[0];
+						if(check){//option has a condition
+							if(check == 'admin' && !that.state.isadmin){
+								return;//do not add.
+							} else if(check != that.state.username){//username check
+								return;
+							}
+						}
+						processed.push(ret);
+					});
+					if(processed.length){
+						this.setState({context: {position: position, options: processed, target: target}});
+					}
 				}
 			},
-//Names: New/Edit/Delete Group/Character/Derivative, but these aren't directly linked to the sort of ID we need. For instance, New Character only takes a group, while Edit Character or Delete Character takes a character.
+
 			handleContext: function(e){
 				var mod = this.state.modal;
 				var name = e.target.textContent;
@@ -239,6 +258,15 @@
 					newmodal.type = 'group';
 				} else if(name.endsWith("Action") || name.endsWith("Say")){
 					newmodal.type = 'action';
+				} else if(name == 'Edit'){
+					newmodal.type = 'action';
+					newmodal.post = this.state.context.target.children[2].textContent;
+					if(newmodal.post.charAt(0) === '"'){
+						newmodal.post = newmodal.post.slice(1, -1);
+					}
+					if(newmodal.post.endsWith(" (Edited)")){
+						newmodal.post = newmodal.post.slice(0, -9);
+					}
 				}
 				this.modalpush(mod, newmodal);
 				this.setState({modal: mod});//if mod isn't changed it probably won't even update, and if it does the difference will be irrelevant.
@@ -273,7 +301,7 @@
 
 				return (
 					<div style={{height: "calc(100% - 15px)"}} onContextMenu={this.contextMenu} onClick={this.closeContext}>
-						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} modal={this.state.modal} closeModal={this.closeModal} loginMessage={this.loginMessage} characters={this.state.characters} settings={this.state.settings}/>
+						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings}/>
 						{context}
 						<div id="left">
 							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters}/>
@@ -294,7 +322,7 @@
 
 		var ModalHandler = React.createClass({
 			getInitialState: function(){
-				return {positions: [], currentDrag: null};
+				return {positions: [], currentDrag: null, loginmessage: 'Please input a username and password of at least 6 characters.'};
 			},
 
 			submission: function (e){
@@ -308,9 +336,10 @@
 					this.props.socket.emit(type, username, md5(password), function (response){
 						if(response.settings){
 							that.props.handleSettings(response.settings, response.characters);
+							that.props.setUser(username);
 							that.props.closeModal(ind);
 						} else {
-							that.props.loginMessage(response, ind);
+							that.setState({loginmessage: response.code || response});
 						}
 					});
 				}
@@ -360,7 +389,7 @@
 			},
 
 			enterCheck: function(e){
-				if(e.keyCode == 13 && e.ctrlKey){//hit enter
+				if(e.keyCode == 13 && !e.shiftKey){//hit enter
 					this.post(e);
 				}
 			},
@@ -369,10 +398,18 @@
 				var modal = e.target.parentNode;
 				var id = modal.getAttribute('id');
 				var modata = this.props.modal[id];
-				var deriv = this.props.characters[modata.id[0]][modata.id[1]][modata.id[2]];
 				var post = this.refs['text'+id].value;
-				//base what type of post it is on modata.name
-				this.props.socket.emit('characterPost', post, deriv, modata.name);
+				if(post){
+					if(modata.name == 'Edit'){
+						if(modata.post != post){
+							this.props.socket.emit('ICedit', post, modata.id[0]);
+						}
+					} else {
+						var deriv = this.props.characters[modata.id[0]][modata.id[1]][modata.id[2]];
+						this.props.socket.emit('characterPost', post, deriv, modata.name);
+					}					
+				}
+
 				this.props.closeModal(id);
 			},
 
@@ -480,10 +517,12 @@
 						if(modata.id[2]){//only in the edit case (we have a deriv) do we NOT add.
 							var deriv = character[modata.id[2]];
 							character[modata.id[2]] = {id: deriv.id, name: name || deriv.name, icon: response[0] || deriv.icon, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle};
-						} else {
+						} else {//but in the add derivatives case we use the 0-ID.
+							var charid = character[0] ? character[0].id : un+'-'+settings.characterIDs++;
 							for(i=0; i<response.length; i++){
-								character.push({id: un+settings.characterIDs++, name: name, icon: response[i], nameColor: nameColor, color: color, fontStyle: fontStyle});
+								character.push({id: charid, name: name || character[0].name, icon: response[i], nameColor: nameColor, color: color, fontStyle: fontStyle});
 							}
+
 						}//now we've added all the new derivatives or just modified the one.
 						characters[modata.id[0]][modata.id[1]] = character;//adds new if new, otherwise overwrites
 						that.props.handleSettings(settings, characters);
@@ -511,9 +550,8 @@
 										<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
 										<button type="submit" id="login" onClick={that.submission}>Login</button>
 										<button type="submit" id="register" onClick={that.submission}>Register</button><br/>
-										<b>{modal.loginmessage}</b>
+										<b>{that.state.loginmessage}</b>
 									</div>);
-								break;
 							case 'character'://character creation/edit modal.
 								var groupdropdown = null;
 								var FIs = (<input type='file' ref={'FIs'+index} multiple onChange={that.handleFIs}/>);//by default it allows multiple
@@ -554,19 +592,16 @@
 									<button type="submit" id="save" onClick={that.charEdit}>Save</button>
 										<button type="submit" id="cancel" onClick={that.closeChar.bind(null, index)}>Cancel</button></div>
 								);
-								break;
 							case 'group'://group creation/edit modal.
 								break;
 							case 'delete'://'are you sure?'
 								return(
 									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>No</button></div>
 								);
-								break;
 							case 'action':
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><textarea rows='4' cols='40' ref={'text'+index} onKeyDown={that.enterCheck}></textarea><br/><button type="submit" onClick={that.post}>OK</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>Cancel</button></div>
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'+index} onKeyDown={that.enterCheck}></textarea><br/><button type="submit" onClick={that.post}>OK</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>Cancel</button></div>
 								);
-								break;
 						}
 					} else {
 						return(<div key={index} className="modal" style={{display:'none'}}></div>);
@@ -617,11 +652,7 @@
 				op.characters[name] = false;
 				this.setState({open: op});
 			},
-//character {name: string, icon: string, }
-//The character creation box should definitely be modal. Experiment with z-index and position a bit.
-//I can center it with position: fixed, so that's good news, as is the fact that it means I can make the modal _anywhere_.
-//Don't worry about format right now, just function. That said, making the modal box appear over the normal is part of 'function' right now.
-//can use .value on input type="file" to determine that it's actually .jpg or .png before proceeding
+
 			render: function(){
 				var currenttab = null;
 				var that=this;
@@ -678,24 +709,66 @@
 			}
 		});
 
+		var Message = React.createClass({
+			render: function(){
+				//TODO: add 'Edit' data to non-omit action and say
+				var message = this.props.message;
+				var character = message.character;//worst case it's just null and then it won't be getting used anyway.
+				var classparam = message.className.split(" ")[1];
+				switch(classparam){
+					case 'message'://ooc message
+						return (<div className={message.className}>( <b>{message.username+': '}</b><span style={{color: message.color}}>{message.post}</span> )</div>);
+					case 'log':
+						return (<div className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
+					case 'say':
+						if(message.className.startsWith('O')){//omit
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span style={{color: character.color}}>{'"'+message.post+'"'} <b>(Omit)</b></span></div>);
+						} else {
+							var charid = character.id.split('-');
+							charid.pop();
+							charid = charid.join('-');//catches names with - in them
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span style={{color: character.color}}>{'"'+message.post+'"'}</span></div>);
+						}
+					case 'action':
+						if(message.className.startsWith('O')){//omit
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span style={{color: character.color}}>{message.post + ' (Omit)'}</span></div>);
+						} else {
+							var charid = character.id.split('-');
+							charid.pop();
+							charid = charid.join('-');//catches names with - in them
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span style={{color: character.color}}>{message.post}</span></div>);							
+						}
+				}
+			}
+		});
+
 		var IChandler = React.createClass({
 			getInitialState: function(){
 				//normally messages would be empty but I want to test this out.
-				return {messages: []};
+				return {messages: [], ids: {}};
 			},
 
 			componentDidMount: function(){
 				var that = this;
 				this.props.socket.on('ICmessage', function(message){
 					var newm = that.state.messages.slice();
-					var classparam = message.className.split(" ")[1];
-					var character = message.character;
-					if(classparam == "action"){//IC action message
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span style={{color: character.color}}>{message.post}</span></div>);
-					} else if(classparam == "say"){//IC say message
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span style={{color: character.color}}>{'"'+message.post+'"'}</span></div>);
+					var ids = that.state.ids;
+					ids[message.id] = newm.length;//index this post to its id
+					newm.push(<Message key={newm.length} message={message}/>);
+					that.setState({messages: newm, ids: ids});
+				});
+
+				this.props.socket.on('ICedit', function(message){
+					var messages = that.state.messages.slice();
+					var ids = that.state.ids;
+					var target = messages[ids[message.id]];
+					if(target){//if it isn't in here obviously we aren't doing it.
+						var msg = target.props.message;
+						msg.post = message.post;
+						messages[ids[message.id]] = React.cloneElement(target, msg);
+						
+						that.setState({messages: messages});
 					}
-					that.setState({messages: newm});
 				});
 			},
 
@@ -712,27 +785,12 @@
 			getInitialState: function(){
 				return {messages: []};
 			},
-//format: {username: string, post: string, color: string}
-//for character messages: {username: string, post: string, color: string, name: string, icon: string, nameColor: string fontStyle: string}
-//Can just check if message.character to verify, probably need more granularity for omit say/action
-//OOC say message, OOC action message, OOC message, OOC log message
+
 			componentDidMount: function(){
 				var that = this;
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
-					var classparam = message.className.split(" ")[1];
-					var character;
-					if(classparam == "action"){//OOC action message
-						character = message.character;
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span style={{color: character.color}}>{message.post + ' (Omit)'}</span></div>);
-					} else if(classparam == "say"){//OOC say message
-						character = message.character;
-						newm.push(<div key={newm.length} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span style={{color: character.color}}>{'"'+message.post+'"'} <b>(Omit)</b></span></div>);
-					} else if(classparam == "message"){//OOC message
-						newm.push(<div key={newm.length} className={message.className}>( <b>{message.username+': '}</b><span style={{color: message.color}}>{message.post}</span> )</div>);
-					} else if(classparam == "log") {//OOC log message
-						newm.push(<div key={newm.length} className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
-					}
+					newm.push(<Message key={newm.length} message={message}/>);
 					that.setState({messages: newm});
 				});				
 			},

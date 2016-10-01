@@ -13,19 +13,25 @@ try{//make sure the logins file exists BEFORE proceeding.
 	fs.writeFileSync('logins.json', JSON.stringify({}));
 }
 
+var postnum = 1;
 try{//make the logs folder if it doesn't exist BEFORE proceeding.
 	fs.mkdirSync(__dirname+'/logs');
+	fs.writeFile(__dirname+'/logs/postid.txt', 1);	
 } catch(e){//do nothing if it already exists.
-	if(e.code != 'EEXIST'){throw e;}
+	if(e.code != 'EEXIST'){throw e;} else {
+		fs.readFile(__dirname+'/logs/postid.txt', 'utf8', function(err, num){
+			postnum = +num;
+		});		
+	}
 }
 
 var iconnum = 0;
 try{//make the faceicons folder if it doesn't exist BEFORE proceeding.
 	fs.mkdirSync(__dirname+'/faceicons');
-	fs.writeFile(__dirname+'/faceicons/'+'num.txt', 0);	
+	fs.writeFile(__dirname+'/faceicons/num.txt', 0);	
 } catch(e){//do nothing if it already exists.
 	if(e.code != 'EEXIST'){throw e;} else {
-		fs.readFile(__dirname+'/faceicons/'+'num.txt', 'utf8', function(err, num){
+		fs.readFile(__dirname+'/faceicons/num.txt', 'utf8', function(err, num){
 			iconnum = +num;
 		});
 	}
@@ -94,7 +100,10 @@ toLog = function (message){
 	}//worst case scenario the dom updates while it's still trying to make htm calls and that breaks something
 	//most likely scenario is that it ends up on one day or the other, just see what happens and fix it later.
 	var logmsg = htm.document.createElement('div');
-	logmsg.setAttribute("class", message.className);
+	logmsg.className = message.className;
+	if(message.id){//no need to do a complicated 'is this an IC post' check if I can do this.
+		logmsg.id = message.id;
+	}
 	//the time stamp is added in all cases.
 	var ts=htm.document.createElement('span');
 	ts.setAttribute("class", "timestamp");
@@ -119,6 +128,29 @@ toLog = function (message){
 	fs.writeFile(logfile, htm.document.documentElement.outerHTML, function(error){
 		if(error) throw error;
 	});
+};
+
+editLog = function(message){
+	var today = new Date();
+	var target = htm.document.getElementById(message.id);
+	if(target){//the message might be from yesterday and then you're just done.
+		var type = target.className.split(" ")[1];
+		var edit = target.cloneNode(true);
+		//don't just do this naively.
+		//make the new timestamp
+		edit.children[0].textContent = '[ Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+		if(type == 'say'){
+			edit.children[3].textContent = '"'+message.post+'"';
+		} else {
+			edit.children[3].textContent = message.post;
+		}
+		//insert after
+		htm.document.body.insertBefore(edit, target.nextElementSibling);
+		fs.writeFile(logfile, htm.document.documentElement.outerHTML, function(error){
+			if(error) throw error;
+		});
+	}
+
 };
 
 generateOOCmessage = function (message, username, post, color){
@@ -174,26 +206,6 @@ generatePost = function (message, username, post, character, say, omit){
 	message.appendChild(cur);
 };
 
-/*generateAction = function (message, username, post, character, omit){
-	message.style.fontFamily = character.fontStyle;
-	var cur = htm.document.createElement('img');
-	cur.src = '/faceicons/'+character.icon+'.png';
-	message.appendChild(cur);
-
-	cur = htm.document.createElement('span');
-	cur.style.color = character.nameColor;
-	cur.textContent = character.name+' ';
-	message.appendChild(cur);
-
-	cur = htm.document.createElement('span');
-	cur.style.color = character.color;
-	cur.textContent = post;
-	if(omit){
-		cur.textContent +=' (Omit)';
-	}
-	message.appendChild(cur);
-};*/
-
 io.on('connection', function(socket){
 	console.log('a user connected');
 	socket.on('disconnect', function(){
@@ -240,15 +252,19 @@ io.on('connection', function(socket){
 			} else {//new username
 				logins[username] = password;
 				//something about linking the sessionid too probably
-				fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+				fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
 					if(!err){
-						sessions[socket.id] = username;
-						//create new user info
-						callback(userdefaults);
-						console.log(socket.id+" has logged in as "+username);
-						var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-						io.emit('OOCmessage', msg);
-						toLog(msg);
+						fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+							if(!err){
+								sessions[socket.id] = username;
+								//create new user info
+								callback(userdefaults);
+								console.log(socket.id+" has logged in as "+username);
+								var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+								io.emit('OOCmessage', msg);
+								toLog(msg);
+							} else {callback(err);}
+						});
 					} else {callback(err);}
 				});
 			}
@@ -277,6 +293,7 @@ io.on('connection', function(socket){
 		var username = sessions[socket.id];
 		if(username){
 			var className = 'message'; var call;
+			var msg = {character: character, post: message};
 			if(type.endsWith('Say')){
 				className = 'say ' + className;
 			} else if(type.endsWith('Action')){
@@ -285,11 +302,13 @@ io.on('connection', function(socket){
 			if(type.startsWith('O') || type.startsWith('T')){//omit say or omit action
 				className = 'OOC ' + className;
 				call = 'OOCmessage';
-			} else {
+			} else {//IC say or action
+				msg.id = postnum++;
 				className = 'IC ' + className;
 				call = 'ICmessage';
+				fs.writeFile(__dirname+'/logs/postid.txt', postnum);
 			}
-			var msg = {className: className, character: character, post: message};
+			msg.className = className;
 			if(type.startsWith('Test')){
 				msg.post += ' (Test)';
 				socket.emit(call, msg);
@@ -298,6 +317,12 @@ io.on('connection', function(socket){
 				toLog(msg);
 			}
 		}
+	});
+	socket.on('ICedit', function(message, postid){
+		var msg = {id: postid, post: message+' (Edited)'};
+		io.emit('ICedit', msg);
+		//work on logs after testing this.
+		editLog(msg);
 	});
 	socket.on('save', function(settings){
 		var username = sessions[socket.id];
@@ -317,7 +342,7 @@ io.on('connection', function(socket){
 				fs.writeFileSync(__dirname+'/faceicons/'+iconnum+'.png', data, 'base64');
 				ids.push(iconnum++);
 			}
-			fs.writeFile(__dirname+'/faceicons/'+'num.txt', iconnum);//update this
+			fs.writeFile(__dirname+'/faceicons/num.txt', iconnum);//update this
 			callback(ids, username);
 		}
 	});
