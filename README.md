@@ -1,7 +1,7 @@
 # Beyond
 A chat program for roleplaying, to support multiple characters, actions, and expressions.
 
-Set up is fairly simple (though they will require node and npm to work); just:
+Set up is fairly simple (though it will require node and npm to work); just:
 
 * [`Install node.js with npm`](https://nodejs.org/en/)
 * Make sure your port of choice is forwarded

@@ -49,8 +49,31 @@ app.get('/', function(req, res){
 	res.sendFile(__dirname + '/index.html');
 });
 
+app.get('/logs/:name', function(req, res){
+	var name = req.params.name;
+	if(name.endsWith('.html')){
+		res.sendFile(name, {root: __dirname+'/logs/'});
+	}
+});
+
+app.get('/logs', function(req, res){
+	fs.readdir(__dirname+'/logs', function(err, files){
+		if(!err){
+			var ret = '<body style="background-color:black;">';
+			files.forEach(function(file, index){
+				if(file.endsWith('.html')){
+					ret += '<a href="/logs/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a><br><br>';
+				}
+			});
+			ret += '</body>';
+			res.send(ret);
+		}
+	});
+});
+
+
 app.use('/faceicons', express.static(__dirname+'/faceicons'));
-app.use('/logs', express.static(__dirname+'/logs'));
+//app.use('/logs', express.static(__dirname+'/logs'));
 
 openLog = function (logfile){//takes in a Date object
 	try{
@@ -77,7 +100,7 @@ openLog = function (logfile){//takes in a Date object
 };
 //initial opening when the server is activated
 var today = new Date();
-var logfile = __dirname+'/logs/'+today.getFullYear()+"_"+today.getMonth()+"_"+today.getDate()+'.html';
+var logfile = __dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+today.getDate()+'.html';
 var htm = null;
 openLog(logfile);
 
@@ -93,8 +116,8 @@ var userdefaults = {
 
 toLog = function (message){
 	var today = new Date();
-	if(__dirname+'/logs/'+today.getFullYear()+"_"+today.getMonth()+"_"+today.getDate()+'.html' != logfile){//new day
-		logfile = __dirname+'/logs/'+today.getFullYear()+"_"+today.getMonth()+"_"+today.getDate()+'.html';
+	if(__dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+today.getDate()+'.html' != logfile){//new day
+		logfile = __dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+today.getDate()+'.html';
 		openLog(logfile);
 		//NOW proceed using htm
 	}//worst case scenario the dom updates while it's still trying to make htm calls and that breaks something
@@ -140,9 +163,9 @@ editLog = function(message){
 		//make the new timestamp
 		edit.children[0].textContent = '[ Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 		if(type == 'say'){
-			edit.children[3].textContent = '"'+message.post+'"';
+			edit.children[3].innerHTML = '"'+message.post+'"';
 		} else {
-			edit.children[3].textContent = message.post;
+			edit.children[3].innerHTML = message.post;
 		}
 		//insert after
 		htm.document.body.insertBefore(edit, target.nextElementSibling);
@@ -163,7 +186,7 @@ generateOOCmessage = function (message, username, post, color){
 
 	cur = htm.document.createElement('span');//create post
 	cur.style.color = color;
-	cur.textContent = post;
+	cur.innerHTML = post;
 	message.appendChild(cur);
 
 	cur = htm.document.createTextNode(" )");//close parentheses
@@ -194,9 +217,9 @@ generatePost = function (message, username, post, character, say, omit){
 	cur = htm.document.createElement('span');
 	cur.style.color = character.color;
 	if(say){
-		cur.textContent = '"'+post+'"';
+		cur.innerHTML = '"'+post+'"';
 	} else {
-		cur.textContent = post;
+		cur.innerHTML = post;
 	}
 	if(omit){
 		var om = htm.document.createElement('b');
@@ -205,6 +228,13 @@ generatePost = function (message, username, post, character, say, omit){
 	}
 	message.appendChild(cur);
 };
+
+processHTML = function(message){
+	message = message.replace(/</g, "&lt;");
+	message = message.replace(/>/g, "&gt;");
+	message = message.replace(/(https?:\/\/\S+)/ig, "<a href=\"$1\" target=\"_blank\">$1</a>");
+	return message;
+}
 
 io.on('connection', function(socket){
 	console.log('a user connected');
@@ -283,6 +313,7 @@ io.on('connection', function(socket){
 					}
 				});
 			} else {
+				message = processHTML(message);
 				var msg = {className: 'OOC message', username: username, post: message, color: color};
 				io.emit('OOCmessage', msg);
 				toLog(msg);
@@ -293,6 +324,7 @@ io.on('connection', function(socket){
 		var username = sessions[socket.id];
 		if(username){
 			var className = 'message'; var call;
+			message = processHTML(message);
 			var msg = {character: character, post: message};
 			if(type.endsWith('Say')){
 				className = 'say ' + className;
@@ -319,10 +351,14 @@ io.on('connection', function(socket){
 		}
 	});
 	socket.on('ICedit', function(message, postid){
-		var msg = {id: postid, post: message+' (Edited)'};
-		io.emit('ICedit', msg);
-		//work on logs after testing this.
-		editLog(msg);
+		var username = sessions[socket.id];
+		if(username){
+			message = processHTML(message);
+			var msg = {id: postid, post: message+' (Edited)'};
+			io.emit('ICedit', msg);
+			//work on logs after testing this.
+			editLog(msg);
+		}
 	});
 	socket.on('save', function(settings){
 		var username = sessions[socket.id];

@@ -39,6 +39,7 @@
 			}
 			div.derivative span{
 				height:50px;
+				width: calc(100% - 50px);
 				margin: 0;
 				border: 0;
 				color: white;
@@ -710,33 +711,63 @@
 		});
 
 		var Message = React.createClass({
+
+			htmlupdate: function(){//modify content to innerHTML
+				var message = this.props.message;
+				var classparam = message.className.split(" ")[1];
+				var post = message.post;
+				if(this.refs.post){
+					switch(classparam){
+						case 'say':
+							post = '"'+post+'"';
+							if(message.className.startsWith('O')){//omit
+								post += ' <b>(Omit)</b>';
+							}
+							break;
+						case 'action':
+							if(message.className.startsWith('O')){//omit
+								post += ' (Omit)';
+							}
+							break;
+					}
+					this.refs.post.innerHTML = post;
+				}
+			},
+
+			componentDidMount: function(){
+				this.htmlupdate();
+			},
+
+			componentDidUpdate: function(){
+				this.htmlupdate();
+			},
+
 			render: function(){
-				//TODO: add 'Edit' data to non-omit action and say
 				var message = this.props.message;
 				var character = message.character;//worst case it's just null and then it won't be getting used anyway.
 				var classparam = message.className.split(" ")[1];
 				switch(classparam){
 					case 'message'://ooc message
-						return (<div className={message.className}>( <b>{message.username+': '}</b><span style={{color: message.color}}>{message.post}</span> )</div>);
+						return (<div className={message.className}>( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> )</div>);
 					case 'log':
 						return (<div className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
 					case 'say':
 						if(message.className.startsWith('O')){//omit
-							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span style={{color: character.color}}>{'"'+message.post+'"'} <b>(Omit)</b></span></div>);
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						} else {
 							var charid = character.id.split('-');
 							charid.pop();
 							charid = charid.join('-');//catches names with - in them
-							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span style={{color: character.color}}>{'"'+message.post+'"'}</span></div>);
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						}
 					case 'action':
 						if(message.className.startsWith('O')){//omit
-							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span style={{color: character.color}}>{message.post + ' (Omit)'}</span></div>);
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						} else {
 							var charid = character.id.split('-');
 							charid.pop();
 							charid = charid.join('-');//catches names with - in them
-							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span style={{color: character.color}}>{message.post}</span></div>);							
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						}
 				}
 			}
