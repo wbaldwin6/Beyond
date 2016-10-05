@@ -10,6 +10,7 @@
   "author": "William Baldwin",
   "license": "ISC",
   "dependencies": {
+    "body-parser": "^1.15.2",
     "express": "^4.14.0",
     "jsdom": "^9.5.0",
     "socket.io": "^1.4.8"

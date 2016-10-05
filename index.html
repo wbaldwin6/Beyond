@@ -53,6 +53,9 @@
 			div.log {
 				font-weight: bold;
 			}
+			div.whisper{
+				font-size: 12px;
+			}
 			div.system {
 
 			}
@@ -146,8 +149,23 @@
 				-ms-user-select: none;
 				user-select: none;
 			}
+			div.PLentry{
+				text-align: center;
+				cursor: default;
+				-webkit-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
 			div.contextOption:hover{
 				background-color: #555;
+			}
+			canvas {
+			    image-rendering: crisp-edges;
+			    image-rendering: -moz-crisp-edges;
+			    image-rendering: -webkit-optimize-contrast;
+			    image-rendering: -o-crisp-edges;
+			    -ms-interpolation-mode: nearest-neighbor;
 			}
 		</style>
 	</head>
@@ -168,7 +186,7 @@
 
 		var Outercontainer = React.createClass({
 			getInitialState: function(){
-				return {settings: {}, characters: [], modal: [{type: 'login'}], isadmin: false, username: ''};
+				return {settings: {}, characters: [], modal: [{type: 'login'}], permissions: 'Guest', username: '', players: {}};
 			},
 
 			componentDidMount: function(){
@@ -182,11 +200,14 @@
 				//If split.js ever breaks on me I'll probably code the sliders based on it instead of dealing with it including that bug, but it isn't worth the effort right now.
 				document.getElementById('left').style.width = "calc(25% - 5px)";
 				document.getElementById('OI').style.width = "calc(75% - 5px)";
+				this.props.socket.on('PlayerList', function(players){
+					that.setState({players: players, permissions: players[that.state.username].permissions});
+				});
 			},
 
 			closeModal: function(n){
 				var modal = this.state.modal;
-				modal[n] = undefined;
+				modal[n] = undefined;//would use delete, but I need the indices to stay in order.
 				this.setState({modal: modal});
 			},
 
@@ -232,7 +253,7 @@
 						var ret = check.shift();
 						check = check[0];
 						if(check){//option has a condition
-							if(check == 'admin' && !that.state.isadmin){
+							if(check == 'admin' && that.state.permissions != 'Admin'){
 								return;//do not add.
 							} else if(check != that.state.username){//username check
 								return;
@@ -268,6 +289,9 @@
 					if(newmodal.post.endsWith(" (Edited)")){
 						newmodal.post = newmodal.post.slice(0, -9);
 					}
+				} else if(name == 'Whisper'){
+					//id is the [username] in this case.
+					newmodal.type = 'action';
 				}
 				this.modalpush(mod, newmodal);
 				this.setState({modal: mod});//if mod isn't changed it probably won't even update, and if it does the difference will be irrelevant.
@@ -305,7 +329,7 @@
 						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings}/>
 						{context}
 						<div id="left">
-							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters}/>
+							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} players={this.state.players}/>
 						</div>
 						<div id="OI">
 							<div id="IC">
@@ -376,8 +400,6 @@
 			handleFIs: function(e){
 				var list = e.target.files;
 				var id = e.target.parentNode.getAttribute('id');//current index
-				/*var canvas = this.refs['canvas'+e.target.parentNode.getAttribute('id')];
-				var ctx = canvas.getContext('2d');*/
 				var img = [];
 				for(var i=0; i<list.length; i++){
 					if (list[i].type.match(/image.*/)) {
@@ -405,6 +427,8 @@
 						if(modata.post != post){
 							this.props.socket.emit('ICedit', post, modata.id[0]);
 						}
+					} else if(modata.name == 'Whisper'){
+						this.props.socket.emit('Whisper', post, modata.id[0]);
 					} else {
 						var deriv = this.props.characters[modata.id[0]][modata.id[1]][modata.id[2]];
 						this.props.socket.emit('characterPost', post, deriv, modata.name);
@@ -481,30 +505,39 @@
 					var nameColor = this.refs['nameColor'+id].value;
 					var color = this.refs['color'+id].value;
 					var canvas = this.refs['canvas'+id];
-					//canvas.width=50; canvas.height=50;
 					var ctx = canvas.getContext('2d');
 					var convertedicons = [];
 					var hermi = true;
 					try{
 						var hermite = new Hermite_class();
 					} catch(err){
+						console.log("Hermite interpolation not working, quality may suffer.");
 						hermi = false;
 					}
-					for(var i=0; i < icons.length; i++){
+					var spritecanvas = document.createElement('canvas');
+					var gridsize = Math.ceil(Math.sqrt(icons.length));//smallest fitting square
+					spritecanvas.width=gridsize*50; spritecanvas.height=gridsize*50;
+					var spritectx = spritecanvas.getContext('2d');
+					var x, y;
+					for(var i=0; i<icons.length; i++){
 						if(hermi){
 							var h = icons[i].naturalHeight;
 							var w = icons[i].naturalWidth;
 							canvas.width = w; canvas.height=h;
 							ctx.drawImage(icons[i], 0, 0);
-							hermite.resample_single(canvas, 50, 50, true);					
+							hermite.resample_single(canvas, 50, 50, true);
 						} else {
+							canvas.width=50; canvas.height=50;
 							ctx.drawImage(icons[i], 0, 0, 50, 50);
 						}
-						convertedicons.push(canvas.toDataURL("image/png"));
+						x = (i%gridsize)*50;
+						y = Math.floor(i/gridsize)*50;//thought it'd default to integer, but...
+						spritectx.drawImage(canvas, x, y);//don't need 50x50 again, it won't be scaled.
+						convertedicons.push({left: x, top: y});
 					}
 					var that=this;
 
-					this.props.socket.emit('sendimage', convertedicons, function(response, un){
+					this.props.socket.emit('sendimage', spritecanvas.toDataURL("image/png"), function(picid, un){
 						var modata = that.props.modal[id];
 						var settings = that.props.settings;
 						var characters = that.props.characters;
@@ -517,11 +550,11 @@
 						}
 						if(modata.id[2]){//only in the edit case (we have a deriv) do we NOT add.
 							var deriv = character[modata.id[2]];
-							character[modata.id[2]] = {id: deriv.id, name: name || deriv.name, icon: response[0] || deriv.icon, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle};
+							character[modata.id[2]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[0] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle};
 						} else {//but in the add derivatives case we use the 0-ID.
 							var charid = character[0] ? character[0].id : un+'-'+settings.characterIDs++;
-							for(i=0; i<response.length; i++){
-								character.push({id: charid, name: name || character[0].name, icon: response[i], nameColor: nameColor, color: color, fontStyle: fontStyle});
+							for(i=0; i<convertedicons.length; i++){
+								character.push({id: charid, name: name || character[0].name, icon: picid, icpos: convertedicons[i], nameColor: nameColor, color: color, fontStyle: fontStyle});
 							}
 
 						}//now we've added all the new derivatives or just modified the one.
@@ -667,7 +700,7 @@
 									//contemplate making character headers like group headers and only showing the derivatives as individual.
 									if(that.state.open.characters[chr[0].id]){//open derivative list
 										var derivs = characters[i][i2].map(function(deriv, i3){
-											return(<div data={['Edit Derivative', 'Delete Derivative', 'Say', 'Action', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src={'/faceicons/'+deriv.icon+'.png'}/><span>{deriv.name}</span></div>);
+											return(<div data={['Edit Derivative', 'Delete Derivative', 'Say', 'Action', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/><span>{deriv.name}</span></div>);
 										});
 										return(<div data={['Create Derivative', 'Delete Character']} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.closeChar}>{chr[0].name} [-]</span>{derivs}</div>);
 									} else {//closed derivative list
@@ -688,13 +721,16 @@
 							</div>);
 						break;
 					case 'players'://case for the players online tab
+						var players = this.props.players;
+						currenttab = Object.keys(players).map(function(player, index){
+							return (<div id={player} key={index} data={['Whisper']} className='PLentry'>{player + ' - ' + players[player].permissions}</div>);
+						});
 						break;
 					case 'commands'://case for player commands tab
 						break;
 					case 'admin'://case for the administrative commands tab
 						break;
 					case 'server'://case for server control tab
-						break;
 				}
 
 				return (
@@ -728,7 +764,6 @@
 							if(message.className.startsWith('O')){//omit
 								post += ' (Omit)';
 							}
-							break;
 					}
 					this.refs.post.innerHTML = post;
 				}
@@ -742,32 +777,34 @@
 				this.htmlupdate();
 			},
 
-			render: function(){
+			render: function(){//TODO: See if you can increase the code reuse a bit, several parts of the post types are identical.
 				var message = this.props.message;
 				var character = message.character;//worst case it's just null and then it won't be getting used anyway.
 				var classparam = message.className.split(" ")[1];
 				switch(classparam){
 					case 'message'://ooc message
 						return (<div className={message.className}>( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> )</div>);
+					case 'whisper'://ooc whisper
+						return (<div className={message.className}>( <b>{message.username+' sent you a message: '}</b><span ref="post"></span> )</div>);
 					case 'log':
 						return (<div className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
 					case 'say':
 						if(message.className.startsWith('O')){//omit
-							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						} else {
 							var charid = character.id.split('-');
 							charid.pop();
 							charid = charid.join('-');//catches names with - in them
-							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						}
 					case 'action':
 						if(message.className.startsWith('O')){//omit
-							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						} else {
 							var charid = character.id.split('-');
 							charid.pop();
 							charid = charid.join('-');//catches names with - in them
-							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src={'/faceicons/'+character.icon+'.png'}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						}
 				}
 			}
