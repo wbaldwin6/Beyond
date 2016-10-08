@@ -13,6 +13,13 @@ try{//make sure the logins file exists BEFORE proceeding.
 	console.log("No Logins file found; creating.");
 	fs.writeFileSync('logins.json', JSON.stringify({}));
 }
+var banlist;
+try{//make sure the logins file exists BEFORE proceeding.
+	banlist = JSON.parse(fs.readFileSync('bans.json', 'utf8'));
+} catch(e) {
+	fs.writeFileSync('bans.json', JSON.stringify({ips: [], users: {}}));
+	banlist = {ips: [], users: {}};
+}
 
 var postnum = 1;
 try{//make the logs folder if it doesn't exist BEFORE proceeding.
@@ -167,8 +174,8 @@ openLog = function (logfile){//takes in a Date object
 		htm = jsdom.jsdom(fs.readFileSync(logfile, 'utf8'));
 	} catch(e){//today's logs don't exist, make them!
 		//this won't change, so just making it a static string (albeit a long one) is more effiicient.
-		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action{font-weight: bold;} div.log{font-weight: bold} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} div.IC{} div.OOC{}</style>';
-		var script = '<script>function OOC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[5].style.display = "none"; x[6].style.display = "initial";} function IC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "none"; x[5].style.display = "initial";}function Both(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[5].style.display = "initial"; x[6].style.display = "initial";}</script>'
+		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action, div.log, div.narration{font-weight: bold;} div.narration{text-align: center;} div.narration span.timestamp{position: absolute; left: 0;} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} div.IC{} div.OOC{}</style>';
+		var script = '<script>function OOC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "none"; x[7].style.display = "initial";} function IC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[7].style.display = "none"; x[6].style.display = "initial";}function Both(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "initial"; x[7].style.display = "initial";}</script>'
 		var body = '<body><div class="buttons" style="width: auto; position:fixed; bottom: 0; right: 0;"><button onclick="OOC()">OOC Only</button><button onclick="IC()">IC Only</button><button onclick="Both()">Both</button></div>'+script+'</body>';
 		var initialhtml = '<html><head><title>Logs for '+new Date().toLocaleString('en-us', {month: "long", day:"2-digit"})+
 		'</title>'+style+'</head>'+body+'</html>';
@@ -185,7 +192,8 @@ openLog(logfile);
 var userdefaults = {
 	settings: {
 		textcolor: 'white',
-		characterIDs: 0
+		characterIDs: 0,
+		dice: []
 	},
 	characters: [
 		[]//where ungrouped characters go, this should always exist.
@@ -223,6 +231,8 @@ toLog = function (message){
 		case 'action':
 			generatePost(logmsg, message.username, message.post, message.character, false, message.className.startsWith('O'));
 			break;
+		case 'narration':
+			generateNarration(logmsg, message.username, message.post, message.color);
 	}
 	htm.body.appendChild(logmsg);
 	fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
@@ -240,9 +250,9 @@ editLog = function(message){
 		//make the new timestamp
 		edit.children[0].textContent = '[ Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 		if(type == 'say'){
-			edit.children[3].innerHTML = '"'+message.post+'"';
+			edit.children[edit.children.length-1].innerHTML = '"'+message.post+'"';
 		} else {
-			edit.children[3].innerHTML = message.post;
+			edit.children[edit.children.length-1].innerHTML = message.post;
 		}
 		//insert after
 		htm.body.insertBefore(edit, target.nextElementSibling);
@@ -272,6 +282,14 @@ generateOOClog = function (message, username, post){
 	var cur = htm.createTextNode("| "+username+" "+post+" |");
 	message.appendChild(cur);
 };
+
+generateNarration = function (message, username, post, color){
+	//I'll make this look different later.
+	var cur = htm.createElement('span');
+	cur.style.color = color;
+	cur.innerHTML = post;
+	message.appendChild(cur);
+}
 
 generatePost = function (message, username, post, character, say, omit){
 	message.style.fontFamily = character.fontStyle;
@@ -326,8 +344,126 @@ removePlayer = function(id){
 	delete users[username];
 	delete playerlist[username];
 };
+process.stdin.setEncoding('utf8');
+process.stdin.on('readable', function() {//support for console commands.
+	var res = process.stdin.read();
+	if(res){
+		res = (res.replace('\r\n','')).split(' ');
+		var command = res.shift();
+		if(commands[command]){
+			commands[command](res.join(' '));//SHOULD call the function at the given index. Hopefully.
+		} else if(['Admin', 'Player', 'Guest'].indexOf(command) > -1) {
+			commands['Set'](res.join(' '), command);
+		} else {
+			console.log('Command '+command+' is not recognized.');
+		}
+	}
+});
+
+var commands = {//console command list, formatted this way for convenience.
+	"Remove": function(names){//deletes user logins and saves outright.
+		var all = names.split(';');
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){console.log(err)} else {
+				var out = "Deleted files for ";
+				logins = JSON.parse(logins);
+				all.forEach(function(name, index){
+					if(logins[name]){
+						if(users[name]){users[name].disconnect();}
+						delete logins[name];
+						out += name+' ';
+						fs.unlink(__dirname+'/saves/'+name+'.json', function(err){
+							if(err){console.log(err);}
+						});
+					}//'shouldn't' need to catch if they have a login.
+				});
+				fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+					if(err){console.log(err);} else {console.log(out);}
+				});
+			}
+		});
+	},
+	"Ban": function(name){//prevents subsequent logins.
+		fs.readFile('bans.json', 'utf8', function(err, bans){
+			if(err){console.log(err);} else {
+				bans = JSON.parse(bans);
+				if(users[name]){
+					var ip = users[name].request.connection.remoteAddress;
+					bans.ips.push(ip); banlist.ips.push(ip);
+					bans.users[name] = ip; banlist.users[name] = ip;
+					users[name].disconnect();
+				} else {
+					bans.users[name] = true; banlist.users[name] = true;
+				}
+				writeFile('bans.json', JSON.stringify(bans), function(err){
+					if(err){console.log(err);} else {console.log(name+' has been banned.');}
+				});
+			}
+		});
+	},
+	"Unban": function(name){
+		if(!banlist.users[name]){
+			console.log(name + ' not found on banlist.');
+		} else {
+			fs.readFile('bans.json', 'utf8', function(err, bans){
+				if(err){console.log(err);} else {
+					bans = JSON.parse(bans);
+					var ip = bans.users[name];
+					delete bans.users[name];
+					bans.ips.splice(bans.ips.indexOf(ip), 1);
+					banlist.ips.splice(banlist.ips.indexOf(ip), 1);
+					writeFile('bans.json', JSON.stringify(bans), function(err){
+						if(err){console.log(err);} else {console.log(name+' has been unbanned.');}
+					});
+				}
+			});
+		}
+	},
+	"Boot": function(name){//Just logs them out.
+		if(users[name]){users[name].disconnect();} else {
+			console.log(name+' is not logged in.');
+		}
+	},
+	"ListPlayers": function(){//Currently active players and their permissions.
+		console.log(playerlist);
+	},
+	"ListAccounts": function(){//All registered users
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){console.log(err);} else {
+				logins = JSON.parse(logins);
+				console.log(Object.keys(logins));
+			}
+		});
+	},
+	"Set": function(name, level){//Change to Guest, Player, or Admin.
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){console.log(err);} else {
+				logins = JSON.parse(logins);
+				if(logins[name]){
+					logins[name].permissions = level;
+					if(playerlist[name]){
+						playerlist[name].permissions = level;
+						io.emit('PlayerList', playerlist);
+					}
+					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+						if(err){console.log(err);} else {console.log(name+' is now a(n) '+level+'.');}
+					});
+				} else {
+					console.log('Username '+name+' not found.');
+				}
+			}
+		});
+	},
+	"Shutdown": function(name){//Self-explanatory.
+		console.log("Shutting down now.");
+		process.exit();
+	},
+};
 
 io.on('connection', function(socket){
+	if(banlist.ips.indexOf(socket.request.connection.remoteAddress) > -1){//banned IP
+		socket.disconnect();
+	}
 	console.log('a user connected');
 	socket.on('disconnect', function(){
 		console.log(sessions[socket.id]+' disconnected');
@@ -350,17 +486,22 @@ io.on('connection', function(socket){
 						callback("Username already logged in!");
 					} else if(logins[username].password == password){//valid login
 						addPlayer(username, socket, logins[username].permissions);
-						//pull up user info
-						fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
-							if(err){callback(err);} else {
-								callback(JSON.parse(info));
-								console.log(socket.id+" has logged in as "+username);
-								var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-								io.emit('OOCmessage', msg);
-								io.emit('PlayerList', playerlist);
-								toLog(msg);
-							}
-						});
+						if(banlist.users[username]){//this is so mean.
+							Commands['Ban'](username);
+							callback("You're still banned.");
+						} else {
+							//pull up user info
+							fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
+								if(err){callback(err);} else {
+									callback(JSON.parse(info));
+									console.log(socket.id+" has logged in as "+username);
+									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+									io.emit('OOCmessage', msg);
+									io.emit('PlayerList', playerlist);
+									toLog(msg);
+								}
+							});
+						}
 					} else {//invalid login
 						callback("Password does not match the given username.");
 					}
@@ -399,21 +540,21 @@ io.on('connection', function(socket){
 	socket.on('OOCmessage', function(message, color){
 		var username = sessions[socket.id];
 		if(username){
-			//placeholder test function, will be added to the options menu later.
-			if(message.startsWith("/setcolor ")){
-				fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function(err, save){
-					if(!err){
-						save = JSON.parse(save);
-						save.settings.textcolor = message.split(" ")[1];
-						fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(save), function(err){});
-					}
-				});
-			} else {
-				message = processHTML(message);
-				var msg = {className: 'OOC message', username: username, post: message, color: color};
-				io.emit('OOCmessage', msg);
-				toLog(msg);
-			}
+			message = processHTML(message);
+			var msg = {className: 'OOC message', username: username, post: message, color: color};
+			io.emit('OOCmessage', msg);
+			toLog(msg);
+		}
+	});
+	socket.on('Narrate', function(message, color){
+		var username = sessions[socket.id];
+		if(username){
+			message = processHTML(message);
+			var msg = {className: 'IC narration message', username: username, post: message, color: color};
+			msg.id = postnum++;
+			fs.writeFile(__dirname+'/logs/postid.txt', postnum);
+			io.emit('ICmessage', msg);
+			toLog(msg);
 		}
 	});
 	socket.on('Whisper', function(message, target){
@@ -423,6 +564,14 @@ io.on('connection', function(socket){
 			users[target].emit('OOCmessage', msg);
 		}//no logging, OBVIOUSLY. What's an admin window?
 	});
+	socket.on('Dice', function(dice, result, color){
+		var username = sessions[socket.id];
+		if(username){
+			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
+			var msg = {className: 'OOC dice', post: post, color: color};
+			io.emit('OOCmessage', msg);
+		}
+	})
 	socket.on('characterPost', function(message, character, type){
 		var username = sessions[socket.id];
 		if(username){
@@ -485,8 +634,21 @@ io.on('connection', function(socket){
 			}
 		}
 	});
+	socket.on('AdminCommand', function(command, target){
+		//before we even consider it: ARE they an admin?
+		var username = sessions[socket.id];
+		if(username && playerlist[username].permissions == 'Admin'){
+			if(commands[command]){
+				commands[command](target);
+			} else if(command.startsWith('Make')) {
+				commands['Set'](target, command.split(' ')[1]);
+			}
+		} else {
+			console.log(username+' attempted to use an admin command.');
+		}
+	});
 });
-/*TODO: Add console commands to give admin, ban, etc*/
+
 if(process.argv[2]){
 	http.listen(process.argv[2], function(){
 	  console.log('listening on *:'+process.argv[2]);

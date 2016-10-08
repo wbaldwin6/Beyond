@@ -25,12 +25,21 @@
 				overflow-y: auto;
 				height: calc(100% - 54px);
 			}
-			div.character span{
+			div.character{
+				margin: 10 0 0 0;
+			}
+			div.chargroup{
+				margin: 10 0 0 0;
 				cursor: default;
 				-webkit-user-select: none;
 				-moz-user-select: none;
 				-ms-user-select: none;
 				user-select: none;
+			}
+			.group{
+				margin: 10 0 0 0;
+				font-size: 20px;
+				font-weight: bold;
 			}
 			div.derivative{
 				padding-bottom: 5px;
@@ -47,11 +56,11 @@
 				vertical-align: middle;
 				line-height: normal;
 			}
-			div.action {
+			div.action, div.dice, div.log, div.narration {
 				font-weight: bold;
 			}
-			div.log {
-				font-weight: bold;
+			div.narration {
+				text-align: center;
 			}
 			div.whisper{
 				font-size: 12px;
@@ -59,19 +68,28 @@
 			div.system {
 
 			}
-			div#IO{
+			div#OI{
+				height: 100%;
+				max-width: calc(100% - 10px);
+			}
+			div#left{
+				max-width: calc(100% - 10px);
+			}
+			div#IC, div#OOC{
+				max-height: calc(100% - 10px);
+			}
+			div.OOCbox{
+				overflow-y: auto;
 				height: 100%;
 			}
-			div#OOC{
+			div.ICbox{
 				overflow-y: auto;
-			}
-			div#IC{
-				overflow-y: auto;
+				height: 100%;
 			}
 			input {
-				background-color: black;
-				color: white;
-				border-color: black;
+				background-color: white;
+				color: black;
+				border: 0;
 			}
 			input.OOCbar {
 				background-color: red;
@@ -157,6 +175,24 @@
 				-ms-user-select: none;
 				user-select: none;
 			}
+			.Command{
+				border: 0;
+				padding: 2 0;
+				color: #d3d3d3;
+				transition: 0.3s;
+				cursor: pointer;
+				-webkit-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+			input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{
+				-webkit-appearance: none;
+				margin: 0;
+			}
+			.Command:hover{
+				color: white;
+			}
 			div.contextOption:hover{
 				background-color: #555;
 			}
@@ -192,9 +228,11 @@
 			componentDidMount: function(){
 				var that = this;
 				Split(['#left', '#OI'], {
+					minSize: [0, 0]
 				});
 				Split(['#IC', '#OOC'], {
-					direction: 'vertical'
+					direction: 'vertical',
+					minSize: [0, 0]
 				});
 				//Admittedly a bit of a cheesey workaround, but Split.js gives me a lot of useful functionality and until it fixes the fact that it sets them to static pixel values when I use sizes: [20, 80] I gotta do it SOMEHOW.
 				//If split.js ever breaks on me I'll probably code the sliders based on it instead of dealing with it including that bug, but it isn't worth the effort right now.
@@ -253,13 +291,13 @@
 						var ret = check.shift();
 						check = check[0];
 						if(check){//option has a condition
-							if(check == 'admin' && that.state.permissions != 'Admin'){
-								return;//do not add.
-							} else if(check != that.state.username){//username check
-								return;
+							if((check == 'admin' && that.state.permissions == 'Admin')
+								|| check == that.state.username){
+								processed.push(ret);
 							}
+						} else {
+							processed.push(ret);
 						}
-						processed.push(ret);
 					});
 					if(processed.length){
 						this.setState({context: {position: position, options: processed, target: target}});
@@ -268,12 +306,19 @@
 			},
 
 			handleContext: function(e){
-				var mod = this.state.modal;
 				var name = e.target.textContent;
 				var id = this.state.context.target.getAttribute('id').split(',');
 				var newmodal = {id: id, name: name};
 				if(name.startsWith('Delete')){
-					newmodal.type = 'delete';
+					if(id[0].startsWith('Dice')){
+						//just delete it outright.
+						var settings = this.state.settings;
+						settings.dice.splice(+id[0].substring(4), 1);
+						this.handleSettings(settings, this.state.characters);
+						newmodal = {};
+					} else {
+						newmodal.type = 'delete';
+					}
 				} else if(name.endsWith("Character") || name.endsWith("Derivative")){
 					newmodal.type = 'character';
 				} else if(name.endsWith("Group")){
@@ -282,7 +327,8 @@
 					newmodal.type = 'action';
 				} else if(name == 'Edit'){
 					newmodal.type = 'action';
-					newmodal.post = this.state.context.target.children[2].textContent;
+					var children = this.state.context.target.children;
+					newmodal.post = children[children.length-1].textContent;
 					if(newmodal.post.charAt(0) === '"'){
 						newmodal.post = newmodal.post.slice(1, -1);
 					}
@@ -291,18 +337,31 @@
 					}
 				} else if(name == 'Whisper'){
 					//id is the [username] in this case.
+					newmodal.id = id.join(',');//this IS a valid character so we gotta fix it.
 					newmodal.type = 'action';
+				} else if(['Ban','Boot','Make Player','Make Admin','Make Guest'].indexOf(name)>-1){
+					//no modal needed.
+					newmodal = null;
+					this.props.socket.emit('AdminCommand', name, id.join(','));
+				} else if(name == 'Ungroup'){//we have the character ID
+					var characters = this.state.characters;
+					var chr = characters[id[0]].splice(id[1], 1);
+					characters[0].push(chr[0]);
+					this.handleSettings(this.state.settings, characters);
 				}
-				this.modalpush(mod, newmodal);
-				this.setState({modal: mod});//if mod isn't changed it probably won't even update, and if it does the difference will be irrelevant.
+				this.modalpush(newmodal);
 			},
 
-			modalpush: function(mod, data){//helper for putting new modals in.
-				var i=0;
-				while(mod[i]){//until we find one that's undefined
-					i++;
-				}//we leave the loop when mod[i] is undefined, so...
-				mod[i] = data;
+			modalpush: function(data){//helper for putting new modals in. Also good for letting other components do it.
+				if(data && data.id && data.type && data.name){
+					var mod = this.state.modal;
+					var i=0;
+					while(mod[i]){//until we find one that's undefined
+						i++;
+					}//we leave the loop when mod[i] is undefined, so...
+					mod[i] = data;
+					this.setState({modal: mod});//if mod isn't changed it probably won't even update, and if it does the difference will be irrelevant.
+				}
 			},
 
 			closeContext: function(e){
@@ -329,7 +388,7 @@
 						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings}/>
 						{context}
 						<div id="left">
-							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} players={this.state.players}/>
+							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions}/>
 						</div>
 						<div id="OI">
 							<div id="IC">
@@ -429,10 +488,12 @@
 						}
 					} else if(modata.name == 'Whisper'){
 						this.props.socket.emit('Whisper', post, modata.id[0]);
+					} else if(modata.name == 'Narrate'){
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor);
 					} else {
 						var deriv = this.props.characters[modata.id[0]][modata.id[1]][modata.id[2]];
 						this.props.socket.emit('characterPost', post, deriv, modata.name);
-					}					
+					}
 				}
 
 				this.props.closeModal(id);
@@ -483,9 +544,11 @@
 				//modata.id contains the ids involved.
 				var characters = this.props.characters;
 				if(modata.id.length === 1){//group delete
-					//TODO: Make sure this works after making group options.
-					var salvage = characters.splice(modata.id[0], 1);
-					characters[0].push(salvage);//add the characters to the ungrouped section.
+					var salvage = characters.splice(modata.id[0], 1)[0];
+					salvage.shift();//remove the name
+					salvage.forEach(function(slv){
+						characters[0].push(slv);
+					});//add the characters to the ungrouped section.
 				} else if(modata.id.length === 2 || characters[modata.id[0]][modata.id[1]].length == 1){//character delete
 					characters[modata.id[0]].splice(modata.id[1], 1);
 				} else {
@@ -543,6 +606,7 @@
 						var characters = that.props.characters;
 						var character;
 						if(modata.id.length === 1){//new char only
+							modata.id[0] = that.refs['group'+id].value;
 							modata.id.push(characters[modata.id[0]].length);//put it at the end of the group
 							character = [];
 						} else {//i1 is group, i2 is character
@@ -564,6 +628,36 @@
 					});
 				}
 				
+			},
+
+			groupEdit: function(e){
+				var modal = e.target.parentNode;//the modal containing the save button
+				var id = modal.getAttribute('id');
+				var name = this.refs['name'+id].value;
+				if(name){
+					var modata = this.props.modal[id];
+					var characters = this.props.characters.slice();
+					var checks = [].slice.call(this.refs['chars'+id].children);
+					var group = modata.name.startsWith('Edit') ? characters[modata.id[0]] : [];
+					group[0] = name;
+					//move the selected characters
+					var n = [];
+					checks.forEach(function(chr, index){
+						if(chr.style.fontWeight == 'bold'){//selected
+							group.push(characters[0][index]);
+						} else {//not selected
+							n.push(characters[0][index]);
+						}
+					});
+					characters[0] = n;//can't exactly slice them out with varying indices.
+					if(modata.name.startsWith('Edit')){
+						characters[modata.id[0]] = group;
+					} else {
+						characters.push(group);//add to end of groups
+					}
+					this.props.handleSettings(this.props.settings, characters);
+					this.props.closeModal(id);
+				}
 			},
 
 			render: function(){
@@ -595,7 +689,14 @@
 									nameColor = '#ffffff';
 									color = '#ffffff';
 									fontStyle = 'Times New Roman';
-									groupdropdown = null;//TODO: Implement dropdown
+									var grouption = that.props.characters.map(function(group, ind){
+										if(!ind){
+											return (<option key={ind} value={ind}>None</option>);
+										} else {
+											return (<option key={ind} value={ind}>{group[0]}</option>);
+										}
+									});
+									groupdropdown = (<select ref={'group'+index}>{grouption}</select>);
 								} else {
 									character = that.props.characters[modal.id[0]][modal.id[1]];
 									nameColor = character[0].nameColor;
@@ -622,12 +723,24 @@
 									Name Color: <input type="color" ref={'nameColor'+index} defaultValue={nameColor}/><br/>
 									Text Color: <input type="color" ref={'color'+index} defaultValue={color}/><br/>
 									<input type="text" ref={'font'+index} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={that.testFont} onKeyDown={that.fontTest}/><br/>
-									{groupdropdown}<br/>
+									{groupdropdown ? 'Select a group: ' : ''}{groupdropdown}<br/>
 									<button type="submit" id="save" onClick={that.charEdit}>Save</button>
 										<button type="submit" id="cancel" onClick={that.closeChar.bind(null, index)}>Cancel</button></div>
 								);
 							case 'group'://group creation/edit modal.
-								break;
+								var chars = that.props.characters[0].map(function(ch, index){
+									return(<div key={'c'+index} className='Command' onClick={function(e){e.target.style.fontWeight=(e.target.style.fontWeight=='bold')? 'normal' : 'bold';}}>{ch[0].name}</div>);
+								});//go through the ungrouped characters.
+								var def = '';
+								if(modal.id[0] > 0){def = that.props.characters[modal.id[0]][0];}
+								return(<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><input type='text' ref={'name'+index} placeholder='Group Name' defaultValue={def} required/><br/>
+									Add characters to the group?<br/>
+									<form ref={"chars"+index}>
+									{chars}
+									</form>
+									<button type="submit" id="save" onClick={that.groupEdit}>Save</button>
+										<button type="submit" id="cancel" onClick={that.props.closeModal.bind(null, index)}>Cancel</button>
+									</div>);
 							case 'delete'://'are you sure?'
 								return(
 									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>No</button></div>
@@ -649,7 +762,7 @@
 
 		var ChartabHandler = React.createClass({
 			getInitialState: function(){//open.characters[ID] will be true if we need to open derivs
-				return {tab: 'Characters', open:{groups: {}, characters: {}}};
+				return {tab: 'characters', open:{groups: {}, characters: {}}};
 			},
 
 			shiftTab: function(e){//It's both a relevant name and a terrible pun!
@@ -659,14 +772,14 @@
 
 			openGroup: function(e){
 				var op = this.state.open;
-				var name = this.props.characters[e.target.getAttribute('id')].name;
+				var name = this.props.characters[e.target.getAttribute('id')][0];
 				op.groups[name] = true;//add group to open list
 				this.setState({open: op});
 			},
 
 			closeGroup: function(e){
 				var op = this.state.open;
-				var name = this.props.characters[e.target.getAttribute('id')].name;
+				var name = this.props.characters[e.target.getAttribute('id')][0];
 				op.groups[name] = false;
 				this.setState({open: op});
 			},
@@ -687,6 +800,48 @@
 				this.setState({open: op});
 			},
 
+			setColor: function(e){
+				var settings = this.props.settings;
+				settings.textcolor = this.refs.OOCcolor.value;
+				this.props.handleSettings(settings, this.props.characters);
+			},
+
+			genmodal: function(e){//only for narrate right now
+				this.props.modalpush({id: [], name: 'Narrate', type: 'action'});
+			},
+
+			gendice: function(e){
+				var settings = this.props.settings;
+				var dice = this.refs.Nd.value+'d'+this.refs.dN.value;
+				if(this.refs.exploding.checked){dice += '!';}
+				settings.dice.push(dice);
+				this.props.handleSettings(settings, this.props.characters);
+			},
+
+			roll: function(e){
+				var dice = e.target.textContent.split('d');// dice[0] is the number, dice[1] is faces (plus ! if it's there)
+				var result = [];
+				if(dice[1].indexOf('!') > 0){//we don't know how many characters long dice[1] is.
+					dice[1] = dice[1].slice(0, -1);
+					dice[2] = '!';
+				}
+				if(dice[0]=='1' && dice[1]=='100' && dice[2]){//special case because I'm a hack.
+					var open = 90;
+					do{
+						var roll = Math.floor(Math.random()*dice[1])+1;
+						result.push(roll);
+					} while (roll >= open++)//open roll window decreases each time.
+				} else {
+					for(var i = 0; i < dice[0]; i++){
+						do {
+							var roll = Math.floor(Math.random()*dice[1])+1;
+							result.push(roll);
+						} while (dice[2] && roll == dice[1])//explode at max
+					}
+				}
+				this.props.socket.emit('Dice', e.target.textContent, result, this.props.settings.textcolor);
+			},
+
 			render: function(){
 				var currenttab = null;
 				var that=this;
@@ -695,25 +850,28 @@
 						//TODO: Consider making the [+] and [-] float right or something.
 						var characters = this.props.characters;
 						var charlist = characters.map(function(group, i){//groups loop
-							if(i==0 || that.state.open.groups[group.name]){//open group
+							if(i==0 || that.state.open.groups[group[0]]){//open group
+								var charop = ['Create Derivative', 'Delete Character'];
+								if(i){charop.push('Ungroup');}
 								var chars = characters[i].map(function(chr, i2){//characters loop
-									//contemplate making character headers like group headers and only showing the derivatives as individual.
-									if(that.state.open.characters[chr[0].id]){//open derivative list
-										var derivs = characters[i][i2].map(function(deriv, i3){
-											return(<div data={['Edit Derivative', 'Delete Derivative', 'Say', 'Action', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/><span>{deriv.name}</span></div>);
-										});
-										return(<div data={['Create Derivative', 'Delete Character']} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.closeChar}>{chr[0].name} [-]</span>{derivs}</div>);
-									} else {//closed derivative list
-										return(<div data={['Create Derivative', 'Delete Character']} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.openChar}>{chr[0].name} [+]</span></div>);
+									if(typeof chr !== 'string'){//make sure it's not the name.
+										if(that.state.open.characters[chr[0].id]){//open derivative list
+											var derivs = characters[i][i2].map(function(deriv, i3){
+												return(<div data={['Edit Derivative', 'Delete Derivative', 'Say', 'Action', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/><span>{deriv.name}</span></div>);
+											});
+											return(<div data={charop} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.closeChar}>{chr[0].name} [-]</span>{derivs}</div>);
+										} else {//closed derivative list
+											return(<div data={charop} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.openChar}>{chr[0].name} [+]</span></div>);
+										}
 									}
 								});
-								if(group.name){//actual group
-									return(<div data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span id={i} onClick={that.closeGroup}>{group.name} [-]</span>{chars}</div>);
+								if(typeof group[0] === 'string'){//actual group
+									return(<div data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span className='group' id={i} onClick={that.closeGroup}>{group[0]} [-]</span>{chars}</div>);
 								} else {//ungrouped
 									return(<div id={0} data={['New Character', 'New Group']} key={i} className="chargroup ungrouped">{chars}</div>);
 								}
 							} else {//closed group
-								return(<div data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span id={i} onClick={that.openGroup}>{group.name} [+]</span></div>);
+								return(<div data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span className='group' id={i} onClick={that.openGroup}>{group[0]} [+]</span></div>);
 							}
 						});
 						currenttab = (<div id={0} data={['New Character', 'New Group']} className="charlist">
@@ -723,22 +881,30 @@
 					case 'players'://case for the players online tab
 						var players = this.props.players;
 						currenttab = Object.keys(players).map(function(player, index){
-							return (<div id={player} key={index} data={['Whisper']} className='PLentry'>{player + ' - ' + players[player].permissions}</div>);
+							return (<div id={player} key={index} data={['Whisper', 'Make Player*admin', 'Make Admin*admin', 'Make Guest*admin', 'Boot*admin', 'Ban*admin']} className='PLentry'>{player + ' - ' + players[player].permissions}</div>);
 						});
 						break;
 					case 'commands'://case for player commands tab
+						//<div key='2' className='Command' onClick={function(e){window.open('/forums?id='+this.props.socket.id);}}>Open Forums</div>
+						//similar for Character Database
+						//<div key='5' className='Command' onClick={this.something}>Show Rules</div>
+						//<div key='6' className='Command' onClick={this.something}>Show MOTD</div>
+						currenttab = [<div key='0' className='Command'><span onClick={this.setColor}>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='7' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						var that = this;
+						this.props.settings.dice.forEach(function(dice, index){
+							currenttab.push(<div key={8+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
+						});
 						break;
 					case 'admin'://case for the administrative commands tab
-						break;
-					case 'server'://case for server control tab
 				}
-
+				var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 				return (
 					<div className="options">
 						<ul className="tab" style={{listStyleType:'none'}}>
 							<li><div className="tablink" id="characters" onClick={this.shiftTab}>Characters</div></li>
 							<li><div className="tablink" id="players" onClick={this.shiftTab}>Players Online</div></li>
 							<li><div className="tablink" id="commands" onClick={this.shiftTab}>Player Commands</div></li>
+							{admin}
 						</ul>
 						{currenttab}
 					</div>
@@ -786,6 +952,10 @@
 						return (<div className={message.className}>( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> )</div>);
 					case 'whisper'://ooc whisper
 						return (<div className={message.className}>( <b>{message.username+' sent you a message: '}</b><span ref="post"></span> )</div>);
+					case 'narration'://ic narration message
+						return (<div id={message.id} data={'Edit*'+message.username} className={message.className}><span ref="post" style={{color: message.color}}></span></div>);
+					case 'dice'://ooc dice message
+						return (<div className={message.className}><span ref="post" style={{color: message.color}}></span></div>);
 					case 'log':
 						return (<div className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
 					case 'say':
@@ -813,7 +983,18 @@
 		var IChandler = React.createClass({
 			getInitialState: function(){
 				//normally messages would be empty but I want to test this out.
-				return {messages: [], ids: {}};
+				return {messages: [], ids: {}, height: 0};
+			},
+
+			shouldComponentUpdate: function(nextProps, nextState){
+				return(nextState.messages.length !== this.state.messages.length);
+			},
+
+			componentDidUpdate: function(){
+				//I need it to only autoscroll if they were previously at the bottom.
+				if(this.refs.box.scrollTop + this.refs.box.clientHeight >= this.state.height){
+					this.refs.box.scrollTop = Number.MAX_SAFE_INTEGER;
+				}
 			},
 
 			componentDidMount: function(){
@@ -823,7 +1004,7 @@
 					var ids = that.state.ids;
 					ids[message.id] = newm.length;//index this post to its id
 					newm.push(<Message key={newm.length} message={message}/>);
-					that.setState({messages: newm, ids: ids});
+					that.setState({messages: newm, ids: ids, height: that.refs.box.scrollHeight});
 				});
 
 				this.props.socket.on('ICedit', function(message){
@@ -835,14 +1016,15 @@
 						msg.post = message.post;
 						messages[ids[message.id]] = React.cloneElement(target, msg);
 						
-						that.setState({messages: messages});
+						that.setState({messages: messages, height: that.refs.box.scrollHeight});
+						that.forceUpdate();//this is the cheap solution.
 					}
 				});
 			},
 
 			render: function(){
 				return (
-					<div className='ICbox'>
+					<div ref='box' className='ICbox'>
 						{this.state.messages}
 					</div>
 				);
@@ -851,7 +1033,17 @@
 
 		var OOChandler = React.createClass({
 			getInitialState: function(){
-				return {messages: []};
+				return {messages: [], height: 0};
+			},
+
+			shouldComponentUpdate: function(nextProps, nextState){
+				return(nextState.messages.length !== this.state.messages.length);
+			},
+
+			componentDidUpdate: function(){
+				if(this.refs.box.scrollTop + this.refs.box.clientHeight >= this.state.height){
+					this.refs.box.scrollTop = Number.MAX_SAFE_INTEGER;
+				}
 			},
 
 			componentDidMount: function(){
@@ -859,13 +1051,18 @@
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
 					newm.push(<Message key={newm.length} message={message}/>);
-					that.setState({messages: newm});
-				});				
+					that.setState({messages: newm, height: that.refs.box.scrollHeight});
+				});
+				this.props.socket.on('disconnect', function(){
+					var newm = that.state.messages.slice();
+					newm.push(<Message key={newm.length} message={{username: 'You', post: 'have disconnected.', className: 'OOC log message'}}/>);
+					that.setState({messages: newm, height: that.refs.box.scrollHeight});
+				});
 			},
 
 			render: function(){
 				return (
-					<div className='OOCbox'>
+					<div ref='box' className='OOCbox'>
 						{this.state.messages}
 					</div>
 				);
