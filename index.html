@@ -94,6 +94,7 @@
 			input.OOCbar {
 				background-color: red;
 				color: black;
+				height: 15px;
 			}
 			input.OOCbar:focus {
 				outline-width: 0;
@@ -186,8 +187,12 @@
 				-ms-user-select: none;
 				user-select: none;
 			}
-			input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{
+			input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{
 				-webkit-appearance: none;
+				margin: 0;
+			}
+			input[type=number]{
+				-moz-appearance: textfield;
 				margin: 0;
 			}
 			.Command:hover{
@@ -409,7 +414,7 @@
 				}
 
 				return (
-					<div style={{height: "calc(100% - 15px)"}} onContextMenu={this.contextMenu} onClick={this.closeContext}>
+					<div style={{height: "calc(100vh - 15px)"}} onContextMenu={this.contextMenu} onClick={this.closeContext}>
 						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings}/>
 						{context}
 						<div id="left">
