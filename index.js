@@ -328,6 +328,7 @@ generatePost = function (message, username, post, character, say, omit){
 processHTML = function(message){
 	message = message.replace(/</g, "&lt;");
 	message = message.replace(/>/g, "&gt;");
+	message = message.replace(/\r\n?|\n/g, "<br />");
 	message = message.replace(/(https?:\/\/\S+)/ig, "<a href=\"$1\" target=\"_blank\">$1</a>");
 	return message;
 };
