@@ -4,21 +4,29 @@ var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 var jsdom = require('jsdom');
+var sanitizeHtml = require('sanitize-html');
 app.use(require('body-parser').json());
 
 try{//make sure the logins file exists BEFORE proceeding.
 	fs.accessSync('logins.json', fs.R_OK | fs.W_OK);
-	console.log("Logins file found.");
 } catch(e) {
-	console.log("No Logins file found; creating.");
 	fs.writeFileSync('logins.json', JSON.stringify({}));
 }
 var banlist;
-try{//make sure the logins file exists BEFORE proceeding.
+try{//make sure the banlist file exists BEFORE proceeding.
 	banlist = JSON.parse(fs.readFileSync('bans.json', 'utf8'));
 } catch(e) {
-	fs.writeFileSync('bans.json', JSON.stringify({ips: [], users: {}}));
 	banlist = {ips: [], users: {}};
+	fs.writeFileSync('bans.json', JSON.stringify(banlist));
+}
+
+var serversettings;
+try{
+	serversettings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
+} catch(e) {
+	console.log('Writing settings.');
+	serversettings = {motd: '', rules: 'Rule 0: Be respectful.'};
+	fs.writeFileSync('settings.json', JSON.stringify(serversettings));
 }
 
 var postnum = 1;
@@ -300,13 +308,25 @@ generatePost = function (message, username, post, character, say, omit){
 	cur.style.backgroundPosition = '-'+character.icpos.left+'px -'+character.icpos.top+'px';
 	message.appendChild(cur);
 
+	//add the space after the image
+	message.appendChild(htm.createTextNode(" "));
+
 	cur = htm.createElement('span');
 	cur.style.color = character.nameColor;
-	if(say){
-		cur.style.fontWeight = 'bold';
-		cur.textContent = character.name+': ';
+	if(!character.customHTML){
+		if(say){
+			cur.style.fontWeight = 'bold';
+			cur.textContent = character.name+': ';
+		} else {
+			cur.textContent = character.name+' ';
+		}
 	} else {
-		cur.textContent = character.name+' ';
+		if(say){
+			cur.style.fontWeight = 'bold';
+			cur.innerHTML = character.customHTML+': ';
+		} else {
+			cur.innerHTML = character.customHTML+' ';
+		}
 	}
 	message.appendChild(cur);
 
@@ -326,10 +346,19 @@ generatePost = function (message, username, post, character, say, omit){
 };
 
 processHTML = function(message){
-	message = message.replace(/</g, "&lt;");
-	message = message.replace(/>/g, "&gt;");
+	//message = message.replace(/</g, "&lt;");
+	//message = message.replace(/>/g, "&gt;");
+	var test = /<|>/.test(message);
 	message = message.replace(/\r\n?|\n/g, "<br />");
 	message = message.replace(/(https?:\/\/\S+)/ig, "<a href=\"$1\" target=\"_blank\">$1</a>");
+	if(test){//we skip it if we don't even find any tags (prior to potentially adding them ourselves)
+		message = sanitizeHtml(message, {allowedTags: ['a', 'b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
+		allowedAttributes: {
+			'a': ['href', 'target'],
+			'span': ['style'],
+			'font': ['color', 'style']
+		}});
+	}
 	return message;
 };
 
@@ -447,7 +476,13 @@ var commands = {//console command list, formatted this way for convenience.
 						io.emit('PlayerList', playerlist);
 					}
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-						if(err){console.log(err);} else {console.log(name+' is now a(n) '+level+'.');}
+						if(err){console.log(err);} else {
+							console.log(name+' is now a(n) '+level+'.');
+							if(users[name]){
+								var msg = {className: 'OOC system message', post: '<font color="red">You are now a(n) '+level+'.</font>'};
+								users[name].emit('OOCmessage', msg);
+							}
+						}
 					});
 				} else {
 					console.log('Username '+name+' not found.');
@@ -464,6 +499,15 @@ var commands = {//console command list, formatted this way for convenience.
 io.on('connection', function(socket){
 	if(banlist.ips.indexOf(socket.request.connection.remoteAddress) > -1){//banned IP
 		socket.disconnect();
+	} else {
+		if(serversettings.rules){
+			var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
+			socket.emit('OOCmessage', msg);
+		}
+		if(serversettings.motd){
+			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
+			socket.emit('OOCmessage', msg);
+		}
 	}
 	console.log('a user connected');
 	socket.on('disconnect', function(){
@@ -568,7 +612,8 @@ io.on('connection', function(socket){
 	socket.on('Dice', function(dice, result, color){
 		var username = sessions[socket.id];
 		if(username){
-			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
+			var total = result.reduce(function(a,b){return a+b;});
+			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '))+' ('+total+')';
 			var msg = {className: 'OOC dice', post: post, color: color};
 			io.emit('OOCmessage', msg);
 		}
@@ -576,6 +621,13 @@ io.on('connection', function(socket){
 	socket.on('characterPost', function(message, character, type){
 		var username = sessions[socket.id];
 		if(username){
+			if(character.customHTML){
+				character.customHTML = sanitizeHtml(character.customHTML, {allowedTags: ['b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
+					allowedAttributes: {
+						'span': ['style'],
+						'font': ['color', 'size', 'style']
+					}});
+			}//always do a serverside check!
 			var className = 'message'; var call;
 			message = processHTML(message);
 			var msg = {character: character, post: message};
@@ -633,6 +685,42 @@ io.on('connection', function(socket){
 				fs.writeFile(__dirname+'/faceicons/num.txt', iconnum);//update this
 				callback(ids, username);
 			}
+		}
+	});
+	socket.on('Show Rules', function(message){
+		if(serversettings.rules){
+			var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
+			socket.emit('OOCmessage', msg);
+		}
+	});
+	socket.on('Show MOTD', function(message){
+		if(serversettings.motd){
+			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
+			socket.emit('OOCmessage', msg);
+		}
+	});
+	socket.on('Edit Rules', function(message){
+		var username = sessions[socket.id];
+		if(username && playerlist[username].permissions == 'Admin'){
+			serversettings.rules = processHTML(message);
+			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the rules.</font>'};
+			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
+				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
+			});
+		} else {
+			console.log(username+' attempted to use an admin command.');
+		}
+	});
+	socket.on('Edit MOTD', function(message){
+		var username = sessions[socket.id];
+		if(username && playerlist[username].permissions == 'Admin'){
+			serversettings.motd = processHTML(message);
+			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the MOTD.</font>'};
+			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
+				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
+			});
+		} else {
+			console.log(username+' attempted to use an admin command.');
 		}
 	});
 	socket.on('AdminCommand', function(command, target){

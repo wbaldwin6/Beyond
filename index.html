@@ -222,7 +222,7 @@
 
 		var Outercontainer = React.createClass({
 			getInitialState: function(){
-				return {settings: {}, characters: [], modal: [{type: 'login'}], permissions: 'Guest', username: '', players: {}};
+				return {settings: {}, characters: [], modal: [{type: 'login'}], permissions: 'Guest', username: '', pass: '', players: {}};
 			},
 
 			componentDidMount: function(){
@@ -240,6 +240,17 @@
 				document.getElementById('OI').style.width = "calc(75% - 5px)";
 				this.props.socket.on('PlayerList', function(players){
 					that.setState({players: players, permissions: players[that.state.username].permissions});
+				});
+				this.props.socket.on('reconnect', function(){
+					if(that.state.username){
+						that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
+							if(res.settings){
+								that.handleSettings(res.settings, res.characters);
+							} else {
+								console.log(res);
+							}
+						});
+					}
 				});
 			},
 
@@ -267,8 +278,8 @@
 				this.props.socket.emit('save', JSON.stringify({settings: settings, characters: characters}));
 			},
 
-			setUser: function(name){
-				this.setState({username: name});
+			setUser: function(name, pass){
+				this.setState({username: name, pass: pass});
 			},
 
 			contextMenu: function(e){
@@ -342,7 +353,7 @@
 				} else if(name == 'Edit'){
 					newmodal.type = 'action';
 					var children = this.state.context.target.children;
-					newmodal.post = children[children.length-1].textContent;
+					newmodal.post = children[children.length-1].innerHTML;
 					if(newmodal.post.charAt(0) === '"'){
 						newmodal.post = newmodal.post.slice(1, -1);
 					}
@@ -434,7 +445,7 @@
 					this.props.socket.emit(type, username, md5(password), function (response){
 						if(response.settings){
 							that.props.handleSettings(response.settings, response.characters);
-							that.props.setUser(username);
+							that.props.setUser(username, md5(password));
 							that.props.closeModal(ind);
 						} else {
 							that.setState({loginmessage: response.code || response});
@@ -504,6 +515,8 @@
 						this.props.socket.emit('Whisper', post, modata.id[0]);
 					} else if(modata.name == 'Narrate'){
 						this.props.socket.emit('Narrate', post, this.props.settings.textcolor);
+					} else if(modata.name == 'Edit Rules' || modata.name == 'Edit MOTD'){
+						this.props.socket.emit(modata.name, post);
 					} else {//find the right id
 						var trueid = this.verifyID(modata.charid, modata.id);
 						if(trueid){
@@ -617,6 +630,7 @@
 				if(name || this.props.modal[id].id.length > 1){//do nothing if they didn't put a name in if it's new
 					var fontStyle = this.refs['font'+id].value;
 					var nameColor = this.refs['nameColor'+id].value;
+					var customHTML = this.refs['html'+id].value;
 					var color = this.refs['color'+id].value;
 					var canvas = this.refs['canvas'+id];
 					var ctx = canvas.getContext('2d');
@@ -669,11 +683,11 @@
 						}
 						if(modata.id[2]){//only in the edit case (we have a deriv) do we NOT add.
 							var deriv = character[trueid[2]];
-							character[trueid[2]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[0] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle};
+							character[trueid[2]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[0] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML || deriv.customHTML};
 						} else {//but in the add derivatives case we use the 0-ID.
 							var charid = character[0] ? character[0].id : un+'-'+settings.characterIDs++;
 							for(i=0; i<convertedicons.length; i++){
-								character.push({id: charid, name: name || character[0].name, icon: picid, icpos: convertedicons[i], nameColor: nameColor, color: color, fontStyle: fontStyle});
+								character.push({id: charid, name: name || character[0].name, icon: picid, icpos: convertedicons[i], nameColor: nameColor, color: color, fontStyle: fontStyle, customHTML: customHTML});
 							}
 
 						}//now we've added all the new derivatives or just modified the one.
@@ -740,13 +754,14 @@
 							case 'character'://character creation/edit modal.
 								var groupdropdown = null;
 								var FIs = (<input type='file' ref={'FIs'+index} multiple onChange={that.handleFIs}/>);//by default it allows multiple
-								var nameColor; var color; var fontStyle;
+								var nameColor; var color; var fontStyle; var customHTML;
 								var character;
 								var trueid;
 								if(modal.id.length == 1){//new character
 									nameColor = '#ffffff';
 									color = '#ffffff';
 									fontStyle = 'Times New Roman';
+									customHTML = '';
 									var grouption = that.props.characters.map(function(group, ind){
 										if(!ind){
 											return (<option key={ind} value={ind}>None</option>);
@@ -761,7 +776,8 @@
 										character = that.props.characters[trueid[0]][trueid[1]];
 										nameColor = character[0].nameColor;
 										color = character[0].color;
-										fontStyle = character[0].fontStyle;	
+										fontStyle = character[0].fontStyle;
+										customHTML = character[0].customHTML;
 									} else {
 										that.closeChar(index);
 									}
@@ -771,6 +787,7 @@
 									color = character[modal.id[2]].color || color;
 									nameColor = character[modal.id[2]].nameColor || nameColor;
 									fontStyle = character[modal.id[2]].fontStyle || fontStyle;
+									customHTML = character[modal.id[2]].customHTML || customHTML;
 								}
 								var previews = null;
 								var im = that.state.images;
@@ -786,6 +803,7 @@
 									Name Color: <input type="color" ref={'nameColor'+index} defaultValue={nameColor}/><br/>
 									Text Color: <input type="color" ref={'color'+index} defaultValue={color}/><br/>
 									<input type="text" ref={'font'+index} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={that.testFont} onKeyDown={that.fontTest}/><br/>
+									<input type="text" ref={'html'+index} placeholder="Custom HTML" defaultValue={customHTML}/><br/>
 									{groupdropdown ? 'Select a group: ' : ''}{groupdropdown}<br/>
 									<button type="submit" id="save" onClick={that.charEdit}>Save</button>
 										<button type="submit" id="cancel" onClick={that.closeChar.bind(null, index)}>Cancel</button></div>
@@ -869,8 +887,8 @@
 				this.props.handleSettings(settings, this.props.characters);
 			},
 
-			genmodal: function(e){//only for narrate right now
-				this.props.modalpush({id: [], name: 'Narrate', type: 'action'});
+			genmodal: function(e){
+				this.props.modalpush({id: [], name: e.target.textContent, type: 'action'});
 			},
 
 			gendice: function(e){
@@ -879,6 +897,10 @@
 				if(this.refs.exploding.checked){dice += '!';}
 				settings.dice.push(dice);
 				this.props.handleSettings(settings, this.props.characters);
+			},
+
+			show: function(e){
+				this.props.socket.emit(e.target.textContent);
 			},
 
 			roll: function(e){
@@ -950,15 +972,14 @@
 					case 'commands'://case for player commands tab
 						//<div key='2' className='Command' onClick={function(e){window.open('/forums?id='+this.props.socket.id);}}>Open Forums</div>
 						//similar for Character Database
-						//<div key='5' className='Command' onClick={this.something}>Show Rules</div>
-						//<div key='6' className='Command' onClick={this.something}>Show MOTD</div>
-						currenttab = [<div key='0' className='Command'><span onClick={this.setColor}>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='7' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab = [<div key='0' className='Command'><span onClick={this.setColor}>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
 							currenttab.push(<div key={8+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
+						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>]
 				}
 				var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 				return (
@@ -996,6 +1017,16 @@
 					}
 					this.refs.post.innerHTML = post;
 				}
+				if(this.refs.name && message.character.customHTML){//only for character posts
+					var name = message.character.customHTML;
+					switch(classparam){
+						case 'say':
+							name += ':';
+						case 'action':
+							name += ' ';
+					}
+					this.refs.name.innerHTML = name;
+				}
 			},
 
 			componentDidMount: function(){
@@ -1021,23 +1052,25 @@
 						return (<div className={message.className}><span ref="post" style={{color: message.color}}></span></div>);
 					case 'log':
 						return (<div className={message.className}>{"| "+message.username+" "+message.post+" |"}</div>);
+					case 'system'://just the post itself.
+						return (<div className={message.className}><span ref="post"></span></div>);
 					case 'say':
 						if(message.className.startsWith('O')){//omit
-							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						} else {
 							var charid = character.id.split('-');
 							charid.pop();
 							charid = charid.join('-');//catches names with - in them
-							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/><span style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						}
 					case 'action':
 						if(message.className.startsWith('O')){//omit
-							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						} else {
 							var charid = character.id.split('-');
 							charid.pop();
 							charid = charid.join('-');//catches names with - in them
-							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/><span style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						}
 				}
 			}
