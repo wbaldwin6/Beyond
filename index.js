@@ -24,8 +24,8 @@ var serversettings;
 try{
 	serversettings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
 } catch(e) {
-	console.log('Writing settings.');
-	serversettings = {motd: '', rules: 'Rule 0: Be respectful.'};
+	var profile = '<style>body{background-color:black}</style><font style="font-size:12px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i><br><br><b>Age:</b> <i>In years, typically.</i><br><br><b>Gender:</b> <i>____</i><br><br><b>Species:</b> <i> </i><br><br><b>Height:</b> <i> </i><br><br><b>History:</b> <i>Any other relevant information can be have fields added.</i>';
+	serversettings = {motd: '', rules: 'Rule 0: Be respectful.', profile: profile};
 	fs.writeFileSync('settings.json', JSON.stringify(serversettings));
 }
 
@@ -67,6 +67,13 @@ try{//make the saves folder if it doesn't exist BEFORE proceeding.
 	if(e.code != 'EEXIST'){throw e;}
 }
 
+try{
+	fs.mkdirSync(__dirname+'/characters');
+	fs.writeFile(__dirname+'/characters/charindex.json', JSON.stringify({}));
+} catch(e){
+	if(e.code != 'EEXIST'){throw e;}
+}
+
 var sessions = {};//maps session.id to username
 var users = {};//maps username to sockets. YES, we need both!
 var playerlist = {};//Having three feels superfluous, but I think O(1) is more important than a bit of extra memory.
@@ -80,6 +87,54 @@ app.get('/logs/:name', function(req, res){
 	if(name.endsWith('.html')){
 		res.sendFile(name, {root: __dirname+'/logs/'});
 	}
+});
+
+app.get('/characters/:user/:name', function(req, res){
+	var name = req.params.name;
+	if(name.endsWith('.html')){
+		try{//make sure the logins file exists BEFORE proceeding.
+			fs.accessSync(__dirname+'/characters/'+req.params.user+'/'+name, fs.R_OK | fs.W_OK);
+			res.sendFile(name, {root: __dirname+'/characters/'+req.params.user});
+		} catch(e) {
+			res.send("<style>body{background-color: black; color: white;}</style><body>Profile not found!</body>")
+		}
+	}
+});
+
+app.get('/characters', function(req, res){
+	fs.readdir(__dirname+'/characters', function(err, files){
+		if(!err){
+			var ret = '<body style="background-color:black;">';
+			files = files.sort();
+			files.forEach(function(file, index){
+				if(!file.endsWith('.json')){
+					ret += '<a href="/characters/'+file+'" style="color:blue;">'+file+'</a><br><br>';
+				}
+			});
+			ret += '</body>';
+			res.send(ret);
+		}
+	});
+});
+app.get('/characters/:user', function(req, res){
+	fs.readdir(__dirname+'/characters/'+req.params.user, function(err, files){
+		if(!err){
+			fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, charindex){
+				if(!err){
+					charindex = JSON.parse(charindex);
+					var ret = '<body style="background-color:black;">';
+					files.forEach(function(file, index){
+						var id=req.params.user+'-'+file.slice(0, -5);
+						var name = charindex[id].name;
+						ret += '<a href="/characters/'+req.params.user+'/'+file+'" style="color:blue;">'+
+						'<img src="/faceicons/img_trans.gif" height="50px" width="50px" style="background-image:url(/faceicons/'+charindex[id].icon+'.png);">'+name+'</a><br><br>';
+					});
+					ret += '</body>';
+					res.send(ret);
+				} else res.send(err);
+			});
+		} else res.send(err);
+	});
 });
 
 app.get('/logs', function(req, res){
@@ -192,8 +247,11 @@ openLog = function (logfile){//takes in a Date object
 	}
 };
 //initial opening when the server is activated
+logday = function(today){
+	return __dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+("0"+today.getDate()).slice(-2)+'.html'
+};
 var today = new Date();
-var logfile = __dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+today.getDate()+'.html';
+var logfile = logday(today);
 var htm = null;
 openLog(logfile);
 
@@ -210,8 +268,8 @@ var userdefaults = {
 
 toLog = function (message){
 	var today = new Date();
-	if(__dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+today.getDate()+'.html' != logfile){//new day
-		logfile = __dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+today.getDate()+'.html';
+	if(logday(today) != logfile){//new day
+		logfile = logday(today);
 		openLog(logfile);
 		//NOW proceed using htm
 	}
@@ -558,27 +616,33 @@ io.on('connection', function(socket){
 	});
 	socket.on('register', function(username, password, callback){
 		fs.readFile('logins.json', 'utf8', function(err, logins){
-			logins = JSON.parse(logins);
-			if(logins[username]){//username in use
-				callback("Username already in use.");
-			} else {//new username
-				logins[username] = {password: password, permissions: 'Guest'};
-				fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
-					if(!err){
-						fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-							if(!err){
-								addPlayer(username, socket, 'Guest');
-								//create new user info
-								callback(userdefaults);
-								console.log(socket.id+" has logged in as "+username);
-								var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-								io.emit('OOCmessage', msg);
-								io.emit('PlayerList', playerlist);
-								toLog(msg);
-							} else {callback(err);}
-						});
-					} else {callback(err);}
-				});
+			if(err){callback(err);} else {
+				logins = JSON.parse(logins);
+				if(logins[username]){//username in use
+					callback("Username already in use.");
+				} else {//new username
+					logins[username] = {password: password, permissions: 'Guest'};
+					fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
+						if(!err){
+							fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+								if(!err){
+									fs.mkdir(__dirname+'/characters/'+username, function(err){
+										if(!err || err.code == 'EEXIST'){
+											addPlayer(username, socket, 'Guest');
+											//create new user info
+											callback(userdefaults);
+											console.log(socket.id+" has logged in as "+username);
+											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+											io.emit('OOCmessage', msg);
+											io.emit('PlayerList', playerlist);
+											toLog(msg);
+										} else {callback(err);}
+									});
+								} else {callback(err);}
+							});
+						} else {callback(err);}
+					});
+				}
 			}
 		});
 	});
@@ -612,8 +676,11 @@ io.on('connection', function(socket){
 	socket.on('Dice', function(dice, result, color){
 		var username = sessions[socket.id];
 		if(username){
-			var total = result.reduce(function(a,b){return a+b;});
-			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '))+' ('+total+')';
+			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
+			if(result.length > 1){
+				var total = result.reduce(function(a,b){return a+b;});
+				post +=' ('+total+')';
+			}
 			var msg = {className: 'OOC dice', post: post, color: color};
 			io.emit('OOCmessage', msg);
 		}
@@ -673,6 +740,13 @@ io.on('connection', function(socket){
 			});
 		}
 	});
+	socket.on('Update Character', function(character){
+		fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
+			index = JSON.parse(index);
+			index[character.id] = {name: character.name, icon: character.icon};
+			fs.writeFile(__dirname+'/characters/charindex.json', JSON.stringify(index));
+		});
+	});
 	socket.on('sendimage', function(icons, callback){
 		var username = sessions[socket.id];
 		if(username){
@@ -687,16 +761,53 @@ io.on('connection', function(socket){
 			}
 		}
 	});
-	socket.on('Show Rules', function(message){
+	socket.on('Show Rules', function(callback){
 		if(serversettings.rules){
-			var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
-			socket.emit('OOCmessage', msg);
+			if(callback){
+				callback(serversettings.rules);
+			} else {
+				var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
+				socket.emit('OOCmessage', msg);
+			}
 		}
 	});
-	socket.on('Show MOTD', function(message){
+	socket.on('Show MOTD', function(callback){
 		if(serversettings.motd){
-			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
-			socket.emit('OOCmessage', msg);
+			if(callback){
+				callback(serversettings.motd);
+			} else {
+				var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
+				socket.emit('OOCmessage', msg);
+			}
+		}
+	});
+	socket.on('Show Profile', function(id, callback){
+		if(id){
+			var n = id.split('-');
+			var d = n.pop();
+			n = n.join('-');
+			fs.readFile(__dirname+'/characters/'+n+'/'+d+'.html', 'utf8', function(err, profile){
+				if(err){
+					callback(serversettings.profile);
+				} else {
+					callback(profile);
+				}
+			});
+		} else {//don't bother file checking in this case.
+			callback(serversettings.profile);
+		}
+	});
+	socket.on('Set Profile', function(profile, id){
+		var username = sessions[socket.id];
+		var n = id.split('-');
+		var d = n.pop();
+		n = n.join('-');
+		if(username && username == n){
+			var dir = '/characters/'+n+'/'+d+'.html';
+			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dir+'" target="_blank">here.</a>'+'</font>'};
+			fs.writeFile(__dirname+dir, profile.replace(/\r\n?|\n/g, "<br />"), function(err){
+				if(err){console.log(err);} else {socket.emit('OOCmessage', msg);}
+			});
 		}
 	});
 	socket.on('Edit Rules', function(message){
@@ -716,6 +827,18 @@ io.on('connection', function(socket){
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.motd = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the MOTD.</font>'};
+			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
+				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
+			});
+		} else {
+			console.log(username+' attempted to use an admin command.');
+		}
+	});
+	socket.on('Edit Default Profile', function(message){
+		var username = sessions[socket.id];
+		if(username && playerlist[username].permissions == 'Admin'){
+			serversettings.profile = processHTML(message);
+			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
 			});

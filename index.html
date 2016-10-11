@@ -325,6 +325,7 @@
 				var name = e.target.textContent;
 				var id = this.state.context.target.getAttribute('id').split(',');
 				var newmodal = {id: id, name: name};
+				//TODO: Replace this spaghetti with a switch if you can.
 				if(name.startsWith('Delete')){
 					if(id[0].startsWith('Dice')){
 						//just delete it outright.
@@ -365,6 +366,15 @@
 					if(newmodal.post.endsWith(" (Edited)")){
 						newmodal.post = newmodal.post.slice(0, -9);
 					}
+					newmodal.post = newmodal.post.replace(/<br( \/)?>/g, '\n');
+				} else if(name == 'Set Profile'){
+					newmodal.charid = this.state.characters[id[0]][id[1]][0].id;
+					var that=this;
+					this.props.socket.emit('Show Profile', newmodal.charid, function(response){
+						newmodal.post = response.replace(/<br( \/)?>/g, '\n');
+						newmodal.type = 'action';
+						that.modalpush(newmodal);//async is just fine thanks to this function.
+					});
 				} else if(name == 'Whisper'){
 					//id is the [username] in this case.
 					newmodal.id = id.join(',');//this IS a valid character so we gotta fix it.
@@ -520,8 +530,10 @@
 						this.props.socket.emit('Whisper', post, modata.id[0]);
 					} else if(modata.name == 'Narrate'){
 						this.props.socket.emit('Narrate', post, this.props.settings.textcolor);
-					} else if(modata.name == 'Edit Rules' || modata.name == 'Edit MOTD'){
+					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
+					} else if(modata.name == 'Set Profile'){
+						this.props.socket.emit(modata.name, post, modata.charid);
 					} else {//find the right id
 						var trueid = this.verifyID(modata.charid, modata.id);
 						if(trueid){
@@ -698,6 +710,7 @@
 						}//now we've added all the new derivatives or just modified the one.
 						characters[trueid[0]][trueid[1]] = character;//adds new if new, otherwise overwrites
 						that.props.handleSettings(settings, characters);
+						that.props.socket.emit('Update Character', character[0]);
 						that.closeChar(id);
 					});
 				}
@@ -893,15 +906,32 @@
 			},
 
 			genmodal: function(e){
-				this.props.modalpush({id: [], name: e.target.textContent, type: 'action'});
+				var name = e.target.textContent;
+				var type = name.split(' '); type = type[type.length-1];
+				var that = this;
+				if(['Rules', 'MOTD', 'Profile'].indexOf(type) > -1){
+					var res = function(response){
+						if(response){response = response.replace(/<br( \/)?>/g, '\n');}
+						that.props.modalpush({id: [], name: name, type: 'action', post: response});
+					};
+					if(type == 'Profile'){
+						this.props.socket.emit('Show '+type, null, res);
+					} else {
+						this.props.socket.emit('Show '+type, res);
+					}
+				} else {
+					this.props.modalpush({id: [], name: name, type: 'action'});
+				}
 			},
 
 			gendice: function(e){
 				var settings = this.props.settings;
 				var dice = this.refs.Nd.value+'d'+this.refs.dN.value;
 				if(this.refs.exploding.checked){dice += '!';}
-				settings.dice.push(dice);
-				this.props.handleSettings(settings, this.props.characters);
+				if(this.refs.Nd.value && this.refs.dN.value){
+					settings.dice.push(dice);
+					this.props.handleSettings(settings, this.props.characters);
+				}
 			},
 
 			show: function(e){
@@ -941,7 +971,7 @@
 						var characters = this.props.characters;
 						var charlist = characters.map(function(group, i){//groups loop
 							if(i==0 || that.state.open.groups[group[0]]){//open group
-								var charop = ['Create Derivative', 'Delete Character'];
+								var charop = ['Create Derivative', 'Delete Character', 'Set Profile'];
 								if(i){charop.push('Ungroup');}
 								var chars = characters[i].map(function(chr, i2){//characters loop
 									if(typeof chr !== 'string'){//make sure it's not the name.
@@ -977,14 +1007,14 @@
 					case 'commands'://case for player commands tab
 						//<div key='2' className='Command' onClick={function(e){window.open('/forums?id='+this.props.socket.id);}}>Open Forums</div>
 						//similar for Character Database
-						currenttab = [<div key='0' className='Command'><span onClick={this.setColor}>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab = [<div key='0' className='Command'><span>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
 							currenttab.push(<div key={8+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
-						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>]
+						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>]
 				}
 				var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 				return (
@@ -1060,22 +1090,24 @@
 					case 'system'://just the post itself.
 						return (<div className={message.className}><span ref="post"></span></div>);
 					case 'say':
+						var charid = character.id.split('-');
+						var d = charid.pop();
+						charid = charid.join('-');//catches names with - in them
+						var profileopen = function(e){window.open('/characters/'+charid+'/'+d+'.html');}
 						if(message.className.startsWith('O')){//omit
-							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						} else {
-							var charid = character.id.split('-');
-							charid.pop();
-							charid = charid.join('-');//catches names with - in them
-							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						}
 					case 'action':
+						var charid = character.id.split('-');
+						var d = charid.pop();
+						charid = charid.join('-');//catches names with - in them
+						var profileopen = function(e){window.open('/characters/'+charid+'/'+d+'.html');}
 						if(message.className.startsWith('O')){//omit
-							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer',backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						} else {
-							var charid = character.id.split('-');
-							charid.pop();
-							charid = charid.join('-');//catches names with - in them
-							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
+							return(<div id={message.id} data={'Edit*'+charid} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span></div>);
 						}
 				}
 			}
