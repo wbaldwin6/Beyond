@@ -351,7 +351,7 @@
 						newmodal.groupname = this.state.characters[id[0]][0];
 					}
 					newmodal.type = 'group';
-				} else if(name.endsWith("Action") || name.endsWith("Say")){
+				} else if(name.endsWith("Action") || name.endsWith("Say") || name == "Join Room"){
 					if(id.length > 1){
 						newmodal.charid = this.state.characters[id[0]][id[1]][0].id;
 					}
@@ -388,6 +388,24 @@
 					var chr = characters[id[0]].splice(id[1], 1);
 					characters[0].push(chr[0]);
 					this.handleSettings(this.state.settings, characters);
+				} else if(name == 'Leave Room'){
+					var charid = this.state.characters[id[0]][id[1]][0].id;
+					var settings = this.state.settings;
+					var rooms = Object.keys(settings.rooms);
+					var ind = -1;
+					for(var i=0; i < rooms.length && ind < 0; i++){//stop if we find it
+						ind = settings.rooms[rooms[i]].indexOf(charid);
+					}
+					if(ind > -1){//it's in this room
+						i--;
+						settings.rooms[rooms[i]].splice(ind, 1);
+						if(settings.rooms[rooms[i]].length < 1){
+							this.props.socket.emit('Leave Room', rooms[i]);
+							delete settings.rooms[rooms[i]];
+						}
+					}
+					newmodal = null;
+					this.handleSettings(settings, this.state.characters);
 				}
 				this.modalpush(newmodal);
 			},
@@ -428,14 +446,14 @@
 						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings}/>
 						{context}
 						<div id="left">
-							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions}/>
+							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions} systemmessage={this.refs.OOCbox ? this.refs.OOCbox.systemmessage : null}/>
 						</div>
 						<div id="OI">
 							<div id="IC">
 								<IChandler socket={this.props.socket}/>
 							</div>
 							<div id="OOC">
-								<OOChandler socket={this.props.socket}/>
+								<OOChandler ref="OOCbox" socket={this.props.socket}/>
 							</div>
 						</div>
 						<input className="OOCbar" style={{width: '100%', padding: '0 0 0 0', border: '0'}} type="text" ref="OOCbar" placeholder="Input an OOC message" onKeyPress={this.handleEnter}/>
@@ -521,7 +539,16 @@
 				var id = modal.getAttribute('id');
 				var modata = this.props.modal[id];
 				var post = this.refs['text'+id].value;
-				if(post){
+				if(modata.name == 'Set Room'){//should allow null
+						if(this.props.settings.room && !this.props.settings.rooms[this.props.settings.room]){//we were in a room and we have no characters in it
+							this.props.socket.emit('Leave Room', this.props.settings.room);
+						}
+						this.props.settings.room = post;
+						if(post){
+							this.props.socket.emit('Join Room', post);
+						}
+						this.props.handleSettings(this.props.settings, this.props.characters);
+				} else if(post){
 					if(modata.name == 'Edit'){
 						if(modata.post != post){
 							this.props.socket.emit('ICedit', post, modata.id[0]);
@@ -529,16 +556,47 @@
 					} else if(modata.name == 'Whisper'){
 						this.props.socket.emit('Whisper', post, modata.id[0]);
 					} else if(modata.name == 'Narrate'){
-						this.props.socket.emit('Narrate', post, this.props.settings.textcolor);
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
 					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
+					} else if(modata.name == 'Join Room'){
+						var settings = this.props.settings;
+						if(!settings.rooms[post]){//not in this room yet
+							this.props.socket.emit('Join Room', post);
+							settings.rooms[post] = [];
+						}
+						//need to remove them from their previous room too if applicable
+						var rooms = Object.keys(settings.rooms);
+						var ind = -1;
+						for(var i=0; i < rooms.length && ind < 0; i++){//stop if we find it
+							ind = settings.rooms[rooms[i]].indexOf(modata.charid);
+						}
+						if(ind > -1){//it's in this room
+							i--;
+							settings.rooms[rooms[i]].splice(ind, 1);
+							if(settings.rooms[rooms[i]].length < 1){
+								this.props.socket.emit('Leave Room', rooms[i]);
+								delete settings.rooms[rooms[i]];
+							}
+						}
+						settings.rooms[post].push(modata.charid);
+						this.props.handleSettings(settings, this.props.characters);
 					} else {//find the right id
 						var trueid = this.verifyID(modata.charid, modata.id);
+						var room = null;
+						if(modata.name == 'Say' || modata.name == 'Action'){//only for IC posts.
+							var rooms = Object.keys(this.props.settings.rooms);
+							for(var i=0; i < rooms.length && !room; i++){
+								if(this.props.settings.rooms[rooms[i]].indexOf(modata.charid) > -1){//it's in this room
+									room = rooms[i];
+								}
+							}
+						}
 						if(trueid){
 							var deriv = this.props.characters[trueid[0]][trueid[1]][trueid[2]];
-							this.props.socket.emit('characterPost', post, deriv, modata.name);
+							this.props.socket.emit('characterPost', post, deriv, modata.name, room);
 						}//if it's undefined the character doesn't exist.
 					}
 				}
@@ -628,6 +686,20 @@
 					trueid = this.verifyID(modata.charid, modata.id);
 					if(trueid){
 						characters[trueid[0]].splice(trueid[1], 1);
+						//have to remove it from the room as well
+						var rooms = Object.keys(this.props.settings.rooms);
+						var ind = -1;
+						for(var i=0; i < rooms.length && ind < 0; i++){
+							ind = this.props.settings.rooms[rooms[i]].indexOf(modata.charid);
+						}
+						if(ind > -1){
+							i--;
+							this.props.settings.rooms[rooms[i]].splice(ind, 1);
+							if(this.props.settings.rooms[rooms[i]].length < 1){
+								this.props.socket.emit('Leave Room', rooms[i]);
+								delete this.props.settings.rooms[rooms[i]];
+							}
+						}
 					}
 				} else {
 					trueid = this.verifyID(modata.charid, modata.id);
@@ -938,6 +1010,30 @@
 				this.props.socket.emit(e.target.textContent);
 			},
 
+			rooms: function(e){
+				var message = '<b>Your Room</b>: '+this.props.settings.room;
+				var rooms = Object.keys(this.props.settings.rooms);
+				var that = this;
+				var idlist = {};
+				this.props.characters.forEach(function(group){
+					group.forEach(function(chr, i){
+						if(typeof chr !== 'string'){//skip the names
+							idlist[chr[0].id] = chr[0].name;
+						}
+					});
+				});
+				rooms.forEach(function(room, j){
+					message += '<br />';
+					message += room + ': ';
+					//add specific characters
+					that.props.settings.rooms[room].forEach(function(chr, i){
+						if(i){message += ', ';}//add before any character but the first
+						message += idlist[chr];
+					});
+				});
+				this.props.systemmessage(message);
+			},
+
 			roll: function(e){
 				var dice = e.target.textContent.split('d');// dice[0] is the number, dice[1] is faces (plus ! if it's there)
 				var result = [];
@@ -971,7 +1067,7 @@
 						var characters = this.props.characters;
 						var charlist = characters.map(function(group, i){//groups loop
 							if(i==0 || that.state.open.groups[group[0]]){//open group
-								var charop = ['Create Derivative', 'Delete Character', 'Set Profile'];
+								var charop = ['Create Derivative', 'Delete Character', 'Set Profile', 'Join Room', 'Leave Room'];
 								if(i){charop.push('Ungroup');}
 								var chars = characters[i].map(function(chr, i2){//characters loop
 									if(typeof chr !== 'string'){//make sure it's not the name.
@@ -1006,11 +1102,10 @@
 						break;
 					case 'commands'://case for player commands tab
 						//<div key='2' className='Command' onClick={function(e){window.open('/forums?id='+this.props.socket.id);}}>Open Forums</div>
-						//similar for Character Database
-						currenttab = [<div key='0' className='Command'><span>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab = [<div key='0' className='Command'><span>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='8' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='9' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={8+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
+							currenttab.push(<div key={10+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
@@ -1167,6 +1262,12 @@
 		var OOChandler = React.createClass({
 			getInitialState: function(){
 				return {messages: [], height: 0};
+			},
+
+			systemmessage: function(message){
+				var newm = this.state.messages.slice();
+				newm.push(<Message key={newm.length} message={{post: message, className: 'OOC system message'}}/>)
+				this.setState({messages: newm, height: this.refs.box.scrollHeight});
 			},
 
 			shouldComponentUpdate: function(nextProps, nextState){

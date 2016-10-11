@@ -259,7 +259,9 @@ var userdefaults = {
 	settings: {
 		textcolor: 'white',
 		characterIDs: 0,
-		dice: []
+		dice: [],
+		rooms: {},
+		room: ''
 	},
 	characters: [
 		[]//where ungrouped characters go, this should always exist.
@@ -596,7 +598,16 @@ io.on('connection', function(socket){
 							//pull up user info
 							fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
 								if(err){callback(err);} else {
-									callback(JSON.parse(info));
+									info = JSON.parse(info);
+									callback(info);
+									if(info.settings.room){
+										socket.join(info.settings.room);
+									}
+									Object.keys(info.settings.rooms).forEach(function(room){
+										if(typeof room === 'string'){
+											socket.join(room);
+										}
+									});
 									console.log(socket.id+" has logged in as "+username);
 									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
 									io.emit('OOCmessage', msg);
@@ -646,6 +657,18 @@ io.on('connection', function(socket){
 			}
 		});
 	});
+	socket.on('Join Room', function(room){
+		var username = sessions[socket.id];
+		if(username){
+			socket.join(room);
+		}
+	});
+	socket.on('Leave Room', function(room){
+		var username = sessions[socket.id];
+		if(username){
+			socket.leave(room);
+		}
+	});
 	socket.on('OOCmessage', function(message, color){
 		var username = sessions[socket.id];
 		if(username){
@@ -655,15 +678,19 @@ io.on('connection', function(socket){
 			toLog(msg);
 		}
 	});
-	socket.on('Narrate', function(message, color){
+	socket.on('Narrate', function(message, color, room){
 		var username = sessions[socket.id];
 		if(username){
 			message = processHTML(message);
 			var msg = {className: 'IC narration message', username: username, post: message, color: color};
 			msg.id = postnum++;
 			fs.writeFile(__dirname+'/logs/postid.txt', postnum);
-			io.emit('ICmessage', msg);
-			toLog(msg);
+			if(room){
+				io.to(room).emit('ICmessage', msg);
+			} else {
+				io.emit('ICmessage', msg);
+				toLog(msg);
+			}
 		}
 	});
 	socket.on('Whisper', function(message, target){
@@ -685,7 +712,7 @@ io.on('connection', function(socket){
 			io.emit('OOCmessage', msg);
 		}
 	})
-	socket.on('characterPost', function(message, character, type){
+	socket.on('characterPost', function(message, character, type, room){
 		var username = sessions[socket.id];
 		if(username){
 			if(character.customHTML){
@@ -716,6 +743,8 @@ io.on('connection', function(socket){
 			if(type.startsWith('Test')){
 				msg.post += ' (Test)';
 				socket.emit(call, msg);
+			} else if(typeof room === 'string'){
+				io.to(room).emit(call, msg);
 			} else {
 				io.emit(call, msg);
 				toLog(msg);
