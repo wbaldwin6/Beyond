@@ -307,7 +307,8 @@
 						var ret = check.shift();
 						check = check[0];
 						if(check){//option has a condition
-							if((check == 'admin' && that.state.permissions == 'Admin')
+							if((check == 'admin' && that.state.permissions == 'Admin'
+								|| check == 'player' && ['Player', 'Admin'].indexOf(that.state.permissions) > -1)
 								|| check == that.state.username){
 								processed.push(ret);
 							}
@@ -1067,13 +1068,13 @@
 						var characters = this.props.characters;
 						var charlist = characters.map(function(group, i){//groups loop
 							if(i==0 || that.state.open.groups[group[0]]){//open group
-								var charop = ['Create Derivative', 'Delete Character', 'Set Profile', 'Join Room', 'Leave Room'];
+								var charop = ['Create Derivative', 'Delete Character', 'Set Profile', 'Join Room*player', 'Leave Room*player'];
 								if(i){charop.push('Ungroup');}
 								var chars = characters[i].map(function(chr, i2){//characters loop
 									if(typeof chr !== 'string'){//make sure it's not the name.
 										if(that.state.open.characters[chr[0].id]){//open derivative list
 											var derivs = characters[i][i2].map(function(deriv, i3){
-												return(<div data={['Edit Derivative', 'Delete Derivative', 'Say', 'Action', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/><span>{deriv.name}</span></div>);
+												return(<div data={['Edit Derivative', 'Delete Derivative', 'Say*player', 'Action*player', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/><span>{deriv.name}</span></div>);
 											});
 											return(<div data={charop} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.closeChar}>{chr[0].name} [-]</span>{derivs}</div>);
 										} else {//closed derivative list
@@ -1221,7 +1222,7 @@
 			componentDidUpdate: function(){
 				//I need it to only autoscroll if they were previously at the bottom.
 				if(this.refs.box.scrollTop + this.refs.box.clientHeight >= this.state.height){
-					this.refs.box.scrollTop = Number.MAX_SAFE_INTEGER;
+					this.refs.box.scrollTop = this.state.height;
 				}
 			},
 
@@ -1276,7 +1277,7 @@
 
 			componentDidUpdate: function(){
 				if(this.refs.box.scrollTop + this.refs.box.clientHeight >= this.state.height){
-					this.refs.box.scrollTop = Number.MAX_SAFE_INTEGER;
+					this.refs.box.scrollTop = this.state.height;
 				}
 			},
 

@@ -556,131 +556,29 @@ var commands = {//console command list, formatted this way for convenience.
 	},
 };
 
-io.on('connection', function(socket){
-	if(banlist.ips.indexOf(socket.request.connection.remoteAddress) > -1){//banned IP
-		socket.disconnect();
-	} else {
-		if(serversettings.rules){
-			var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
-			socket.emit('OOCmessage', msg);
-		}
-		if(serversettings.motd){
-			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
-			socket.emit('OOCmessage', msg);
-		}
-	}
-	console.log('a user connected');
-	socket.on('disconnect', function(){
-		console.log(sessions[socket.id]+' disconnected');
-		//handle other logoff things if there was a login
-		if(sessions[socket.id]){
-			var username = sessions[socket.id];
-			var msg = {className: 'OOC log message', username: username, post: "has logged off"}
-			io.emit('OOCmessage', msg);
-			toLog(msg);
-			removePlayer(socket.id);
-			io.emit('PlayerList', playerlist);
-		}
-	})
-	socket.on('login', function(username, password, callback){
-		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){callback(err);} else {
-				logins = JSON.parse(logins);
-				if(logins[username]){//valid username
-					if(users[username]){//already on the list?
-						callback("Username already logged in!");
-					} else if(logins[username].password == password){//valid login
-						addPlayer(username, socket, logins[username].permissions);
-						if(banlist.users[username]){//this is so mean.
-							Commands['Ban'](username);
-							callback("You're still banned.");
-						} else {
-							//pull up user info
-							fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
-								if(err){callback(err);} else {
-									info = JSON.parse(info);
-									callback(info);
-									if(info.settings.room){
-										socket.join(info.settings.room);
-									}
-									Object.keys(info.settings.rooms).forEach(function(room){
-										if(typeof room === 'string'){
-											socket.join(room);
-										}
-									});
-									console.log(socket.id+" has logged in as "+username);
-									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-									io.emit('OOCmessage', msg);
-									io.emit('PlayerList', playerlist);
-									toLog(msg);
-								}
-							});
-						}
-					} else {//invalid login
-						callback("Password does not match the given username.");
-					}
-				} else {//invalid username
-					callback(username+" is not in our list yet.");
-				}
-			}
-		});
-	});
-	socket.on('register', function(username, password, callback){
-		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){callback(err);} else {
-				logins = JSON.parse(logins);
-				if(logins[username]){//username in use
-					callback("Username already in use.");
-				} else {//new username
-					logins[username] = {password: password, permissions: 'Guest'};
-					fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
-						if(!err){
-							fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-								if(!err){
-									fs.mkdir(__dirname+'/characters/'+username, function(err){
-										if(!err || err.code == 'EEXIST'){
-											addPlayer(username, socket, 'Guest');
-											//create new user info
-											callback(userdefaults);
-											console.log(socket.id+" has logged in as "+username);
-											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-											io.emit('OOCmessage', msg);
-											io.emit('PlayerList', playerlist);
-											toLog(msg);
-										} else {callback(err);}
-									});
-								} else {callback(err);}
-							});
-						} else {callback(err);}
-					});
-				}
-			}
-		});
-	});
+Setconnections = function(socket){//username will definitely be present or something is wrong enough to warrant throwing.
 	socket.on('Join Room', function(room){
 		var username = sessions[socket.id];
-		if(username){
+		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			socket.join(room);
 		}
 	});
 	socket.on('Leave Room', function(room){
 		var username = sessions[socket.id];
-		if(username){
+		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			socket.leave(room);
 		}
 	});
 	socket.on('OOCmessage', function(message, color){
 		var username = sessions[socket.id];
-		if(username){
-			message = processHTML(message);
-			var msg = {className: 'OOC message', username: username, post: message, color: color};
-			io.emit('OOCmessage', msg);
-			toLog(msg);
-		}
+		message = processHTML(message);
+		var msg = {className: 'OOC message', username: username, post: message, color: color};
+		io.emit('OOCmessage', msg);
+		toLog(msg);
 	});
 	socket.on('Narrate', function(message, color, room){
 		var username = sessions[socket.id];
-		if(username){
+		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			message = processHTML(message);
 			var msg = {className: 'IC narration message', username: username, post: message, color: color};
 			msg.id = postnum++;
@@ -702,7 +600,7 @@ io.on('connection', function(socket){
 	});
 	socket.on('Dice', function(dice, result, color){
 		var username = sessions[socket.id];
-		if(username){
+		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
 			if(result.length > 1){
 				var total = result.reduce(function(a,b){return a+b;});
@@ -733,7 +631,7 @@ io.on('connection', function(socket){
 			if(type.startsWith('O') || type.startsWith('T')){//omit say or omit action
 				className = 'OOC ' + className;
 				call = 'OOCmessage';
-			} else {//IC say or action
+			} else if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1) {//IC say or action
 				msg.id = postnum++;
 				className = 'IC ' + className;
 				call = 'ICmessage';
@@ -743,9 +641,9 @@ io.on('connection', function(socket){
 			if(type.startsWith('Test')){
 				msg.post += ' (Test)';
 				socket.emit(call, msg);
-			} else if(typeof room === 'string'){
+			} else if(typeof room === 'string' && call){
 				io.to(room).emit(call, msg);
-			} else {
+			} else if(call) {//If it doesn't have a call(IE they didn't pass the player/admin test) drop the message
 				io.emit(call, msg);
 				toLog(msg);
 			}
@@ -753,20 +651,11 @@ io.on('connection', function(socket){
 	});
 	socket.on('ICedit', function(message, postid){
 		var username = sessions[socket.id];
-		if(username){
+		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			message = processHTML(message);
 			var msg = {id: postid, post: message+' (Edited)'};
 			io.emit('ICedit', msg);
 			editLog(msg);
-		}
-	});
-	socket.on('save', function(settings){
-		var username = sessions[socket.id];
-		if(username){
-			fs.writeFile(__dirname+'/saves/'+username+'.json', settings, function(err){
-				if(!err){
-				}
-			});
 		}
 	});
 	socket.on('Update Character', function(character){
@@ -886,6 +775,120 @@ io.on('connection', function(socket){
 			}
 		} else {
 			console.log(username+' attempted to use an admin command.');
+		}
+	});
+};
+
+io.on('connection', function(socket){
+	if(banlist.ips.indexOf(socket.request.connection.remoteAddress) > -1){//banned IP
+		socket.disconnect();
+	} else {
+		if(serversettings.rules){
+			var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
+			socket.emit('OOCmessage', msg);
+		}
+		if(serversettings.motd){
+			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
+			socket.emit('OOCmessage', msg);
+		}
+	}
+	console.log('a user connected');
+	socket.on('disconnect', function(){
+		console.log(sessions[socket.id]+' disconnected');
+		//handle other logoff things if there was a login
+		if(sessions[socket.id]){
+			var username = sessions[socket.id];
+			var msg = {className: 'OOC log message', username: username, post: "has logged off"}
+			io.emit('OOCmessage', msg);
+			toLog(msg);
+			removePlayer(socket.id);
+			io.emit('PlayerList', playerlist);
+		}
+	});
+	socket.on('login', function(username, password, callback){
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){callback(err);} else {
+				logins = JSON.parse(logins);
+				if(logins[username]){//valid username
+					if(users[username]){//already on the list?
+						callback("Username already logged in!");
+					} else if(logins[username].password == password){//valid login
+						addPlayer(username, socket, logins[username].permissions);
+						if(banlist.users[username]){//this is so mean.
+							Commands['Ban'](username);
+							callback("You're still banned.");
+						} else {
+							//pull up user info
+							fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
+								if(err){callback(err);} else {
+									setImmediate(function() {Setconnections(socket);});
+									info = JSON.parse(info);
+									callback(info);
+									if(info.settings.room){
+										socket.join(info.settings.room);
+									}
+									Object.keys(info.settings.rooms).forEach(function(room){
+										if(typeof room === 'string'){
+											socket.join(room);
+										}
+									});
+									console.log(socket.id+" has logged in as "+username);
+									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+									io.emit('OOCmessage', msg);
+									io.emit('PlayerList', playerlist);
+									toLog(msg);
+								}
+							});
+						}
+					} else {//invalid login
+						callback("Password does not match the given username.");
+					}
+				} else {//invalid username
+					callback(username+" is not in our list yet.");
+				}
+			}
+		});
+	});
+	socket.on('register', function(username, password, callback){
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){callback(err);} else {
+				logins = JSON.parse(logins);
+				if(logins[username]){//username in use
+					callback("Username already in use.");
+				} else {//new username
+					logins[username] = {password: password, permissions: 'Guest'};
+					fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
+						if(!err){
+							fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+								if(!err){
+									fs.mkdir(__dirname+'/characters/'+username, function(err){
+										if(!err || err.code == 'EEXIST'){
+											setImmediate(function() {Setconnections(socket);});
+											addPlayer(username, socket, 'Guest');
+											//create new user info
+											callback(userdefaults);
+											console.log(socket.id+" has logged in as "+username);
+											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+											io.emit('OOCmessage', msg);
+											io.emit('PlayerList', playerlist);
+											toLog(msg);
+										} else {callback(err);}
+									});
+								} else {callback(err);}
+							});
+						} else {callback(err);}
+					});
+				}
+			}
+		});
+	});
+	socket.on('save', function(settings){
+		var username = sessions[socket.id];
+		if(username){
+			fs.writeFile(__dirname+'/saves/'+username+'.json', settings, function(err){
+				if(!err){
+				}
+			});
 		}
 	});
 });
