@@ -42,11 +42,11 @@
 				font-weight: bold;
 			}
 			div.derivative{
-				padding-bottom: 5px;
 				height:50px;
 				line-height: 50px;
 			}
 			div.derivative span{
+				pointer-events: none;
 				height:50px;
 				width: calc(100% - 50px);
 				margin: 0;
@@ -194,6 +194,13 @@
 			input[type=number]{
 				-moz-appearance: textfield;
 				margin: 0;
+			}
+			input.char, select.char{
+				float: right;
+				width: 60%;
+				padding: 0;
+				border: 0;
+				height:17px;
 			}
 			.Command:hover{
 				color: white;
@@ -844,10 +851,11 @@
 									</div>);
 							case 'character'://character creation/edit modal.
 								var groupdropdown = null;
-								var FIs = (<input type='file' ref={'FIs'+index} multiple onChange={that.handleFIs}/>);//by default it allows multiple
+								var FIs = (<input type='file' ref={'FIs'+index} style={{width:'100%',marginBottom:'1px'}} multiple onChange={that.handleFIs}/>);//by default it allows multiple
 								var nameColor; var color; var fontStyle; var customHTML;
 								var character;
 								var trueid;
+								var name;
 								if(modal.id.length == 1){//new character
 									nameColor = '#ffffff';
 									color = '#ffffff';
@@ -860,7 +868,8 @@
 											return (<option key={ind} value={ind}>{group[0]}</option>);
 										}
 									});
-									groupdropdown = (<select ref={'group'+index}>{grouption}</select>);
+									groupdropdown = (<select className="char" ref={'group'+index}>{grouption}</select>);
+									name = modal.name;
 								} else {
 									trueid = that.verifyID(modal.charid, modal.id);
 									if(trueid){
@@ -869,16 +878,18 @@
 										color = character[0].color;
 										fontStyle = character[0].fontStyle;
 										customHTML = character[0].customHTML;
+										name = modal.name+' - '+character[0].name;
 									} else {
 										that.closeChar(index);
 									}
 								}
 								if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
-									FIs = <input type='file' ref={'FIs'+index} onChange={that.handleFIs}/>;
+									FIs = <input type='file' ref={'FIs'+index} style={{width:'100%',marginBottom:'1px'}} onChange={that.handleFIs}/>;
 									color = character[modal.id[2]].color || color;
 									nameColor = character[modal.id[2]].nameColor || nameColor;
 									fontStyle = character[modal.id[2]].fontStyle || fontStyle;
 									customHTML = character[modal.id[2]].customHTML || customHTML;
+									name = modal.name+' - '+character[modal.id[2]].name;
 								}
 								var previews = null;
 								var im = that.state.images;
@@ -888,13 +899,14 @@
 									});
 								}
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>{FIs}<br/>
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+									{FIs}<br/>
 									<span ref={'faceicons'+index}>{previews}</span><canvas ref={'canvas'+index} width='0' height='0'></canvas><br/>
-									<input type="text" ref={'name'+index} placeholder="Character Name" required/><br/>
-									Name Color: <input type="color" ref={'nameColor'+index} defaultValue={nameColor}/><br/>
-									Text Color: <input type="color" ref={'color'+index} defaultValue={color}/><br/>
-									<input type="text" ref={'font'+index} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={that.testFont} onKeyDown={that.fontTest}/><br/>
-									<input type="text" ref={'html'+index} placeholder="Custom HTML" defaultValue={customHTML}/><br/>
+									Name: <input type="text" className="char" ref={'name'+index} placeholder="Character Name" required style={{marginBottom:'1px'}}/><br/>
+									Name Color: <input type="color" className="char" ref={'nameColor'+index} defaultValue={nameColor}/><br/>
+									Text Color: <input type="color" className="char" ref={'color'+index} defaultValue={color}/><br/>
+									Font: <input type="text" className="char" ref={'font'+index} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={that.testFont} onKeyDown={that.fontTest}/><br/>
+									Custom HTML: <input type="text" className="char" ref={'html'+index} placeholder="Custom HTML" defaultValue={customHTML} style={{marginBottom:'1px'}}/><br/>
 									{groupdropdown ? 'Select a group: ' : ''}{groupdropdown}<br/>
 									<button type="submit" id="save" onClick={that.charEdit}>Save</button>
 										<button type="submit" id="cancel" onClick={that.closeChar.bind(null, index)}>Cancel</button></div>
@@ -904,8 +916,10 @@
 									return(<div key={'c'+index} className='Command' onClick={function(e){e.target.style.fontWeight=(e.target.style.fontWeight=='bold')? 'normal' : 'bold';}}>{ch[0].name}</div>);
 								});//go through the ungrouped characters.
 								var def = '';
-								if(modal.id[0] > 0){def = that.props.characters[modal.id[0]][0];}
-								return(<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><input type='text' ref={'name'+index} placeholder='Group Name' defaultValue={def} required/><br/>
+								var name = modal.name;
+								if(modal.id[0] > 0){def = that.props.characters[modal.id[0]][0]; name += ' - '+def;}
+								return(<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+									<input type='text' ref={'name'+index} placeholder='Group Name' defaultValue={def} required style={{width:'100%'}}/><br/>
 									Add characters to the group?<br/>
 									<form ref={"chars"+index}>
 									{chars}
@@ -914,12 +928,25 @@
 										<button type="submit" id="cancel" onClick={that.props.closeModal.bind(null, index)}>Cancel</button>
 									</div>);
 							case 'delete'://'are you sure?'
+								var name = modal.name;
+								if(modal.groupname){name += ' - '+modal.groupname;
+								} else if(modal.charid){
+									var trueid = that.verifyID(modal.charid, modal.id);
+									if(trueid){name+=' - '+that.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {that.closeModal(index);}
+								}
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>No</button></div>
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+									Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>No</button></div>
 								);
 							case 'action':
+								var name = modal.name;
+								if(modal.charid){
+									var trueid = that.verifyID(modal.charid, modal.id);
+									if(trueid){name+=' - '+that.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {that.closeModal(index);}
+								}
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'+index} onKeyDown={that.enterCheck}></textarea><br/><button type="submit" onClick={that.post}>OK</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>Cancel</button></div>
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+									<textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'+index} onKeyDown={that.enterCheck}></textarea><br/><button type="submit" onClick={that.post}>OK</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>Cancel</button></div>
 								);
 						}
 					} else {
@@ -957,6 +984,7 @@
 			},
 
 			openChar: function(e){
+				e.stopPropagation();//make sure it doesn't try to close the group
 				var id = e.target.getAttribute('id').split(',');
 				var op = this.state.open;
 				var name = this.props.characters[id[0]][id[1]][0].id;//characters[0][2][0] for instance.
@@ -965,6 +993,7 @@
 			},
 
 			closeChar: function(e){
+				e.stopPropagation();//make sure it doesn't try to close the group
 				var id = e.target.getAttribute('id').split(',');
 				var op = this.state.open;
 				var name = this.props.characters[id[0]][id[1]][0].id;
@@ -1059,6 +1088,71 @@
 				this.props.socket.emit('Dice', e.target.textContent, result, this.props.settings.textcolor);
 			},
 
+			dragstart: function(e){
+				e.stopPropagation();
+				var handler;
+				if(e.target.className == 'derivative'){handler = e.target.parentNode;} else {handler = document.getElementsByClassName('charlist')[0];}
+				handler.addEventListener("dragover", this.dragover, false);
+				handler.addEventListener("dragend", this.dragend, false);
+				handler.addEventListener("drop", this.drop, false);
+				this.setState({dragEl: e.target});
+			},
+
+			dragover: function(e){
+				//make sure they're the same type but not the same element
+				if(e.target.className == this.state.dragEl.className && e.target.id != this.state.dragEl.id){
+					e.preventDefault();
+				} else if(this.state.dragEl.className == 'character' && e.target.className.startsWith('chargroup')){
+					e.preventDefault();
+				}
+			},
+
+			dragend: function(e){
+				var handler;
+				if(e.target.className == 'derivative'){handler = e.target.parentNode;} else {handler = document.getElementsByClassName('charlist')[0];}
+				handler.removeEventListener("dragover", this.dragover, false);
+				handler.removeEventListener("dragend", this.dragend, false);
+				handler.removeEventListener("drop", this.drop, false);
+				this.setState({dragEl: null});
+			},
+
+			drop: function(e){//should only work if we prevented the default.
+				var rect = e.target.getBoundingClientRect();
+				var where = (e.clientY - rect.top)/(rect.bottom-rect.top) > 0.5;//if it's greater it's below
+				var id1 = this.state.dragEl.id.split(',');
+				var id2 = e.target.id.split(',');//length doesn't matter yet, we'll figure out what to do.
+				var el;
+				switch(this.state.dragEl.className){
+					case 'derivative':
+						el = this.props.characters[id1[0]][id1[1]].splice(id1[2], 1)[0];
+						if(+id1[2] < +id2[2]){id2[2]--;}//if splice shifted the array up, account for this
+						if(where){id2[2]++;}
+						this.props.characters[id1[0]][id1[1]].splice(id2[2], 0, el);
+						break;
+					case 'character':
+						el = this.props.characters[id1[0]].splice(id1[1], 1)[0];
+						if(id2[1]){//no need or ability to check this otherwise
+							if(id1[0] == id2[0] && +id1[1] < +id2[1]){id2[1]--;}//same group AND higher placement, or there's no shift up.
+							if(where){id2[1]++;}//this needs a check regardless.
+							this.props.characters[id2[0]].splice(id2[1], 0, el);
+						} else {
+							if(!where && id2[0] == '1'){//top group and at the top
+								this.props.characters[0].push(el);//add it to the end of ungrouped.
+							} else {
+								this.props.characters[id2[0]].splice(1, 0, el);//add to first non-name position
+							}
+						}
+						break;
+					case 'chargroup'://no case for ungrouped, it should never be moved or draggable at all.
+						el = this.props.characters.splice(id1[0], 1)[0];
+						if(+id1[0] < +id2[0]){id2[0]--;}
+						if(where){id2[0]++;}
+						this.props.characters.splice(id2[0], 0, el);
+						break;
+				}
+				this.props.handleSettings(this.props.settings, this.props.characters);
+			},
+
 			render: function(){
 				var currenttab = null;
 				var that=this;
@@ -1074,24 +1168,27 @@
 									if(typeof chr !== 'string'){//make sure it's not the name.
 										if(that.state.open.characters[chr[0].id]){//open derivative list
 											var derivs = characters[i][i2].map(function(deriv, i3){
-												return(<div data={['Edit Derivative', 'Delete Derivative', 'Say*player', 'Action*player', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/><span>{deriv.name}</span></div>);
+												return(<div draggable data={['Edit Derivative', 'Delete Derivative', 'Say*player', 'Action*player', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px', pointerEvents:'none'}}/><span>{deriv.name}</span></div>);
 											});
-											return(<div data={charop} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.closeChar}>{chr[0].name} [-]</span>{derivs}</div>);
+											return(<div draggable onDragStart={that.dragstart} onClick={that.closeChar} data={charop} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [-]</span>{derivs}</div>);
 										} else {//closed derivative list
-											return(<div data={charop} key={i2} id={i+','+i2} className="character"><span id={i+','+i2} onClick={that.openChar}>{chr[0].name} [+]</span></div>);
+											return(<div draggable onClick={that.openChar} data={charop} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [+]</span></div>);
 										}
 									}
 								});
 								if(typeof group[0] === 'string'){//actual group
-									return(<div data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span className='group' id={i} onClick={that.closeGroup}>{group[0]} [-]</span>{chars}</div>);
+									return(<div draggable onClick={that.closeGroup} data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span style={{pointerEvents:'none'}} className='group'>{group[0]} [-]</span>{chars}</div>);
 								} else {//ungrouped
 									return(<div id={0} data={['New Character', 'New Group']} key={i} className="chargroup ungrouped">{chars}</div>);
 								}
 							} else {//closed group
-								return(<div data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span className='group' id={i} onClick={that.openGroup}>{group[0]} [+]</span></div>);
+								return(<div draggable onClick={that.openGroup} data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span className='group' style={{pointerEvents:'none'}}>{group[0]} [+]</span></div>);
 							}
 						});
-						currenttab = (<div id={0} data={['New Character', 'New Group']} className="charlist">
+						if(characters.length == 1 && characters[0].length == 0){//none
+							charlist = [<div id={0} data={['New Character', 'New Group']} key={0} className="chargroup ungrouped">Right-click to create a character!</div>];
+						}
+						currenttab = (<div id={0} onDragStart={that.dragstart} data={['New Character', 'New Group']} className="charlist">
 							{charlist}
 							</div>);
 						break;

@@ -51,8 +51,7 @@ var iconnum = 0;
 try{//make the faceicons folder if it doesn't exist BEFORE proceeding.
 	fs.mkdirSync(__dirname+'/faceicons');
 	fs.writeFile(__dirname+'/faceicons/num.txt', 0);
-	var data = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';//one transparent pixel
-	fs.writeFile(__dirname+'/faceicons/img_trans.gif', data, 'base64');
+	fs.writeFile(__dirname+'/faceicons/img_trans.gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 } catch(e){//do nothing if it already exists.
 	if(e.code != 'EEXIST'){throw e;} else {
 		fs.readFile(__dirname+'/faceicons/num.txt', 'utf8', function(err, num){
@@ -584,6 +583,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 			msg.id = postnum++;
 			fs.writeFile(__dirname+'/logs/postid.txt', postnum);
 			if(room){
+				msg.post = '<span style="color:white;">['+room+']</span> '+msg.post;
 				io.to(room).emit('ICmessage', msg);
 			} else {
 				io.emit('ICmessage', msg);
@@ -642,6 +642,9 @@ Setconnections = function(socket){//username will definitely be present or somet
 				msg.post += ' (Test)';
 				socket.emit(call, msg);
 			} else if(typeof room === 'string' && call){
+				if(character.customHTML){
+					msg.character.customHTML = '<span style="color:white;">['+room+']</span> '+msg.character.customHTML;
+				} else {msg.character.customHTML = '<span style="color:white;">['+room+']</span> '+msg.character.name;}
 				io.to(room).emit(call, msg);
 			} else if(call) {//If it doesn't have a call(IE they didn't pass the player/admin test) drop the message
 				io.emit(call, msg);
