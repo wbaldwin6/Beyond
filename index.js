@@ -162,83 +162,6 @@ app.get('/logs', function(req, res){
 	});
 });
 
-/*app.use('/forums', function(req, res){
-	var username = sessions[req.query.id];
-	var permissions = username ? playerlist[username].permissions : 'Guest';
-	var url = req.originalUrl.split('?')[0];//drop the ID for checking purposes
-	if(req.method == "POST" && permissions != 'Guest'){//handle their input
-		if(req.body.forum && admin){//new forum
-			//var forumname = __dirname+url+'/'+req.body.forum;//there won't be a slash because that'd clash with ending with ?
-			//mkdir(Sync?)(forumname);
-			//writeFile(Sync?)(forumname+'/'+Description.txt, req.body.description);
-		} else if(req.body.postname){//new post
-			//writeFile(Sync?)(__dirname+url+'/'+req.body.postname+'.html', req.body.post);
-		}
-	}//then do the page-sending
-	if(req.originalUrl.endsWith('.html')){//are we already in a file?
-		var name = url.split('/');
-		res.sendFile(name.pop(), {root: __dirname+name.join('/')+'/'});//if it errors it'll ostensibly hit them, not the server.
-	} else {//we assume it's a subfolder; if it's not, they'll take an error to the face.
-		//make a jsdom here to set things up, this is worth that overhead.
-		fs.readdir(__dirname+url, function(err, files){//check this forum level
-			if(err){res.send(err);} else {//if they asked for an invalid level then they don't get anything fancy.
-				var doc = jsdom.jsdom(undefined);
-				var posts = [];
-				var subfolders = [];
-				var form;
-				var lmnt, lmnt2;
-				//make the stylesheet or whatever here.
-				files.forEach(function(file, index){//make sure any links preserve the socket id
-					lmnt = doc.createElement('div');//at bare minimum, needs the (linked) name
-					lmnt2 = doc.createElement('a');
-					lmnt2.href = url+file;//don't forget to keep the id!
-					lmnt2.href += req.query.id ? '?id='+req.query.id : '';
-					lmnt.appendChild(lmnt2);
-					//might want to add the timestamp too.
-					if(file.endsWith('.html')){
-						lmnt.className = 'post';
-						lmnt2.textContent = file.slice(0, -5);
-						//Give it edit and delete buttons on the OUTSIDE (IE, here)
-						//Make sure they only show up if it's the same user, somehow
-						posts.push(lmnt);
-					} else if(!/\./.test(file)){//it'll have no dots if it's a subfolder. Simple.
-						lmnt.className = 'subforum';
-						lmnt2.textContent = file;
-						lmnt.appendChild(doc.createElement('br'));
-						lmnt2 = doc.createElement('div');
-						//will this format properly? we'll just have to see.
-						lmnt2.textContent = fs.readFileSync(__dirname+url+'/'+file+'Description.txt', 'utf8');//not sure if I need +'/'+ between url and file yet.
-						//do a read into subfolder/Description.txt
-						//synchronously? That could add up, but async in a loop would be chaos.
-						if(permissions == 'Admin'){//if they're an admin add the edit and delete commands
-
-						}
-						subfolders.push(lmnt);
-					}
-				});//after we're out of loop add the html elements in order
-				subfolders.forEach(function(fold){
-					doc.body.appendChild(fold);
-				});
-				doc.body.appendChild(doc.createElement('br'));
-				posts.forEach(function(post){
-					doc.body.appendChild(post);
-				});
-				if(url != /\/forums\/?/ && permissions != 'Guest'){//check if we're at the root
-					//we're not and they're a player, add the post form
-				}//Note that subfolders look the same at this level as anywhere else
-				if(permissions == 'Admin'){//add the Create Forum form
-					form = doc.createElement('form');
-					form.action = req.originalUrl; form.method = 'post';//send the post to the same level
-					form.appendChild(doc.createTextNode());
-					//actually, see about having buttons that make these forms appear onclick
-				}
-				res.send(doc.documentElement.outerHTML);//display whatever when done
-			}
-
-		});
-	}
-});*/
-
 app.use('/faceicons', express.static(__dirname+'/faceicons'));
 
 openLog = function (logfile){//takes in a Date object
@@ -313,6 +236,7 @@ toLog = function (message){
 			generateNarration(logmsg, message.username, message.post, message.color);
 	}
 	htm.body.appendChild(logmsg);
+	htm.body.appendChild(htm.createElement('br'));
 	fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
 		if(error) throw error;
 	});
@@ -334,6 +258,7 @@ editLog = function(message){
 		}
 		//insert after
 		htm.body.insertBefore(edit, target.nextElementSibling);
+		htm.body.insertBefore(htm.createElement('br'), target.nextElementSibling);
 		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
 			if(error) throw error;
 		});
@@ -605,6 +530,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 	socket.on('Whisper', function(message, target){
 		var username = sessions[socket.id];
 		if(username && users[target]){//if they logged out midwhisper or they send an invalid one somehow we need to stop that.
+			message = processHTML(message);
 			var msg = {className: 'OOC whisper', username: username, post: message};
 			users[target].emit('OOCmessage', msg);
 		}//no logging, OBVIOUSLY. What's an admin window?
