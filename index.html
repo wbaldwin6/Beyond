@@ -26,10 +26,10 @@
 				height: calc(100% - 54px);
 			}
 			div.character{
-				margin: 10 0 0 0;
+				padding: 5 0 5 0;
 			}
 			div.chargroup{
-				margin: 10 0 0 0;
+				padding: 5 0 5 0;
 				cursor: default;
 				-webkit-user-select: none;
 				-moz-user-select: none;
@@ -37,7 +37,6 @@
 				user-select: none;
 			}
 			.group{
-				margin: 10 0 0 0;
 				font-size: 20px;
 				font-weight: bold;
 			}
@@ -475,6 +474,14 @@
 				return {positions: [], currentDrag: null, loginmessage: 'Please input a username and password of at least 6 characters.'};
 			},
 
+			/*componentDidUpdate: function(){
+				Array.from(ReactDOM.findDOMNode(this).getElementsByTagName('textarea')).forEach(function(area){
+					if(!area.style.height){//only if it isn't defined yet
+						area.style.height = area.scrollHeight;
+					}
+				});
+			},*/
+
 			submission: function (e){
 				var type = e.target.getAttribute('id');
 				e.preventDefault();
@@ -510,7 +517,13 @@
 				e.preventDefault();
 				var pos = this.state.positions;
 				var initpos = this.state.initialposition;
-				pos[this.state.currentDrag] = {x: e.clientX-initpos.x, y: e.clientY-initpos.y};
+				var x = e.clientX-initpos.x;
+				var y = e.clientY-initpos.y;
+				var rect = this.refs[this.state.currentDrag].getBoundingClientRect();
+				if(x < 0){x=0;} if(y < 0){y=0;}
+				if(x+rect.width > document.body.clientWidth){x=document.body.clientWidth-rect.width;}
+				if(y+rect.height > document.body.clientHeight){y=document.body.clientHeight-rect.height;}
+				pos[this.state.currentDrag] = {x: x, y: y};
 				this.setState({positions: pos});
 			},
 
@@ -565,7 +578,7 @@
 						this.props.socket.emit('Whisper', post, modata.id[0]);
 					} else if(modata.name == 'Narrate'){
 						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
-					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile'].indexOf(modata.name) > -1){
+					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
@@ -780,7 +793,7 @@
 						}
 						if(modata.id[2]){//only in the edit case (we have a deriv) do we NOT add.
 							var deriv = character[trueid[2]];
-							character[trueid[2]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[0] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML || deriv.customHTML};
+							character[trueid[2]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[0] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML};
 						} else {//but in the add derivatives case we use the 0-ID.
 							var charid = character[0] ? character[0].id : un+'-'+settings.characterIDs++;
 							for(i=0; i<convertedicons.length; i++){
@@ -842,12 +855,13 @@
 						switch(modal.type){
 							case 'login'://basically hardcoded and single-purpose.
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}>
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
 										<input type="text" name="username" ref="username" placeholder="Username" required /><br/>
 										<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
 										<button type="submit" id="login" onClick={that.submission}>Login</button>
 										<button type="submit" id="register" onClick={that.submission}>Register</button><br/>
-										<b>{that.state.loginmessage}</b>
+										<b>{that.state.loginmessage}</b><br/><br/>
+										<iframe src='/worldinfo' style={{width:'95%', height:'85%'}}/>
 									</div>);
 							case 'character'://character creation/edit modal.
 								var groupdropdown = null;
@@ -899,7 +913,7 @@
 									});
 								}
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y, width:'300px'}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
 									{FIs}<br/>
 									<span ref={'faceicons'+index}>{previews}</span><canvas ref={'canvas'+index} width='0' height='0'></canvas><br/>
 									Name: <input type="text" className="char" ref={'name'+index} placeholder="Character Name" required style={{marginBottom:'1px'}}/><br/>
@@ -969,35 +983,19 @@
 			},
 
 
-			openGroup: function(e){
+			toggleGroup: function(e){
 				var op = this.state.open;
 				var name = this.props.characters[e.target.getAttribute('id')][0];
-				op.groups[name] = true;//add group to open list
+				op.groups[name] = !op.groups[name];//works even on undefined!
 				this.setState({open: op});
 			},
 
-			closeGroup: function(e){
-				var op = this.state.open;
-				var name = this.props.characters[e.target.getAttribute('id')][0];
-				op.groups[name] = false;
-				this.setState({open: op});
-			},
-
-			openChar: function(e){
+			toggleChar: function(e){
 				e.stopPropagation();//make sure it doesn't try to close the group
 				var id = e.target.getAttribute('id').split(',');
 				var op = this.state.open;
 				var name = this.props.characters[id[0]][id[1]][0].id;//characters[0][2][0] for instance.
-				op.characters[name] = true;
-				this.setState({open: op});
-			},
-
-			closeChar: function(e){
-				e.stopPropagation();//make sure it doesn't try to close the group
-				var id = e.target.getAttribute('id').split(',');
-				var op = this.state.open;
-				var name = this.props.characters[id[0]][id[1]][0].id;
-				op.characters[name] = false;
+				op.characters[name] = !op.characters[name];
 				this.setState({open: op});
 			},
 
@@ -1011,7 +1009,7 @@
 				var name = e.target.textContent;
 				var type = name.split(' '); type = type[type.length-1];
 				var that = this;
-				if(['Rules', 'MOTD', 'Profile'].indexOf(type) > -1){
+				if(['Rules', 'MOTD', 'Profile', 'Info'].indexOf(type) > -1){
 					var res = function(response){
 						if(response){response = response.replace(/<br( \/)?>/g, '\n');}
 						that.props.modalpush({id: [], name: name, type: 'action', post: response});
@@ -1170,19 +1168,19 @@
 											var derivs = characters[i][i2].map(function(deriv, i3){
 												return(<div draggable data={['Edit Derivative', 'Delete Derivative', 'Say*player', 'Action*player', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px', pointerEvents:'none'}}/><span>{deriv.name}</span></div>);
 											});
-											return(<div draggable onDragStart={that.dragstart} onClick={that.closeChar} data={charop} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [-]</span>{derivs}</div>);
+											return(<div draggable onDragStart={that.dragstart} onClick={that.toggleChar} data={charop} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [-]</span>{derivs}</div>);
 										} else {//closed derivative list
-											return(<div draggable onClick={that.openChar} data={charop} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [+]</span></div>);
+											return(<div draggable onClick={that.toggleChar} data={charop} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [+]</span></div>);
 										}
 									}
 								});
 								if(typeof group[0] === 'string'){//actual group
-									return(<div draggable onClick={that.closeGroup} data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span style={{pointerEvents:'none'}} className='group'>{group[0]} [-]</span>{chars}</div>);
+									return(<div draggable onClick={that.toggleGroup} data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span style={{pointerEvents:'none'}} className='group'>{group[0]} [-]</span>{chars}</div>);
 								} else {//ungrouped
 									return(<div id={0} data={['New Character', 'New Group']} key={i} className="chargroup ungrouped">{chars}</div>);
 								}
 							} else {//closed group
-								return(<div draggable onClick={that.openGroup} data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span className='group' style={{pointerEvents:'none'}}>{group[0]} [+]</span></div>);
+								return(<div draggable onClick={that.toggleGroup} data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span className='group' style={{pointerEvents:'none'}}>{group[0]} [+]</span></div>);
 							}
 						});
 						if(characters.length == 1 && characters[0].length == 0){//none
@@ -1200,14 +1198,14 @@
 						break;
 					case 'commands'://case for player commands tab
 						//<div key='2' className='Command' onClick={function(e){window.open('/forums?id='+this.props.socket.id);}}>Open Forums</div>
-						currenttab = [<div key='0' className='Command'><span>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='8' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='9' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab = [<div key='0' className='Command'><span>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='8' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='9' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='10' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={10+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
+							currenttab.push(<div key={11+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
-						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>]
+						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>]
 				}
 				var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 				return (

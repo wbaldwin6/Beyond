@@ -24,9 +24,16 @@ var serversettings;
 try{
 	serversettings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
 } catch(e) {
-	var profile = '<style>body{background-color:black}</style><font style="font-size:12px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i><br><br><b>Age:</b> <i>In years, typically.</i><br><br><b>Gender:</b> <i>____</i><br><br><b>Species:</b> <i> </i><br><br><b>Height:</b> <i> </i><br><br><b>History:</b> <i>Any other relevant information can be have fields added.</i>';
+	var profile = '<style>body{background-color:black}</style><font style="font-size:16px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i><br><br><b>Age:</b> <i>In years, typically.</i><br><br><b>Gender:</b> <i>____</i><br><br><b>Species:</b> <i> </i><br><br><b>Height:</b> <i> </i><br><br><b>History:</b> <i>Any other relevant information can be have fields added.</i>';
 	serversettings = {motd: '', rules: 'Rule 0: Be respectful.', profile: profile};
 	fs.writeFileSync('settings.json', JSON.stringify(serversettings));
+}
+
+try{
+	fs.accessSync('worldinfo.html', fs.R_OK | fs.W_OK);
+} catch(e) {
+	var worldinfo = '<style>body{background-color:black;color:white} h1{text-align:center}</style><body><h1>Welcome to Beyond!</h1></body>';
+	fs.writeFileSync('worldinfo.html', worldinfo);
 }
 
 var postnum = 1;
@@ -79,6 +86,10 @@ var playerlist = {};//Having three feels superfluous, but I think O(1) is more i
 
 app.get('/', function(req, res){
 	res.sendFile(__dirname + '/index.html');
+});
+
+app.get('/worldinfo', function(req, res){
+	res.sendFile(__dirname + '/worldinfo.html');
 });
 
 app.get('/logs/:name', function(req, res){
@@ -683,23 +694,19 @@ Setconnections = function(socket){//username will definitely be present or somet
 		}
 	});
 	socket.on('Show Rules', function(callback){
-		if(serversettings.rules){
-			if(callback){
-				callback(serversettings.rules);
-			} else {
-				var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
-				socket.emit('OOCmessage', msg);
-			}
+		if(callback){
+			callback(serversettings.rules);
+		} else {
+			var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
+			socket.emit('OOCmessage', msg);
 		}
 	});
 	socket.on('Show MOTD', function(callback){
-		if(serversettings.motd){
-			if(callback){
-				callback(serversettings.motd);
-			} else {
-				var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
-				socket.emit('OOCmessage', msg);
-			}
+		if(callback){
+			callback(serversettings.motd);
+		} else {
+			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
+			socket.emit('OOCmessage', msg);
 		}
 	});
 	socket.on('Show Profile', function(id, callback){
@@ -717,6 +724,15 @@ Setconnections = function(socket){//username will definitely be present or somet
 		} else {//don't bother file checking in this case.
 			callback(serversettings.profile);
 		}
+	});
+	socket.on('Show Info', function(callback){
+		fs.readFile('worldinfo.html', 'utf8', function(err, info){
+			if(!err){
+				callback(info);
+			} else {
+				callback('');
+			}
+		});
 	});
 	socket.on('Set Profile', function(profile, id){
 		var username = sessions[socket.id];
@@ -758,9 +774,20 @@ Setconnections = function(socket){//username will definitely be present or somet
 	socket.on('Edit Default Profile', function(message){
 		var username = sessions[socket.id];
 		if(username && playerlist[username].permissions == 'Admin'){
-			serversettings.profile = processHTML(message);
+			serversettings.profile = message.replace(/\r\n?|\n/g, "<br />");//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
+				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
+			});
+		} else {
+			console.log(username+' attempted to use an admin command.');
+		}
+	});
+	socket.on('Edit World Info', function(message){
+		var username = sessions[socket.id];
+		if(username && playerlist[username].permissions == 'Admin'){
+			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
+			fs.writeFile('worldinfo.html', message.replace(/\r\n?|\n/g, "<br />"), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
 			});
 		} else {
