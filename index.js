@@ -170,7 +170,7 @@ openLog = function (logfile){//takes in a Date object
 		htm = jsdom.jsdom(fs.readFileSync(logfile, 'utf8'));
 	} catch(e){//today's logs don't exist, make them!
 		//this won't change, so just making it a static string (albeit a long one) is more effiicient.
-		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action, div.log, div.narration{font-weight: bold;} div.narration{text-align: center;} div.narration span.timestamp{position: absolute; left: 0;} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} div.IC{} div.OOC{}</style>';
+		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action, div.log, div.narration{font-weight: bold;} div.narration{text-align: center;} div.narration span.timestamp{position: absolute; left: 0;} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} .IC{} .OOC{}</style>';
 		var script = '<script>function OOC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "none"; x[7].style.display = "initial";} function IC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[7].style.display = "none"; x[6].style.display = "initial";}function Both(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "initial"; x[7].style.display = "initial";}</script>'
 		var body = '<body><div class="buttons" style="width: auto; position:fixed; bottom: 0; right: 0;"><button onclick="OOC()">OOC Only</button><button onclick="IC()">IC Only</button><button onclick="Both()">Both</button></div>'+script+'</body>';
 		var initialhtml = '<html><head><title>Logs for '+new Date().toLocaleString('en-us', {month: "long", day:"2-digit"})+
@@ -236,7 +236,9 @@ toLog = function (message){
 			generateNarration(logmsg, message.username, message.post, message.color);
 	}
 	htm.body.appendChild(logmsg);
-	htm.body.appendChild(htm.createElement('br'));
+	var br = htm.createElement('br');
+	br.className = message.className.split(" ")[0];
+	htm.body.appendChild(br);
 	fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
 		if(error) throw error;
 	});
@@ -258,7 +260,9 @@ editLog = function(message){
 		}
 		//insert after
 		htm.body.insertBefore(edit, target.nextElementSibling);
-		htm.body.insertBefore(htm.createElement('br'), target.nextElementSibling);
+		var br = htm.createElement('br');
+		br.className = 'IC';
+		htm.body.insertBefore(br, target.nextElementSibling);
 		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
 			if(error) throw error;
 		});
@@ -353,6 +357,7 @@ processHTML = function(message){
 			'span': ['style'],
 			'font': ['color', 'style']
 		}});
+		message = message.replace(/(^|"|;)((?!(text-decoration|text-shadow|font-.*|outline-.*))[-A-Za-z])*:.+?\b/g, "");
 	}
 	return message;
 };

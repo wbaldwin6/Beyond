@@ -334,6 +334,10 @@
 				var newmodal = {id: id, name: name};
 				if(id.length >= 2 && name != 'Whisper'){
 					newmodal.charid = this.state.characters[id[0]][id[1]][0].id;
+					if(id.length === 3){
+						var deriv = this.state.characters[id[0]][id[1]][id[2]];
+						newmodal.icpos = {left: deriv.icpos.left, top: deriv.icpos.top};
+					}
 				}
 				switch(name){
 					case 'Delete Dice'://just delete it outright.
@@ -619,7 +623,7 @@
 						settings.rooms[post].push(modata.charid);
 						this.props.handleSettings(settings, this.props.characters);
 					} else {//find the right id
-						var trueid = this.verifyID(modata.charid, modata.id);
+						var trueid = this.verifyID(modata.charid, modata.id, modata.icpos);
 						var room = null;
 						if(modata.name == 'Say' || modata.name == 'Action'){//only for IC posts.
 							var rooms = Object.keys(this.props.settings.rooms);
@@ -639,16 +643,34 @@
 				this.props.closeModal(id);
 			},
 
-			verifyID: function(charid, id){
-				var i, j;
+			verifyID: function(charid, id, icpos){
+				var i, j, k;
 				var characters = this.props.characters;
 				if(characters[id[0]] && (id[0] == 0 && characters[0][0] || characters[id[0]][1])){//group exists and isn't empty.
 					if(characters[id[0]][id[1]] && characters[id[0]][id[1]][0].id == charid){//id is occupied by the right character
-						return id;
+						if(icpos && (!(characters[id[0]][id[1]][id[2]].icpos.left == icpos.left) || !(characters[id[0]][id[1]][id[2]].icpos.top == icpos.top))){
+							for(k=0; k < characters[id[0]][id[1]].length; k++){//for each deriv in char
+								if(characters[id[0]][id[1]][k].icpos.left == icpos.left && characters[id[0]][id[1]][k].icpos.top == icpos.top){//same deriv position
+									return [id[0], id[1], k];
+								}
+							}
+							return null;
+						} else {
+							return id;
+						}
 					} else {//wrong character or wrong length
 						for(i=0; i < characters[id[0]].length; i++){//for each char in group
 							if(characters[id[0]][i][0].id == charid){
-								return [id[0], i, id[2]];
+								if(icpos && (!(characters[id[0]][i][id[2]].icpos.left == icpos.left) || !(characters[id[0]][i][id[2]].icpos.top == icpos.top))){
+									for(k=0; k < characters[id[0]][i].length; k++){//for each deriv in char
+										if(characters[id[0]][i][k].icpos.left == icpos.left && characters[id[0]][i][k].icpos.top == icpos.top){//same deriv position
+											return [id[0], i, k];
+										}
+									}
+									return null;//do not check other characters if this fails.
+								} else {//non-derivative or derivative matches
+									return [id[0], i, id[2]];
+								}
 							}
 						}
 					}
@@ -657,7 +679,16 @@
 					if(characters[i] != id[0]){//again, doesn't exist, is empty, or doesn't contain it.
 						for(j=0; j < characters[i].length; j++){//for each char ([i][j]) in group
 							if(characters[i][j][0].id == charid){
-								return [i, j, id[2]];
+								if(icpos && (!(characters[i][j][id[2]].icpos.left == icpos.left) || !(characters[i][j][id[2]].icpos.top == icpos.top))){
+									for(k=0; k < characters[i][j].length; k++){//for each deriv in char
+										if(characters[i][j][k].icpos.left == icpos.left && characters[i][j][k].icpos.top == icpos.top){//same deriv position
+											return [i, j, k];
+										}
+									}
+									return null;//do not check other characters if this fails.
+								} else {//non-derivative or derivative matches
+									return [i, j, id[2]];
+								}
 							}
 						}
 					}
@@ -718,7 +749,7 @@
 						});//add the characters to the ungrouped section.
 					}
 				} else if(modata.id.length === 2 || characters[modata.id[0]][modata.id[1]].length == 1){//character delete
-					trueid = this.verifyID(modata.charid, modata.id);
+					trueid = this.verifyID(modata.charid, modata.id, modata.icpos);
 					if(trueid){
 						characters[trueid[0]].splice(trueid[1], 1);
 						//have to remove it from the room as well
@@ -737,7 +768,7 @@
 						}
 					}
 				} else {
-					trueid = this.verifyID(modata.charid, modata.id);
+					trueid = this.verifyID(modata.charid, modata.id, modata.icpos);
 					if(trueid){
 						characters[trueid[0]][trueid[1]].splice(trueid[2], 1);
 					}
@@ -800,7 +831,7 @@
 							trueid.push(characters[trueid[0]].length);//put it at the end of the group
 							character = [];
 						} else {//i1 is group, i2 is character
-							trueid = that.verifyID(modata.charid, modata.id);
+							trueid = that.verifyID(modata.charid, modata.id, modata.icpos);
 							if(trueid){
 								character = characters[trueid[0]][trueid[1]];
 							}
@@ -899,7 +930,7 @@
 									groupdropdown = (<select className="char" ref={'group'+index}>{grouption}</select>);
 									name = modal.name;
 								} else {
-									trueid = that.verifyID(modal.charid, modal.id);
+									trueid = that.verifyID(modal.charid, modal.id, modal.icpos);
 									if(trueid){
 										character = that.props.characters[trueid[0]][trueid[1]];
 										nameColor = character[0].nameColor;
@@ -913,11 +944,11 @@
 								}
 								if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
 									FIs = <input type='file' ref={'FIs'+index} style={{width:'100%',marginBottom:'1px'}} onChange={that.handleFIs}/>;
-									color = character[modal.id[2]].color || color;
-									nameColor = character[modal.id[2]].nameColor || nameColor;
-									fontStyle = character[modal.id[2]].fontStyle || fontStyle;
-									customHTML = character[modal.id[2]].customHTML || customHTML;
-									name = modal.name+' - '+character[modal.id[2]].name;
+									color = character[trueid[2]].color || color;
+									nameColor = character[trueid[2]].nameColor || nameColor;
+									fontStyle = character[trueid[2]].fontStyle || fontStyle;
+									customHTML = character[trueid[2]].customHTML || customHTML;
+									name = modal.name+' - '+character[trueid[2]].name;
 								}
 								var previews = null;
 								var im = that.state.images;
@@ -959,7 +990,7 @@
 								var name = modal.name;
 								if(modal.groupname){name += ' - '+modal.groupname;
 								} else if(modal.charid){
-									var trueid = that.verifyID(modal.charid, modal.id);
+									var trueid = that.verifyID(modal.charid, modal.id, modal.icpos);
 									if(trueid){name+=' - '+that.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {that.closeModal(index);}
 								}
 								return(
@@ -969,7 +1000,7 @@
 							case 'action':
 								var name = modal.name;
 								if(modal.charid){
-									var trueid = that.verifyID(modal.charid, modal.id);
+									var trueid = that.verifyID(modal.charid, modal.id, modal.icpos);
 									if(trueid){name+=' - '+that.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {that.closeModal(index);}
 								}
 								return(
@@ -1042,7 +1073,7 @@
 				var settings = this.props.settings;
 				var dice = this.refs.Nd.value+'d'+this.refs.dN.value;
 				if(this.refs.exploding.checked){dice += '!';}
-				if(this.refs.Nd.value && this.refs.dN.value){
+				if(this.refs.Nd.value > 0 && this.refs.dN.value > 1){
 					settings.dice.push(dice);
 					this.props.handleSettings(settings, this.props.characters);
 				}
@@ -1257,7 +1288,7 @@
 					this.refs.post.innerHTML = post;
 				}
 				if(this.refs.name && message.character.customHTML){//only for character posts
-					var name = message.character.customHTML;
+					var name = message.character.customHTML || message.character.name;
 					switch(classparam){
 						case 'say':
 							name += ':';
@@ -1294,6 +1325,7 @@
 					case 'system'://just the post itself.
 						return (<div className={message.className}><span ref="post"></span>{'\r'}</div>);
 					case 'say':
+						character.name +=':';
 					case 'action':
 						var charid = character.id.split('-');
 						var d = charid.pop();
@@ -1301,7 +1333,7 @@
 						var profileopen = function(e){window.open('/characters/'+charid+'/'+d+'.html');}
 						var edit = '';
 						if(message.id){edit = 'Edit*'+charid;}//worst case message.id is undefined
-						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+': '}</span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
+						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
 				}
 			}
 		});
