@@ -1,7 +1,7 @@
 <html>
 	<head>
 		<title>Beyond</title>
-		<link rel="shortcut icon" href="">
+		<link rel="icon" href="">
 		<style>
 			body {
 				background-color: black;
@@ -144,7 +144,7 @@
 				pointer-events: auto;
 				z-index: 1;
 				position: fixed;
-				display: none;
+				display: block;
 				width: auto;
 				overflow: auto;
 				background-color: rgb(0,0,0);
@@ -228,7 +228,6 @@
 		<script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
 		<script src="https://unpkg.com/babel-core@5.8.38/browser.min.js"></script>
 		<script type="text/babel">
-
 		var socket = io();
 
 		var Outercontainer = React.createClass({
@@ -340,7 +339,7 @@
 					}
 				}
 				switch(name){
-					case 'Delete Dice'://just delete it outright.
+					case 'Delete'://just delete it outright.
 						var settings = this.state.settings;
 						settings.dice.splice(+id[0].substring(4), 1);
 						this.handleSettings(settings, this.state.characters);
@@ -492,14 +491,6 @@
 				return {positions: [], currentDrag: null, loginmessage: 'Please input a username and password of at least 6 characters.'};
 			},
 
-			/*componentDidUpdate: function(){
-				Array.from(ReactDOM.findDOMNode(this).getElementsByTagName('textarea')).forEach(function(area){
-					if(!area.style.height){//only if it isn't defined yet
-						area.style.height = area.scrollHeight;
-					}
-				});
-			},*/
-
 			submission: function (e){
 				var type = e.target.getAttribute('id');
 				e.preventDefault();
@@ -512,7 +503,7 @@
 						if(response.settings){
 							that.props.handleSettings(response.settings, response.characters);
 							that.props.setUser(username, md5(password));
-							that.props.closeModal(ind);
+							that.closeModal(ind);
 						} else {
 							that.setState({loginmessage: response.code || response});
 						}
@@ -640,7 +631,7 @@
 					}
 				}
 
-				this.props.closeModal(id);
+				this.closeModal(id);
 			},
 
 			verifyID: function(charid, id, icpos){
@@ -730,7 +721,7 @@
 					images[id] = null;
 					this.setState({images: images});
 				}
-				this.props.closeModal(id);
+				this.closeModal(id);
 			},
 
 			charDelete: function(e){
@@ -767,6 +758,8 @@
 							}
 						}
 					}
+					//tell it to delete the profile too.
+					this.props.socket.emit('Delete Profile', modata.charid);
 				} else {
 					trueid = this.verifyID(modata.charid, modata.id, modata.icpos);
 					if(trueid){
@@ -774,7 +767,7 @@
 					}
 				}
 				this.props.handleSettings(this.props.settings, characters);
-				this.props.closeModal(id);
+				this.closeModal(id);
 			},
 
 			charEdit: function(e){
@@ -883,8 +876,13 @@
 						}
 						this.props.handleSettings(this.props.settings, characters);
 					}
-					this.props.closeModal(id);
+					this.closeModal(id);
 				}
+			},
+			closeModal: function(id){
+				this.state.positions[id] = null;
+				this.props.closeModal(id);
+				this.setState({positions: this.state.positions});
 			},
 
 			render: function(){
@@ -899,8 +897,7 @@
 						}
 						switch(modal.type){
 							case 'login'://basically hardcoded and single-purpose.
-								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
+								return(<div key={index} id={index} ref={index} className="modal" style={{textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
 										<input type="text" name="username" ref="username" placeholder="Username" required /><br/>
 										<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
 										<button type="submit" id="login" onClick={that.submission}>Login</button>
@@ -958,7 +955,7 @@
 									});
 								}
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y, width:'300px'}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+									<div key={index} id={index} ref={index} className="modal" style={{left: x, top: y, width:'300px'}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
 									{FIs}<br/>
 									<span ref={'faceicons'+index}>{previews}</span><canvas ref={'canvas'+index} width='0' height='0'></canvas><br/>
 									Name: <input type="text" className="char" ref={'name'+index} placeholder="Character Name" required style={{marginBottom:'1px'}}/><br/>
@@ -977,14 +974,14 @@
 								var def = '';
 								var name = modal.name;
 								if(modal.id[0] > 0){def = that.props.characters[modal.id[0]][0]; name += ' - '+def;}
-								return(<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+								return(<div key={index} id={index} ref={index} className="modal" style={{left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
 									<input type='text' ref={'name'+index} placeholder='Group Name' defaultValue={def} required style={{width:'100%'}}/><br/>
 									Add characters to the group?<br/>
 									<form ref={"chars"+index}>
 									{chars}
 									</form>
 									<button type="submit" id="save" onClick={that.groupEdit}>Save</button>
-										<button type="submit" id="cancel" onClick={that.props.closeModal.bind(null, index)}>Cancel</button>
+										<button type="submit" id="cancel" onClick={that.closeModal.bind(null, index)}>Cancel</button>
 									</div>);
 							case 'delete'://'are you sure?'
 								var name = modal.name;
@@ -994,8 +991,8 @@
 									if(trueid){name+=' - '+that.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {that.closeModal(index);}
 								}
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
-									Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>No</button></div>
+									<div key={index} id={index} ref={index} className="modal" style={{left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+									Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.closeModal.bind(null, index)}>No</button></div>
 								);
 							case 'action':
 								var name = modal.name;
@@ -1004,8 +1001,8 @@
 									if(trueid){name+=' - '+that.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {that.closeModal(index);}
 								}
 								return(
-									<div key={index} id={index} ref={index} className="modal" style={{display: 'block', left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
-									<textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'+index} onKeyDown={that.enterCheck}></textarea><br/><button type="submit" onClick={that.post}>OK</button><button type="submit" onClick={that.props.closeModal.bind(null, index)}>Cancel</button></div>
+									<div key={index} id={index} ref={index} className="modal" style={{left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
+									<textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'+index} onKeyDown={that.enterCheck}></textarea><br/><button type="submit" onClick={that.post}>OK</button><button type="submit" onClick={that.closeModal.bind(null, index)}>Cancel</button></div>
 								);
 						}
 					} else {
@@ -1054,7 +1051,7 @@
 				var name = e.target.textContent;
 				var type = name.split(' '); type = type[type.length-1];
 				var that = this;
-				if(['Rules', 'MOTD', 'Profile', 'Info'].indexOf(type) > -1){
+				if(['Rules', 'MOTD', 'Profile', 'Info'].indexOf(type) > -1 && this.props.permissions == 'Admin'){
 					var res = function(response){
 						if(response){response = response.replace(/<br( \/)?>/g, '\n');}
 						that.props.modalpush({id: [], name: name, type: 'action', post: response});
@@ -1064,7 +1061,7 @@
 					} else {
 						this.props.socket.emit('Show '+type, res);
 					}
-				} else {
+				} else if(['Player', 'Admin'].indexOf(this.props.permissions) > -1){//Narrate or Set Room
 					this.props.modalpush({id: [], name: name, type: 'action'});
 				}
 			},
@@ -1073,7 +1070,7 @@
 				var settings = this.props.settings;
 				var dice = this.refs.Nd.value+'d'+this.refs.dN.value;
 				if(this.refs.exploding.checked){dice += '!';}
-				if(this.refs.Nd.value > 0 && this.refs.dN.value > 1){
+				if(this.refs.Nd.value > 0 && this.refs.dN.value > 1 && ['Player', 'Admin'].indexOf(this.props.permissions) > -1){
 					settings.dice.push(dice);
 					this.props.handleSettings(settings, this.props.characters);
 				}
@@ -1241,8 +1238,7 @@
 						});
 						break;
 					case 'commands'://case for player commands tab
-						//<div key='2' className='Command' onClick={function(e){window.open('/forums?id='+this.props.socket.id);}}>Open Forums</div>
-						currenttab = [<div key='0' className='Command'><span>Set OOC Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='8' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='9' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='10' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab = [<div key='0' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>,/* <div key='2' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>,*/ <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='8' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='9' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='10' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
 							currenttab.push(<div key={11+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);

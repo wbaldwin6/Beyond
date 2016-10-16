@@ -5,7 +5,7 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 var jsdom = require('jsdom');
 var sanitizeHtml = require('sanitize-html');
-app.use(require('body-parser').json());
+//var database = require('./database');
 
 try{//make sure the logins file exists BEFORE proceeding.
 	fs.accessSync('logins.json', fs.R_OK | fs.W_OK);
@@ -48,12 +48,6 @@ try{//make the logs folder if it doesn't exist BEFORE proceeding.
 	}
 }
 
-try{//make the forums folder if it doesn't exist BEFORE proceeding.
-	fs.mkdirSync(__dirname+'/forums');
-} catch(e){//do nothing if it already exists.
-	if(e.code != 'EEXIST'){throw e;}
-}
-
 var iconnum = 0;
 try{//make the faceicons folder if it doesn't exist BEFORE proceeding.
 	fs.mkdirSync(__dirname+'/faceicons');
@@ -91,6 +85,20 @@ app.get('/', function(req, res){
 app.get('/worldinfo', function(req, res){
 	res.sendFile(__dirname + '/worldinfo.html');
 });
+
+/*app.get('/database', function(req, res){
+	res.sendFile(__dirname + '/database.html');
+});
+
+app.get('/database/*', function(req, res){
+	var name = req.originalURL;
+	var page = database.GetEntryContent(name);
+	if(page){
+		res.send(page);
+	} else {
+		res.send('Page not found.');
+	}
+});*/
 
 app.get('/logs/:name', function(req, res){
 	var name = req.params.name;
@@ -164,7 +172,7 @@ app.get('/logs', function(req, res){
 
 app.use('/faceicons', express.static(__dirname+'/faceicons'));
 
-openLog = function (logfile){//takes in a Date object
+var openLog = function (logfile){//takes in a Date object
 	try{
 		fs.accessSync(logfile, fs.R_OK | fs.W_OK);
 		htm = jsdom.jsdom(fs.readFileSync(logfile, 'utf8'));
@@ -180,7 +188,7 @@ openLog = function (logfile){//takes in a Date object
 	}
 };
 //initial opening when the server is activated
-logday = function(today){
+var logday = function(today){
 	return __dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+("0"+today.getDate()).slice(-2)+'.html'
 };
 var today = new Date();
@@ -201,7 +209,7 @@ var userdefaults = {
 	]
 };
 
-toLog = function (message){
+var toLog = function (message){
 	var today = new Date();
 	if(logday(today) != logfile){//new day
 		logfile = logday(today);
@@ -244,7 +252,7 @@ toLog = function (message){
 	});
 };
 
-editLog = function(message){
+var editLog = function(message){
 	var today = new Date();
 	var target = htm.getElementById(message.id);
 	if(target){//the message might be from yesterday and then you're just done.
@@ -270,7 +278,7 @@ editLog = function(message){
 
 };
 
-generateOOCmessage = function (message, username, post, color){
+var generateOOCmessage = function (message, username, post, color){
 	message.appendChild(htm.createTextNode("( "));//open parentheses
 
 	cur = htm.createElement('b');//create username
@@ -285,20 +293,19 @@ generateOOCmessage = function (message, username, post, color){
 	message.appendChild(htm.createTextNode(" )"));//close parentheses
 };
 
-generateOOClog = function (message, username, post){
+var generateOOClog = function (message, username, post){
 	var cur = htm.createTextNode("| "+username+" "+post+" |");
 	message.appendChild(cur);
 };
 
-generateNarration = function (message, username, post, color){
-	//I'll make this look different later.
+var generateNarration = function (message, username, post, color){
 	var cur = htm.createElement('span');
 	cur.style.color = color;
 	cur.innerHTML = post;
 	message.appendChild(cur);
 }
 
-generatePost = function (message, username, post, character, say, omit){
+var generatePost = function (message, username, post, character, say, omit){
 	message.style.fontFamily = character.fontStyle;
 	var cur = htm.createElement('img');
 	cur.src = '/faceicons/img_trans.gif';
@@ -344,7 +351,7 @@ generatePost = function (message, username, post, character, say, omit){
 	message.appendChild(cur);
 };
 
-processHTML = function(message){
+var processHTML = function(message){
 	//message = message.replace(/</g, "&lt;");
 	//message = message.replace(/>/g, "&gt;");
 	var test = /<|>/.test(message);
@@ -362,13 +369,13 @@ processHTML = function(message){
 	return message;
 };
 
-addPlayer = function(username, socket, permissions){
-	sessions[socket.id] = username;
+var addPlayer = function(username, socket, permissions){
+	sessions[socket.request.connection.remoteAddress] = username;
 	users[username] = socket;
 	playerlist[username] = {permissions: permissions};
 };
 
-removePlayer = function(id){
+var removePlayer = function(id){
 	var username = sessions[id];
 	delete sessions[id];
 	delete users[username];
@@ -403,6 +410,9 @@ var commands = {//console command list, formatted this way for convenience.
 						delete logins[name];
 						out += name+' ';
 						fs.unlink(__dirname+'/saves/'+name+'.json', function(err){
+							if(err){console.log(err);}
+						});
+						fs.unlink(__dirname+'/characters/'+name, function(err){
 							if(err){console.log(err);}
 						});
 					}//'shouldn't' need to catch if they have a login.
@@ -461,7 +471,10 @@ var commands = {//console command list, formatted this way for convenience.
 		fs.readFile('logins.json', 'utf8', function(err, logins){
 			if(err){console.log(err);} else {
 				logins = JSON.parse(logins);
-				console.log(Object.keys(logins));
+				Object.keys(logins).forEach(function(key){
+					delete logins[key].password;
+				})
+				console.log(logins);
 			}
 		});
 	},
@@ -496,28 +509,28 @@ var commands = {//console command list, formatted this way for convenience.
 	},
 };
 
-Setconnections = function(socket){//username will definitely be present or something is wrong enough to warrant throwing.
+var Setconnections = function(socket){//username will definitely be present or something is wrong enough to warrant throwing.
 	socket.on('Join Room', function(room){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			socket.join(room);
 		}
 	});
 	socket.on('Leave Room', function(room){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			socket.leave(room);
 		}
 	});
 	socket.on('OOCmessage', function(message, color){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		message = processHTML(message);
 		var msg = {className: 'OOC message', username: username, post: message, color: color};
 		io.emit('OOCmessage', msg);
 		toLog(msg);
 	});
 	socket.on('Narrate', function(message, color, room){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			message = processHTML(message);
 			var msg = {className: 'IC narration message', username: username, post: message, color: color};
@@ -533,7 +546,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		}
 	});
 	socket.on('Whisper', function(message, target){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && users[target]){//if they logged out midwhisper or they send an invalid one somehow we need to stop that.
 			message = processHTML(message);
 			var msg = {className: 'OOC whisper', username: username, post: message};
@@ -541,7 +554,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		}//no logging, OBVIOUSLY. What's an admin window?
 	});
 	socket.on('Dice', function(dice, result, color){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
 			if(result.length > 1){
@@ -553,7 +566,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		}
 	})
 	socket.on('characterPost', function(message, character, type, room){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(username){
 			if(character.customHTML){
 				character.customHTML = sanitizeHtml(character.customHTML, {allowedTags: ['b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
@@ -595,7 +608,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		}
 	});
 	socket.on('ICedit', function(message, postid){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			message = processHTML(message);
 			var msg = {id: postid, post: message+' (Edited)'};
@@ -611,7 +624,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		});
 	});
 	socket.on('sendimage', function(icons, callback){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(username){
 			var data = icons.replace(/^data:image\/png;base64,/, "");
 			if(icons == 'data:,'){//no image
@@ -666,7 +679,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		});
 	});
 	socket.on('Set Profile', function(profile, id){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		var n = id.split('-');
 		var d = n.pop();
 		n = n.join('-');
@@ -678,8 +691,26 @@ Setconnections = function(socket){//username will definitely be present or somet
 			});
 		}
 	});
+	socket.on('Delete Profile', function(id){
+		var username = sessions[socket.request.connection.remoteAddress];
+		var n = id.split('-');
+		var d = n.pop();
+		n = n.join('-');
+		if(username && username == n){
+			var dir = '/characters/'+n+'/'+d+'.html';
+			fs.unlink(__dirname+dir, function(err){
+				if(err){console.log(err);} else {
+					fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
+						index = JSON.parse(index);
+						delete index[id];
+						fs.writeFile(__dirname+'/characters/charindex.json', JSON.stringify(index));
+					});
+				}
+			});
+		}
+	});
 	socket.on('Edit Rules', function(message){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.rules = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the rules.</font>'};
@@ -691,7 +722,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		}
 	});
 	socket.on('Edit MOTD', function(message){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.motd = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the MOTD.</font>'};
@@ -703,7 +734,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		}
 	});
 	socket.on('Edit Default Profile', function(message){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.profile = message.replace(/\r\n?|\n/g, "<br />");//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
@@ -715,7 +746,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 		}
 	});
 	socket.on('Edit World Info', function(message){
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
 			fs.writeFile('worldinfo.html', message.replace(/\r\n?|\n/g, "<br />"), function(err){
@@ -727,7 +758,7 @@ Setconnections = function(socket){//username will definitely be present or somet
 	});
 	socket.on('AdminCommand', function(command, target){
 		//before we even consider it: ARE they an admin?
-		var username = sessions[socket.id];
+		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			if(commands[command]){
 				commands[command](target);
@@ -737,6 +768,14 @@ Setconnections = function(socket){//username will definitely be present or somet
 		} else {
 			console.log(username+' attempted to use an admin command.');
 		}
+	});
+	socket.on('disconnect', function(){
+		var username = sessions[socket.request.connection.remoteAddress];
+		var msg = {className: 'OOC log message', username: username, post: "has logged off"}
+		io.emit('OOCmessage', msg);
+		toLog(msg);
+		removePlayer(socket.request.connection.remoteAddress);
+		io.emit('PlayerList', playerlist);
 	});
 };
 
@@ -754,104 +793,97 @@ io.on('connection', function(socket){
 		}
 	}
 	console.log('a user connected');
-	socket.on('disconnect', function(){
-		console.log(sessions[socket.id]+' disconnected');
-		//handle other logoff things if there was a login
-		if(sessions[socket.id]){
-			var username = sessions[socket.id];
-			var msg = {className: 'OOC log message', username: username, post: "has logged off"}
-			io.emit('OOCmessage', msg);
-			toLog(msg);
-			removePlayer(socket.id);
-			io.emit('PlayerList', playerlist);
-		}
-	});
-	socket.on('login', function(username, password, callback){
-		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){callback(err);} else {
-				logins = JSON.parse(logins);
-				if(logins[username]){//valid username
-					if(users[username]){//already on the list?
-						callback("Username already logged in!");
-					} else if(logins[username].password == password){//valid login
-						addPlayer(username, socket, logins[username].permissions);
-						if(banlist.users[username]){//this is so mean.
-							Commands['Ban'](username);
-							callback("You're still banned.");
-						} else {
-							//pull up user info
-							fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
-								if(err){callback(err);} else {
-									setImmediate(function() {Setconnections(socket);});
-									info = JSON.parse(info);
-									callback(info);
-									if(info.settings.room){
-										socket.join(info.settings.room);
-									}
-									Object.keys(info.settings.rooms).forEach(function(room){
-										if(typeof room === 'string'){
-											socket.join(room);
+	var username = sessions[socket.request.connection.remoteAddress]
+	if(username){//logged in, probably a database access
+		//setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
+	} else {
+		socket.on('login', function(username, password, callback){
+			fs.readFile('logins.json', 'utf8', function(err, logins){
+				if(err){callback(err);} else {
+					logins = JSON.parse(logins);
+					if(logins[username]){//valid username
+						if(users[username]){//already on the list?
+							callback("User already logged in!");
+						} else if(logins[username].password == password){//valid login
+							addPlayer(username, socket, logins[username].permissions);
+							if(banlist.users[username]){//this is so mean.
+								Commands['Ban'](username);
+								callback("You're still banned.");
+							} else {
+								//pull up user info
+								fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
+									if(err){callback(err);} else {
+										setImmediate(function() {Setconnections(socket);});
+										info = JSON.parse(info);
+										callback(info);
+										if(info.settings.room){
+											socket.join(info.settings.room);
 										}
-									});
-									console.log(socket.id+" has logged in as "+username);
-									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-									io.emit('OOCmessage', msg);
-									io.emit('PlayerList', playerlist);
-									toLog(msg);
-								}
-							});
+										Object.keys(info.settings.rooms).forEach(function(room){
+											if(typeof room === 'string'){
+												socket.join(room);
+											}
+										});
+										console.log(socket.id+" has logged in as "+username);
+										var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+										io.emit('OOCmessage', msg);
+										io.emit('PlayerList', playerlist);
+										toLog(msg);
+									}
+								});
+							}
+						} else {//invalid login
+							callback("Password does not match the given username.");
 						}
-					} else {//invalid login
-						callback("Password does not match the given username.");
+					} else {//invalid username
+						callback(username+" is not in our list yet.");
 					}
-				} else {//invalid username
-					callback(username+" is not in our list yet.");
-				}
-			}
-		});
-	});
-	socket.on('register', function(username, password, callback){
-		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){callback(err);} else {
-				logins = JSON.parse(logins);
-				if(logins[username]){//username in use
-					callback("Username already in use.");
-				} else {//new username
-					logins[username] = {password: password, permissions: 'Guest'};
-					fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
-						if(!err){
-							fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-								if(!err){
-									fs.mkdir(__dirname+'/characters/'+username, function(err){
-										if(!err || err.code == 'EEXIST'){
-											setImmediate(function() {Setconnections(socket);});
-											addPlayer(username, socket, 'Guest');
-											//create new user info
-											callback(userdefaults);
-											console.log(socket.id+" has logged in as "+username);
-											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-											io.emit('OOCmessage', msg);
-											io.emit('PlayerList', playerlist);
-											toLog(msg);
-										} else {callback(err);}
-									});
-								} else {callback(err);}
-							});
-						} else {callback(err);}
-					});
-				}
-			}
-		});
-	});
-	socket.on('save', function(settings){
-		var username = sessions[socket.id];
-		if(username){
-			fs.writeFile(__dirname+'/saves/'+username+'.json', settings, function(err){
-				if(!err){
 				}
 			});
-		}
-	});
+		});
+		socket.on('register', function(username, password, callback){
+			fs.readFile('logins.json', 'utf8', function(err, logins){
+				if(err){callback(err);} else {
+					logins = JSON.parse(logins);
+					if(logins[username]){//username in use
+						callback("Username already in use.");
+					} else {//new username
+						logins[username] = {password: password, permissions: 'Guest'};
+						fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
+							if(!err){
+								fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+									if(!err){
+										fs.mkdir(__dirname+'/characters/'+username, function(err){
+											if(!err || err.code == 'EEXIST'){
+												setImmediate(function() {Setconnections(socket);});
+												addPlayer(username, socket, 'Guest');
+												//create new user info
+												callback(userdefaults);
+												console.log(socket.id+" has logged in as "+username);
+												var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+												io.emit('OOCmessage', msg);
+												io.emit('PlayerList', playerlist);
+												toLog(msg);
+											} else {callback(err);}
+										});
+									} else {callback(err);}
+								});
+							} else {callback(err);}
+						});
+					}
+				}
+			});
+		});
+		socket.on('save', function(settings){
+			var username = sessions[socket.request.connection.remoteAddress];
+			if(username){
+				fs.writeFile(__dirname+'/saves/'+username+'.json', settings, function(err){
+					if(!err){
+					}
+				});
+			}
+		});
+	}
 });
 
 if(process.argv[2]){
