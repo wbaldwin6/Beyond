@@ -1,0 +1,352 @@
+<html>
+	<head>
+		<style>
+			body {
+				background-color: black;
+				margin: 0 0 0 0;
+			}
+			div {
+				display: block;
+				float: left;
+				height: auto;
+				width: 100%;
+				background-color: black;
+				color: white;
+			}
+			div.contextMenu {
+				position: fixed;
+				z-index: 1;
+				width: auto;
+				cursor: default;
+			}
+			
+			.modalContainer{
+				z-index: 2;
+				position: fixed;
+				pointer-events: none;
+				background: none;
+			}
+			.modal {
+				pointer-events: auto;
+				z-index: 2;
+				position: fixed;
+				width: auto;
+				overflow: auto;
+				background-color: rgb(0,0,0);
+				background-color: rgba(50,50,50,0.8);
+			}
+			
+			iframe {
+				background-color: black;
+				color: white;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="main"></div>
+	
+		<script src="/socket.io/socket.io.js"></script>
+		<script src="http://www.myersdaily.org/joseph/javascript/md5.js"></script>
+		<script src="http://nathancahill.github.io/Split.js/split.js"></script>
+		<script src="https://cdn.rawgit.com/viliusle/Hermite-resize/master/dist/hermite.js"></script>
+		<script src="http://www.lalit.org/wordpress/wp-content/uploads/2008/05/fontdetect.js"></script>
+		<script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
+		<script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
+		<script src="https://unpkg.com/babel-core@5.8.38/browser.min.js"></script>
+		
+		<script type='text/babel'>
+		var socket = io();
+		
+		//Properties: socket
+		var OuterArea = React.createClass({
+			getInitialState: function() {
+				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "Sk8torchic", contents: {}}, page: ''};
+			},
+		
+			componentDidMount: function() {
+				var that = this;
+				Split(["#Directory", "#Content"], {minSize: [0, 0]});
+				document.getElementById('Directory').style.width = "calc(20% - 5px)";
+				document.getElementById('Content').style.width = "calc(80% - 5px)";
+				
+				//Initialize socket event listeners
+				this.props.socket.on('UpdateDatabase', function (funcname, args) { //args is an object, funcname is a string
+					switch(funcname) {
+					case 'set':
+						var directory = args.directory;
+						that.setState({directory: directory});
+						break;
+					case 'add':
+						var directory = that.state.directory;
+						var dir = directory;
+						for(var i = 0; i < args.path.length; i++) {
+							dir = dir.contents[args.path[i]];
+						}
+						dir.contents[args.entry.name] = args.entry;
+						that.setState({directory: directory});
+						break;
+					case 'del':
+						var directory = that.state.directory;
+						var dir = directory;
+						for(var i = 0; i < args.path.length-1; i++) {
+							dir = dir.contents[args.path[i]];
+						}
+						delete dir.contents[args.path[args.path.length - 1]];
+						that.setState({directory: directory});
+						break;
+					case 'edit':
+						var directory = that.state.directory;
+						var dir = directory;
+						for(var i = 0; i < args.path.length-1; i++) {
+							dir = dir.contents[args.path[i]];
+						}
+						dir.contents[args.name] = dir.contents[args.path[args.path.length-1]];
+						dir.contents[args.name].name = args.name;
+						delete dir.contents[args.path[args.path.length-1]];
+						break;
+					}
+				});
+				this.props.socket.on('UpdateError', function (err_msg) {
+					alert(err_msg);
+				});
+				this.props.socket.on('SetUsername', function(username, permissions) {
+					that.setState({username: username, permissions: permissions});
+				});
+				this.props.socket.on('SetPermissions', function(permissions) {
+					that.setState({permissions: permissions});
+				});
+				this.props.socket.on('InitializeDatabase', function(username, permissions, dir) {
+					that.setState({username: username, permissions: permissions, directory: dir});
+				});
+				
+			},
+			
+			GetDirectoryFromPath: function(path) {
+				var ret_val = this.state.directory;
+				for(var i = 0; i < path.length; i++) {
+					if(!("contents" in ret_val) || !(path[i] in ret_val.contents)) {
+						return undefined;
+					}
+					ret_val = ret_val.contents[path[i]];
+				}
+				return ret_val;
+			},
+			
+			closeContext: function(e) {
+				this.setState({context: null});
+			},
+			
+			AddDirectory: function(e) {
+				var newname = prompt("Enter the name of the new directory:");
+				if(newname && newname.length) {
+					this.props.socket.emit("AddDirectory", this.state.context.path, newname, this.state.username);
+				}
+				this.closeContext(e);
+			},
+			
+			AddEntry: function(e) {
+				var path = this.state.context.path;
+				var pathname = 'database/';
+				for(var i = 0; i < path.length; i++)
+					pathname += path[i] + '/';
+				var modal = <EditEntryModal socket={this.props.socket} path={path} funcname='add' titletext={'Creating new entry in ' + pathname} outerarea={this} />;
+				this.setState({modal: modal, context: null});
+			},
+			
+			DeleteEntry: function(e) {
+				var path = this.state.context.path;
+				if(confirm("Are you sure you want to delete " + path[path.length-1] + "?")) {
+					this.props.socket.emit('DeleteEntry', path);
+				}
+				this.closeContext(e);
+			},
+			
+			EditEntry: function(e) {
+				var path = this.state.context.path;
+				var pathname = 'database';
+				for(var i = 0; i < path.length; i++)
+					pathname += '/' + path[i];
+				pathname += '.html';
+				var modal = <EditEntryModal socket={this.props.socket} path={path} funcname='edit' titletext={'Editing ' + pathname} outerarea={this} />;
+				this.setState({modal: modal, context: null});
+			},
+			
+			render: function() {
+				var context = null;
+				if(this.state.context) { //context should have keys x, y, path, functions; functions include AddDirectory, AddEntry, Delete, Edit
+					var contextOptions = [];
+					if(this.state.context.functions.includes("AddDirectory")) {
+						contextOptions.push(<div key="AddDirectory" onClick={this.AddDirectory}>Add Directory</div>);
+					}
+					if(this.state.context.functions.includes("AddEntry")) {
+						contextOptions.push(<div key="AddEntry" onClick={this.AddEntry}>Add Entry</div>);
+					}
+					if(this.state.context.functions.includes("Delete")) {
+						contextOptions.push(<div key="Delete" onClick={this.DeleteEntry}>Delete</div>);
+					}
+					if(this.state.context.functions.includes("Edit")) {
+						contextOptions.push(<div key="Edit" onClick={this.EditEntry}>Edit</div>);
+					}
+					context = <div className="contextMenu" style={{left: this.state.context.x + "px", top: this.state.context.y + "px"}}>{contextOptions}</div>;
+				}
+				var dir = (<div key="Directory" id="Directory" style={{height: "100%"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} parents={[]} /></div>);
+				var content = (<div key="Content" id="Content"><iframe height="100%" width="100%" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
+				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}</div>);
+			}
+		});
+		
+		//Properties: socket, name, creator, contents, parents
+		var DirectoryList = React.createClass({
+			getInitialState: function() {
+				var path = this.props.parents.concat([this.props.name]);
+				path.splice(0,1);
+				var dir = this.props.outerarea.GetDirectoryFromPath(path);
+				return {open: "open" in dir ? dir.open : false};
+			},
+			
+			toggleOpen: function(e) {
+				var path = this.props.parents.concat([this.props.name]);
+				path.splice(0,1);
+				var directory = this.props.outerarea.state.directory;
+				var dir = directory;
+				for(var i = 0; i < path.length; i++) {
+					dir = dir.contents[path[i]];
+				}
+				dir.open = !dir.open;
+				this.props.outerarea.setState({directory: directory});
+				this.setState({open: dir.open});
+			},
+			
+			onContextMenu: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				if(this.props.outerarea.modal)
+					return;
+				var path = this.props.parents.concat([this.props.name]);
+				path.splice(0, 1);
+				var context = {x: e.clientX, y: e.clientY, path: path, functions: ["AddDirectory", "AddEntry", "Delete"]};
+				this.props.outerarea.setState({context: context});
+			},
+			
+			render: function() {
+				if(this.state.open) {
+					var name = <div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [&#8209;]</span></div>
+					var children = [];
+					var parents = this.props.parents.concat([this.props.name]);
+					for(var entry_name in this.props.contents) {
+						var entry = this.props.contents[entry_name];
+						if("contents" in entry) {
+							children.push(<DirectoryList key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} contents={entry.contents} parents={parents} />)
+						} else {
+							children.push(<Entry key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} parents={parents} />)
+						}
+					}
+					return(<div>{name}<br />{children}</div>);
+				} else {
+					return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [+]</span><br /></div>);
+				}
+			}
+		});
+		
+		//Properties: socket, name, creator, parents
+		var Entry = React.createClass({
+			navigateTo: function(e) {
+				var pathname = "/";
+				for(var i = 0; i < this.props.parents.length; i++) {
+					pathname += this.props.parents[i] + "/";
+				}
+				this.props.outerarea.setState({page: encodeURI(pathname + this.props.name + ".html")});
+			},
+			
+			onContextMenu: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				if(this.props.outerarea.modal)
+					return;
+				var path = this.props.parents.concat([this.props.name]);
+				path.splice(0, 1);
+				var context = {x: e.clientX, y: e.clientY, path: path, functions: ["Delete", "Edit"]};
+				this.props.outerarea.setState({context: context});
+			},
+			
+			render: function() {
+				return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name}</span></div>);
+			}
+		});
+		
+		//Properties: socket, path, funcname, titletext, outerarea
+		var EditEntryModal = React.createClass({
+			getInitialState: function() {
+				if(this.props.funcname === 'edit') {
+					var path = this.props.path;
+					var pathname = '/database';
+					for(var i = 0; i < path.length; i++)
+						pathname += '/' + path[i];
+					pathname = encodeURI(pathname + '.html');
+					var that = this;
+					this.props.socket.emit('RequestEntry', pathname, function(page) {
+						that.setState({defaultText: page.replace(/<br \/>/g, "\n")});
+					});
+				} else {
+					return {defaultText: '<html><body style=color:white;>\nYour Message Here\n</body></html>'};
+				}
+				return {};
+			},
+			
+			OKButton: function(e) {
+				var path = this.props.path;
+				switch(this.props.funcname) {
+					case 'add':
+						if(this.refs.inputName.value) {
+							this.props.socket.emit('AddEntry', path, this.refs.inputName.value, this.props.outerarea.state.username, this.CleanContent());
+						}
+						break;
+					case 'edit':
+						var name = this.refs.inputName.value;
+						var oldname = this.props.path[this.props.path.length - 1];
+						var content = this.CleanContent();
+						if(content === this.state.defaultText) {
+							content = null;
+						}
+						if(!name.length || name === oldname) {
+							name = null;
+						}
+						socket.emit('EditEntry', this.props.path, name, content);
+				}
+				this.props.outerarea.setState({modal: undefined});
+			},
+			
+			CancelButton: function(e) {
+				this.props.outerarea.setState({modal: undefined});
+			},
+			
+			CleanContent: function() {
+				var content = this.refs.textArea.value;
+				content = content.replace(/\r\n?|\n/g, "<br />");
+				return content;
+			},
+			
+			render: function() {
+				if(this.state.defaultText) {
+					var titlebar = <div key='titlebar' style={{width: "100%", height: "24px"}}>{this.props.titletext}</div>;
+					var buttonOK = <button key='buttonOK' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.OKButton}>OK</button>;
+					var buttonCancel = <button key='buttonCancel' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.CancelButton}>Cancel</button>;
+					var textArea = <textarea key='textArea' style={{width: "100%", height: "calc(100% - 80px)"}} ref="textArea" defaultValue={this.state.defaultText}></textarea>;
+					var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4px 0px"}}>Name:</div>;
+					var inputName = <input key='inputName' type="text" ref="inputName" style={{width: "80%", height: "24px", margin: "4px 0px"}} defaultValue={this.props.funcname === 'edit' ? this.props.path[this.props.path.length-1] : ""}></input>;
+					return (<div className="modal" style={{height: "68%", width: "50%", top: "16%", left: "25%"}}>
+								{titlebar}
+								{labelName}{inputName}
+								{textArea}
+								{buttonOK}{buttonCancel}
+							</div>);
+				} else {
+					return <div className="modal" style={{display: "none"}}></div>;
+				}
+			}
+		});
+
+		ReactDOM.render(<OuterArea socket={socket} />, document.getElementById("main"));
+		</script>
+	</body>
+</html>
