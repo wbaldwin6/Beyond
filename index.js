@@ -702,7 +702,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 		if(username && username == n){
 			var dir = '/characters/'+n+'/'+d+'.html';
 			fs.unlink(__dirname+dir, function(err){
-				if(err){console.log(err);} else {
+				if(err && err.code != 'ENOENT'){console.log(err);} else {
 					fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
 						index = JSON.parse(index);
 						delete index[id];
