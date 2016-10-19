@@ -775,7 +775,7 @@
 				var id = modal.getAttribute('id');//I'll be using this frequently, so I'd best.
 				var name = this.refs['name'+id].value;
 				var icons = this.refs['faceicons'+id].children;
-				if(name || this.props.modal[id].id.length > 1){//do nothing if they didn't put a name in if it's new
+				if((name && icons.length) || this.props.modal[id].id.length > 1){//do nothing if they didn't put a name in if it's new
 					var fontStyle = this.refs['font'+id].value;
 					var nameColor = this.refs['nameColor'+id].value;
 					var customHTML = this.refs['html'+id].value;

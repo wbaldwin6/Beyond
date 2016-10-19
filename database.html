@@ -299,7 +299,7 @@
 			},
 			
 			render: function() {
-				return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name}</span></div>);
+				return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name} (Created by {this.props.creator})</span></div>);
 			}
 		});
 		
