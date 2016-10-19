@@ -1,0 +1,669 @@
+<html>
+	<head>
+		<style>
+			body {
+				background-color: black;
+				margin: 0 0 0 0;
+			}
+			div {
+				display: block;
+				float: left;
+				height: auto;
+				width: 100%;
+				color: white;
+			}
+			div.contextMenu {
+				position: fixed;
+				z-index: 1;
+				width: auto;
+				background-color: black;
+				cursor: default;
+			}
+			
+			iframe {
+				height: 100%;
+				width: 100%;
+				border: none;
+			}
+			
+			.gutter {
+				background-color: #d3d3d3;
+			}
+			
+			.gutter.gutter-horizontal{
+				height: 100%;
+				cursor: ew-resize;
+			}
+			
+			.modal {
+				pointer-events: auto;
+				z-index: 1000;
+				position: fixed;
+				width: auto;
+				overflow: auto;
+				background-color: rgb(0,0,0);
+				background-color: rgba(50,50,50,0.8);
+				
+				-webkit-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+			
+			iframe {
+				background-color: black;
+				color: white;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="main"></div>
+	
+		<script src="/socket.io/socket.io.js"></script>
+		<script src="http://www.myersdaily.org/joseph/javascript/md5.js"></script>
+		<script src="http://nathancahill.github.io/Split.js/split.js"></script>
+		<script src="https://cdn.rawgit.com/viliusle/Hermite-resize/master/dist/hermite.js"></script>
+		<script src="http://www.lalit.org/wordpress/wp-content/uploads/2008/05/fontdetect.js"></script>
+		<script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
+		<script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
+		<script src="https://unpkg.com/babel-core@5.8.38/browser.min.js"></script>
+		
+		<script type='text/babel'>
+		var socket = io();
+		
+		//Properties: socket
+		var OuterArea = React.createClass({
+			getInitialState: function() {
+				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "Sk8torchic", contents: {}}, page: '', openness: {}};
+			},
+		
+			componentDidMount: function() {
+				var that = this;
+				Split(["#Directory", "#Content"], {minSize: [0, 0]});
+				document.getElementById('Directory').style.width = "calc(20% - 5px)";
+				document.getElementById('Content').style.width = "calc(80% - 5px)";
+				
+				//Initialize socket event listeners
+				this.props.socket.on('UpdateDatabase', function (directory) {
+					that.setState({directory: directory});
+					document.getElementById('iFrame').contentWindow.location.reload(true);
+				});
+				this.props.socket.on('UpdateError', function (err_msg) {
+					alert(err_msg);
+				});
+				this.props.socket.on('SetUsername', function(username, permissions) {
+					that.setState({username: username, permissions: permissions});
+				});
+				this.props.socket.on('SetPermissions', function(permissions) {
+					that.setState({permissions: permissions});
+				});
+				this.props.socket.on('InitializeDatabase', function(username, permissions, dir) {
+					that.setState({username: username, permissions: permissions, directory: dir});
+				});
+				
+			},
+			
+			GetDirectoryFromPath: function(path) {
+				var ret_val = this.state.directory;
+				for(var i = 0; i < path.length; i++) {
+					if(!("contents" in ret_val) || !(path[i] in ret_val.contents)) {
+						return undefined;
+					}
+					ret_val = ret_val.contents[path[i]];
+				}
+				return ret_val;
+			},
+			
+			closeContext: function(e) {
+				this.setState({context: null});
+			},
+			
+			AddDirectory: function(e) {
+				var path = this.state.context.path;
+				var modal = <AddDirectoryModal socket={this.props.socket} path={path} outerarea={this} />;
+				this.setState({context: null, modal: modal});
+			},
+			
+			AddEntry: function(e) {
+				var path = this.state.context.path;
+				var pathname = 'database/';
+				for(var i = 0; i < path.length; i++)
+					pathname += path[i] + '/';
+				var modal = <EditEntryModal socket={this.props.socket} path={path} funcname='add' titletext={'Creating new entry in ' + pathname} outerarea={this} />;
+				this.setState({modal: modal, context: null});
+			},
+			
+			DeleteEntry: function(e) {
+				var path = this.state.context.path;
+				var modal = <DeleteEntryModal socket={this.props.socket} path={path} outerarea={this} />;
+				this.setState({context: null, modal: modal});
+			},
+			
+			EditEntry: function(e) {
+				var path = this.state.context.path;
+				var pathname = 'database';
+				for(var i = 0; i < path.length; i++)
+					pathname += '/' + path[i];
+				pathname += '.html';
+				var modal = <EditEntryModal socket={this.props.socket} path={path} funcname='edit' titletext={'Editing ' + pathname} outerarea={this} />;
+				this.setState({modal: modal, context: null});
+			},
+			
+			OpenEntry: function(e) {
+				var path = this.state.context.path;
+				var pathname = '/database';
+				for(var i = 0; i < path.length; i++)
+					pathname += '/' + path[i];
+				window.open(pathname + '.html');
+				this.setState({context: null});
+			},
+			
+			MoveEntry: function(e) {
+				var modal = <MoveEntryModal socket={this.props.socket} path={this.state.context.path} outerarea={this} />;
+				this.setState({context: null, modal: modal});
+			},
+			
+			RenameDirectory: function(e) {
+				var modal = <RenameDirectoryModal socket={this.props.socket} path={this.state.context.path} outerarea={this} />;
+				this.setState({context: null, modal: modal});
+			},
+			
+			render: function() {
+				var context = null;
+				if(this.state.context) { //context should have keys x, y, path, functions; functions include AddDirectory, AddEntry, Delete, Edit
+					var contextOptions = [];
+					if(this.state.context.functions.includes("AddDirectory")) {
+						contextOptions.push(<div key="AddDirectory" onClick={this.AddDirectory}>Add Directory</div>);
+					}
+					if(this.state.context.functions.includes("AddEntry")) {
+						contextOptions.push(<div key="AddEntry" onClick={this.AddEntry}>Add Entry</div>);
+					}
+					if(this.state.context.functions.includes("RenameDirectory")) {
+						contextOptions.push(<div key="RenameDirectory" onClick={this.RenameDirectory}>Rename</div>);
+					}
+					if(this.state.context.functions.includes("Delete")) {
+						contextOptions.push(<div key="Delete" onClick={this.DeleteEntry}>Delete</div>);
+					}
+					if(this.state.context.functions.includes("Edit")) {
+						contextOptions.push(<div key="Edit" onClick={this.EditEntry}>Edit</div>);
+					}
+					if(this.state.context.functions.includes("Move")) {
+						contextOptions.push(<div key="Move" onClick={this.MoveEntry}>Move To...</div>);
+					}
+					if(this.state.context.functions.includes("Open")) {
+						contextOptions.push(<div key="Open" onClick={this.OpenEntry}>Open in New Tab</div>);
+					}
+					context = <div className="contextMenu" style={{left: this.state.context.x + "px", top: this.state.context.y + "px"}}>{contextOptions}</div>;
+				}
+				var dir = (<div key="Directory" id="Directory" style={{height: "100%", overflowY: "auto"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} parents={[]} /></div>);
+				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
+				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}</div>);
+			}
+		});
+		
+		//Properties: socket, name, creator, contents, parents
+		var DirectoryList = React.createClass({
+			getInitialState: function() {
+				var path = this.props.parents.concat([this.props.name]);
+				var openness = this.props.outerarea.state.openness;
+				return {open: path.toString() in openness ? openness[path.toString()] : false};
+			},
+			
+			toggleOpen: function(e) {
+				var path = this.props.parents.concat([this.props.name]);
+				var openness = this.props.outerarea.state.openness;
+				openness[path.toString()] = !openness[path.toString()];
+				this.props.outerarea.setState({openness: openness});
+				this.setState({open: !this.state.open});
+				var movemodal = this.props.outerarea.state.movemodal;
+				if(movemodal) {
+					movemodal.setState({clickedDirectory: this});
+				}
+			},
+			
+			onContextMenu: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				if(this.props.outerarea.state.modal)
+					return;
+				var path = this.props.parents.concat([this.props.name]);
+				path.splice(0, 1);
+				var funcs = ["AddEntry"];
+				if(this.props.outerarea.state.permissions === 'Admin') {
+					funcs.push("AddDirectory");
+					if(this.props.parents.length) {
+						funcs.push("Delete");
+						funcs.push("Move");
+						funcs.push("RenameDirectory");
+					}
+				}
+				var context = {x: e.clientX, y: e.clientY, path: path, functions: funcs};
+				this.props.outerarea.setState({context: context});
+			},
+			
+			render: function() {
+				if(this.state.open) {
+					var name = <div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [&#8209;]</span></div>
+					var children = [];
+					var parents = this.props.parents.concat([this.props.name]);
+					for(var entry_name in this.props.contents) {
+						var entry = this.props.contents[entry_name];
+						if("contents" in entry) {
+							children.push(<DirectoryList key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} contents={entry.contents} parents={parents} />)
+						} else {
+							children.push(<Entry key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} parents={parents} />)
+						}
+					}
+					return(<div>{name}<br />{children}</div>);
+				} else {
+					return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [+]</span><br /></div>);
+				}
+			}
+		});
+		
+		//Properties: socket, name, creator, parents
+		var Entry = React.createClass({
+			navigateTo: function(e) {
+				var pathname = "/";
+				for(var i = 0; i < this.props.parents.length; i++) {
+					pathname += this.props.parents[i] + "/";
+				}
+				this.props.outerarea.setState({page: encodeURI(pathname + this.props.name + ".html")});
+			},
+			
+			onContextMenu: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				if(this.props.outerarea.state.modal)
+					return;
+				var path = this.props.parents.concat([this.props.name]);
+				path.splice(0, 1);
+				var funcnames = ['Open'];
+				if(this.props.outerarea.state.permissions === 'Admin' || this.props.creator === this.props.outerarea.state.username) {
+					funcnames = ['Delete', 'Edit', 'Open'];
+				}
+				if(this.props.outerarea.state.permissions === 'Admin') {
+					funcnames.push('Move');
+				}
+				var context = {x: e.clientX, y: e.clientY, path: path, functions: funcnames};
+				this.props.outerarea.setState({context: context});
+			},
+			
+			render: function() {
+				return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name}</span></div>);
+			}
+		});
+		
+		//Properties: socket, path, funcname, titletext, outerarea
+		var EditEntryModal = React.createClass({
+			getInitialState: function() {
+				if(this.props.funcname === 'edit') {
+					var path = this.props.path;
+					var pathname = '/database';
+					for(var i = 0; i < path.length; i++)
+						pathname += '/' + path[i];
+					pathname = encodeURI(pathname + '.html');
+					var that = this;
+					this.props.socket.emit('RequestEntry', pathname, function(page) {
+						that.setState({defaultText: page.replace(/<br \/>/g, "\n")});
+					});
+				} else {
+					return {defaultText: '<html><body style="color:white;background-color:black;">\nYour Message Here\n</body></html>', x: 100, y: 100};
+				}
+				return {x: 100, y: 100};
+			},
+			
+			OKButton: function(e) {
+				var path = this.props.path;
+				switch(this.props.funcname) {
+					case 'add':
+						if(this.refs.inputName.value) {
+							this.props.socket.emit('AddEntry', path, this.refs.inputName.value, this.props.outerarea.state.username, this.CleanContent());
+						}
+						break;
+					case 'edit':
+						var name = this.refs.inputName.value;
+						var oldname = this.props.path[this.props.path.length - 1];
+						var content = this.CleanContent();
+						if(content === this.state.defaultText) {
+							content = null;
+						}
+						if(!name.length || name === oldname) {
+							name = null;
+						}
+						if(name || content)
+							socket.emit('EditEntry', this.props.path, name, content);
+						break;
+				}
+				this.props.outerarea.setState({modal: undefined});
+			},
+			
+			CancelButton: function(e) {
+				this.props.outerarea.setState({modal: undefined});
+			},
+			
+			CleanContent: function() {
+				var content = this.refs.textArea.value;
+				content = content.replace(/\r\n?|\n/g, "<br />");
+				return content;
+			},
+			
+			render: function() {
+				if(this.state.defaultText) {
+					var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{this.props.titletext}</div>;
+					var buttonOK = <button key='buttonOK' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.OKButton}>OK</button>;
+					var buttonCancel = <button key='buttonCancel' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.CancelButton}>Cancel</button>;
+					var textArea = <textarea key='textArea' ref="textArea" style={{minWidth: "100%", minHeight: "calc(100%-80px)"}} defaultValue={this.state.defaultText}></textarea>;
+					var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4px 0px"}}>Name:</div>;
+					var inputName = <input key='inputName' type="text" ref="inputName" style={{width: "80%", height: "24px", margin: "4px 0px"}} defaultValue={this.props.funcname === 'edit' ? this.props.path[this.props.path.length-1] : ""}></input>;
+					return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+								{titlebar}<br />
+								{labelName}{inputName}<br />
+								{textArea}<br />
+								{buttonOK}{buttonCancel}
+							</div>);
+				} else {
+					return <div className="modal" style={{display: "none"}}></div>;
+				}
+			},
+			
+			startDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+			
+			drag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var initpos = this.state.initpos;
+				var x = e.clientX - initpos.x;
+				var y = e.clientY - initpos.y;
+				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
+				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
+				if(x < 0) x = 0;
+				if(y < 0) y = 0;
+				this.setState({x: x, y: y});
+			},
+			
+			stopDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "auto";
+			}
+		});
+		
+		var DeleteEntryModal = React.createClass({
+			getInitialState: function() {
+				return {x: 100, y: 100};
+			},
+			
+			YesButton: function(e) {
+				this.props.socket.emit('DeleteEntry',this.props.path);
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			NoButton: function(e) {
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			render: function() {
+				var filename = this.props.path[this.props.path.length-1];
+				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Delete ' + filename}</div>;
+				var labelAreYouSure = <div key='labelAreYouSure' style={{margin: "4 0"}}>{'Are you sure you want to delete ' + filename + '?'}</div>;
+				var buttonYes = <button key='buttonYes' type="button" onClick={this.YesButton}>Yes</button>;
+				var buttonNo = <button key='buttonNo' type="button" onClick={this.NoButton}>No</button>;
+				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+							{titlebar}<br />
+							{labelAreYouSure}<br />
+							{buttonYes}{buttonNo}
+						</div>);
+			},
+			
+			startDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+			
+			drag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var initpos = this.state.initpos;
+				var x = e.clientX - initpos.x;
+				var y = e.clientY - initpos.y;
+				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
+				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
+				if(x < 0) x = 0;
+				if(y < 0) y = 0;
+				this.setState({x: x, y: y});
+			},
+			
+			stopDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "auto";
+			}
+		});
+		
+		var AddDirectoryModal = React.createClass({
+			getInitialState: function() {
+				return {x: 100, y: 100};
+			},
+			
+			OKButton: function(e) {
+				var newname = this.refs.inputName.value;
+				if(newname.length) {
+					this.props.socket.emit('AddDirectory', this.props.path, newname, this.props.outerarea.state.username);
+				}
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			CancelButton: function(e) {
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			render: function() {
+				var pathname = 'database/';
+				for(var i = 0; i < this.props.path.length; i++)
+					pathname += this.props.path[i] + '/';
+				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Add Directory to ' + pathname}</div>;
+				var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4 0"}}>Name: </div>;
+				var inputName = <input key='inputName' ref='inputName' type="text" style={{width: "80%", height: "24px", margin: "4 0"}}></input>;
+				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
+				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
+				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+							{titlebar}<br />
+							{labelName}{inputName}<br />
+							{buttonOK}{buttonCancel}
+						</div>);
+			},
+			
+			startDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+			
+			drag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var initpos = this.state.initpos;
+				var x = e.clientX - initpos.x;
+				var y = e.clientY - initpos.y;
+				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
+				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
+				if(x < 0) x = 0;
+				if(y < 0) y = 0;
+				this.setState({x: x, y: y});
+			},
+			
+			stopDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "auto";
+			}
+		});
+		
+		var MoveEntryModal = React.createClass({
+			getInitialState: function() {
+				return {x: 100, y: 100};
+			},
+			
+			componentDidMount: function() {
+				this.props.outerarea.setState({movemodal: this});
+			},
+			
+			OKButton: function(e) {
+				var dir = this.state.clickedDirectory;
+				if(dir) {
+					var newpath = dir.props.parents.concat([dir.props.name]);
+					newpath.splice(0, 1);
+					var oldpath = this.props.path;
+					this.props.socket.emit('MoveEntry', oldpath, newpath);
+				}
+				this.props.outerarea.setState({modal: null, movemodal: null});
+			},
+			
+			CancelButton: function(e) {
+				this.props.outerarea.setState({modal: null, movemodal: null});
+			},
+			
+			render: function() {
+				var dirname = this.props.path[this.props.path.length-1]
+				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Move ' + dirname}</div>;
+				var buttonOK = <button key='buttonOK' type="button" onClick={this.OKButton}>OK</button>;
+				var buttonCancel = <button key='buttonCancel' type="button" onClick={this.CancelButton}>Cancel</button>;
+				var labelAsk;
+				if(this.state.clickedDirectory) {
+					labelAsk = <div key='labelAsk'>{'Move to ' + this.state.clickedDirectory.props.name}</div>;
+				} else {
+					labelAsk = <div key='labelAsk'>Select a target directory on the left.</div>;
+				}
+				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+							{titlebar}<br />
+							{labelAsk}<br />
+							{buttonOK}{buttonCancel}
+						</div>);
+			},
+			
+			startDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+			
+			drag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var initpos = this.state.initpos;
+				var x = e.clientX - initpos.x;
+				var y = e.clientY - initpos.y;
+				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
+				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
+				if(x < 0) x = 0;
+				if(y < 0) y = 0;
+				this.setState({x: x, y: y});
+			},
+			
+			stopDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "auto";
+			}
+		});
+		
+		var RenameDirectoryModal = React.createClass({
+			getInitialState: function() {
+				return {x: 100, y: 100};
+			},
+			
+			OKButton: function(e) {
+				var newname = this.refs.inputName.value;
+				if(newname.length) {
+					var path = this.props.path;
+					this.props.socket.emit('RenameDirectory', path, newname);
+				}
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			CancelButton: function(e) {
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			render: function() {
+				var dirname = this.props.path[this.props.path.length - 1];
+				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Rename ' + dirname}</div>;
+				var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4 0"}}>Name: </div>;
+				var inputName = <input key='inputName' ref='inputName' type="text" style={{width: "80%", height: "24px", margin: "4 0"}}></input>;
+				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
+				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
+				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+							{titlebar}<br />
+							{labelName}{inputName}<br />
+							{buttonOK}{buttonCancel}
+						</div>);
+			},
+			
+			startDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+			
+			drag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var initpos = this.state.initpos;
+				var x = e.clientX - initpos.x;
+				var y = e.clientY - initpos.y;
+				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
+				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
+				if(x < 0) x = 0;
+				if(y < 0) y = 0;
+				this.setState({x: x, y: y});
+			},
+			
+			stopDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "auto";
+			}
+		});
+		
+		
+
+		ReactDOM.render(<OuterArea socket={socket} />, document.getElementById("main"));
+		</script>
+	</body>
+</html>

@@ -5,7 +5,10 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 var jsdom = require('jsdom');
 var sanitizeHtml = require('sanitize-html');
-//var database = require('./database');
+var database = require('./database');
+
+//Make sure the database exists
+database.LoadDatabase(); //TODO: Move this somewhere more appropriate?
 
 try{//make sure the logins file exists BEFORE proceeding.
 	fs.accessSync('logins.json', fs.R_OK | fs.W_OK);
@@ -86,19 +89,19 @@ app.get('/worldinfo', function(req, res){
 	res.sendFile(__dirname + '/worldinfo.html');
 });
 
-/*app.get('/database', function(req, res){
+app.get('/database', function(req, res){
 	res.sendFile(__dirname + '/database.html');
 });
 
 app.get('/database/*', function(req, res){
-	var name = req.originalURL;
+	var name = req.originalUrl;
 	var page = database.GetEntryContent(name);
 	if(page){
 		res.send(page);
 	} else {
 		res.send('Page not found.');
 	}
-});*/
+});
 
 app.get('/logs/:name', function(req, res){
 	var name = req.params.name;
@@ -795,7 +798,7 @@ io.on('connection', function(socket){
 	console.log('a user connected');
 	var username = sessions[socket.request.connection.remoteAddress]
 	if(username){//logged in, probably a database access
-		//setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
+		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
 	} else {
 		socket.on('login', function(username, password, callback){
 			fs.readFile('logins.json', 'utf8', function(err, logins){
