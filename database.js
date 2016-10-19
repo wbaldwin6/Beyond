@@ -89,7 +89,7 @@ RenameEntry: function(path, newname) {
 	var dirpath = this.GetPathnameFromPath(dir);
 	var oldname = path[path.length - 1];
 	dir = this.GetDirectoryFromPath(dir);
-	if(!(contents in dir) || newname in dir.contents || !(oldname in dir.contents)) {
+	if(!("contents" in dir) || newname in dir.contents || !(oldname in dir.contents)) {
 		return false;
 	}
 	var oldpath = encodeURI(dirpath + "/" + oldname + ".html");
@@ -198,7 +198,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 	var that = this;
 	var user = [socket, username, permissions];
 	databaseSockets.push(user);
-	console.log(JSON.stringify(toplevel));
+	socket.emit('InitializeDatabase', username, permissions, toplevel);
 	socket.on('disconnect', function() {
 		databaseSockets.splice(databaseSockets.indexOf(user), 1);
 	});
