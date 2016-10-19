@@ -142,6 +142,27 @@ UpdateMovedEntries: function(dir, oldpathname, newpathname) {
 	}
 },
 
+RenameDirectory: function(path, newname) {
+	var oldname = path[path.length - 1];
+	if(oldname === newname)
+		return false;
+	var parentPath = path.slice(0, -1);
+	var dir = this.GetDirectoryFromPath(parentPath);
+	if(!("contents" in dir) || !(oldname in dir.contents) || newname in dir.contents)
+		return false;
+	var parentPathname = this.GetPathnameFromPath(parentPath);
+	if("contents" in dir.contents[oldname]) {
+		for(var name in dir.contents[oldname].contents) {
+			this.UpdateMovedEntries(dir.contents[oldname].contents[name], parentPathname + "/" + oldname, parentPathname + "/" + newname);
+		}
+	}
+	dir.contents[newname] = dir.contents[oldname];
+	dir.contents[newname].name = newname;
+	delete dir.contents[oldname];
+	this.SaveDatabase();
+	return true;
+},
+
 LoadDatabase: function() {
 	try {
 		toplevel = JSON.parse(fs.readFileSync('./database/database.json', 'utf8'));
@@ -177,18 +198,22 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 	var that = this;
 	var user = [socket, username, permissions];
 	databaseSockets.push(user);
-	socket.emit('InitializeDatabase', username, permissions, toplevel);
+	console.log(JSON.stringify(toplevel));
 	socket.on('disconnect', function() {
 		databaseSockets.splice(databaseSockets.indexOf(user), 1);
 	});
 	socket.on('AddDirectory', function(path, name, creator) {
+		if(user[2] !== 'Admin') {
+			socket.emit('UpdateError', 'You do not have permission to create directories!');
+			return;
+		}
 		var dir = that.AddDirectory(path, name, creator);
 		if(dir) {
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
 		} else {
-			socket.emit('UpdateError', 'That Directory Already Exists!');
+			socket.emit('UpdateError', 'That directory could not be created.');
 		}
 	});
 	socket.on('AddEntry', function(path, name, creator, content) {
@@ -198,7 +223,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
 		} else {
-			socket.emit('UpdateError', 'That File Already Exists!');
+			socket.emit('UpdateError', 'That file could not be created.');
 		}
 	});
 	socket.on('DeleteEntry', function(path) {
@@ -266,6 +291,19 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			}
 		} else {
 			socket.emit('UpdateError', 'That could not be moved into the selected directory.');
+		}
+	});
+	socket.on('RenameDirectory', function(path, newname) {
+		if(user[2] !== 'Admin') {
+			socket.emit('UpdateError', 'You do not have permission to rename directories.');
+			return;
+		}
+		if(that.RenameDirectory(path, newname)) {
+			for(var i = 0; i < databaseSockets.length; i++) {
+				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
+			}
+		} else {
+			socket.emit('UpdateError', 'The directory could not be renamed to the given name.');
 		}
 	});
 }

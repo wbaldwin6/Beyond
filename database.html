@@ -163,6 +163,11 @@
 				this.setState({context: null, modal: modal});
 			},
 			
+			RenameDirectory: function(e) {
+				var modal = <RenameDirectoryModal socket={this.props.socket} path={this.state.context.path} outerarea={this} />;
+				this.setState({context: null, modal: modal});
+			},
+			
 			render: function() {
 				var context = null;
 				if(this.state.context) { //context should have keys x, y, path, functions; functions include AddDirectory, AddEntry, Delete, Edit
@@ -172,6 +177,9 @@
 					}
 					if(this.state.context.functions.includes("AddEntry")) {
 						contextOptions.push(<div key="AddEntry" onClick={this.AddEntry}>Add Entry</div>);
+					}
+					if(this.state.context.functions.includes("RenameDirectory")) {
+						contextOptions.push(<div key="RenameDirectory" onClick={this.RenameDirectory}>Rename</div>);
 					}
 					if(this.state.context.functions.includes("Delete")) {
 						contextOptions.push(<div key="Delete" onClick={this.DeleteEntry}>Delete</div>);
@@ -220,10 +228,14 @@
 					return;
 				var path = this.props.parents.concat([this.props.name]);
 				path.splice(0, 1);
-				var funcs = ["AddDirectory", "AddEntry"];
-				if(this.props.parents.length && this.props.outerarea.state.permissions === 'Admin') {
-					funcs.push("Delete");
-					funcs.push("Move");
+				var funcs = ["AddEntry"];
+				if(this.props.outerarea.state.permissions === 'Admin') {
+					funcs.push("AddDirectory");
+					if(this.props.parents.length) {
+						funcs.push("Delete");
+						funcs.push("Move");
+						funcs.push("RenameDirectory");
+					}
 				}
 				var context = {x: e.clientX, y: e.clientY, path: path, functions: funcs};
 				this.props.outerarea.setState({context: context});
@@ -536,7 +548,7 @@
 			},
 			
 			render: function() {
-				var dirname = this.props.path[this.props.path-1]
+				var dirname = this.props.path[this.props.path.length-1]
 				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Move ' + dirname}</div>;
 				var buttonOK = <button key='buttonOK' type="button" onClick={this.OKButton}>OK</button>;
 				var buttonCancel = <button key='buttonCancel' type="button" onClick={this.CancelButton}>Cancel</button>;
@@ -584,6 +596,72 @@
 				document.getElementById('iFrame').style.pointerEvents = "auto";
 			}
 		});
+		
+		var RenameDirectoryModal = React.createClass({
+			getInitialState: function() {
+				return {x: 100, y: 100};
+			},
+			
+			OKButton: function(e) {
+				var newname = this.refs.inputName.value;
+				if(newname.length) {
+					var path = this.props.path;
+					this.props.socket.emit('RenameDirectory', path, newname);
+				}
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			CancelButton: function(e) {
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			render: function() {
+				var dirname = this.props.path[this.props.path.length - 1];
+				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Rename ' + dirname}</div>;
+				var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4 0"}}>Name: </div>;
+				var inputName = <input key='inputName' ref='inputName' type="text" style={{width: "80%", height: "24px", margin: "4 0"}}></input>;
+				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
+				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
+				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+							{titlebar}<br />
+							{labelName}{inputName}<br />
+							{buttonOK}{buttonCancel}
+						</div>);
+			},
+			
+			startDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+			
+			drag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var initpos = this.state.initpos;
+				var x = e.clientX - initpos.x;
+				var y = e.clientY - initpos.y;
+				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
+				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
+				if(x < 0) x = 0;
+				if(y < 0) y = 0;
+				this.setState({x: x, y: y});
+			},
+			
+			stopDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "auto";
+			}
+		});
+		
+		
 
 		ReactDOM.render(<OuterArea socket={socket} />, document.getElementById("main"));
 		</script>
