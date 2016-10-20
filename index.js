@@ -251,7 +251,7 @@ var toLog = function (message){
 	br.className = message.className.split(" ")[0];
 	htm.body.appendChild(br);
 	fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
-		if(error) throw error;
+		if(error){console.log(error);}
 	});
 };
 
@@ -275,7 +275,7 @@ var editLog = function(message){
 		br.className = 'IC';
 		htm.body.insertBefore(br, target.nextElementSibling);
 		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
-			if(error) throw error;
+			if(error){console.log(error);}
 		});
 	}
 
