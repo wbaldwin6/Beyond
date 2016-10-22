@@ -89,6 +89,10 @@ app.get('/worldinfo', function(req, res){
 	res.sendFile(__dirname + '/worldinfo.html');
 });
 
+app.get('/idle.js', function(req, res){
+	res.sendFile(__dirname + '/idle.js');
+});
+
 app.get('/database', function(req, res){
 	res.sendFile(__dirname + '/database.html');
 });
@@ -556,6 +560,13 @@ var Setconnections = function(socket){//username will definitely be present or s
 			users[target].emit('OOCmessage', msg);
 		}//no logging, OBVIOUSLY. What's an admin window?
 	});
+	socket.on('AFK', function(on){
+		var username = sessions[socket.request.connection.remoteAddress];
+		if(on != playerlist[username].afk){
+			playerlist[username].afk = on;
+			io.emit('PlayerList', playerlist);
+		}
+	});
 	socket.on('Dice', function(dice, result, color){
 		var username = sessions[socket.request.connection.remoteAddress];
 		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
@@ -580,7 +591,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 			}//always do a serverside check!
 			var className = 'message'; var call;
 			message = processHTML(message);
-			var msg = {character: character, post: message};
+			var msg = {character: character, post: message, username: username};
 			if(type.endsWith('Say')){
 				className = 'say ' + className;
 			} else if(type.endsWith('Action')){

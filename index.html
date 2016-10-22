@@ -103,7 +103,7 @@
 			    margin: 0;
 			    padding: 0;
 			    overflow: hidden;
-			    background-color: black;	
+			    background-color: black;
 			}
 			ul.tab li {
 				transition: 0.3s;
@@ -170,7 +170,18 @@
 			div.contextOption:hover{
 				background-color: #555;
 			}
-			div.PLentry{
+			.Red{
+				background-color:red;
+				border-color:red;
+			}
+			.Green{
+				background-color:#0f0;
+				border-color:#0f0;
+			}
+			.Button{
+				outline:0;
+			}
+			.mtitle, div.PLentry{
 				text-align: center;
 				cursor: default;
 				-webkit-user-select: none;
@@ -355,6 +366,26 @@
 		    return resCV;
 		};
 
+		var idleInterval;// = new Worker("idle.js");
+		var idleresponse = function(e){//sends only when the timer hits the designated point
+			socket.emit('AFK', true); idleInterval.terminate(); idleInterval = null;
+			document.onmousemove = null;
+			document.onkeypress = null;
+			document.title = "(AFK) Beyond";
+		};
+
+		var resetTimer = function(e){idleInterval.postMessage(0)};
+
+		var timersetup = function(){idleInterval = new Worker("idle.js"); idleInterval.onmessage = idleresponse; document.onmousemove = resetTimer; document.onkeypress = resetTimer;}
+
+		window.onfocus = function(e){
+			if(!idleInterval){socket.emit('AFK', false); timersetup();}
+			document.title = "Beyond";
+			//change icon
+		};
+
+		timersetup();
+
 		var Outercontainer = React.createClass({
 			getInitialState: function(){
 				return {settings: {}, characters: [], modal: [{type: 'login'}], permissions: 'Guest', username: '', pass: '', players: {}};
@@ -374,7 +405,9 @@
 				document.getElementById('left').style.width = "calc(25% - 5px)";
 				document.getElementById('OI').style.width = "calc(75% - 5px)";
 				this.props.socket.on('PlayerList', function(players){
-					that.setState({players: players, permissions: players[that.state.username].permissions});
+					var ret = {players: players};
+					if(players[that.state.username]){ret.permissions = players[that.state.username].permissions;}
+					that.setState(ret);
 				});
 				this.props.socket.on('reconnect', function(){
 					if(that.state.username){
@@ -397,7 +430,7 @@
 
 			closeModal: function(n){
 				var modal = this.state.modal;
-				modal[n] = undefined;//would use delete, but I need the indices to stay in order.
+				delete modal[n];
 				this.setState({modal: modal});
 			},
 
@@ -605,10 +638,10 @@
 						</div>
 						<div id="OI">
 							<div id="IC">
-								<IChandler socket={this.props.socket}/>
+								<IChandler socket={this.props.socket} notify={this.state.settings.notify}/>
 							</div>
 							<div id="OOC">
-								<OOChandler ref="OOCbox" socket={this.props.socket}/>
+								<OOChandler ref="OOCbox" socket={this.props.socket} notify={this.state.settings.notify}/>
 							</div>
 						</div>
 						<input className="OOCbar" style={{width: '100%', padding: '0 0 0 0', border: '0'}} type="text" ref="OOCbar" placeholder="Input an OOC message" onKeyPress={this.handleEnter}/>
@@ -618,153 +651,6 @@
 		});
 
 		var ModalHandler = React.createClass({
-			getInitialState: function(){
-				return {positions: [], currentDrag: null, loginmessage: 'Please input a username and password of at least 6 characters.'};
-			},
-
-			submission: function (e){
-				var type = e.target.getAttribute('id');
-				e.preventDefault();
-				var that=this;
-				var username = this.refs.username.value;
-				var password = this.refs.password.value;
-				if(username.length >= 6 && password.length >= 6){
-					var ind = e.target.parentNode.getAttribute('id');
-					this.props.socket.emit(type, username, md5(password), function (response){
-						if(response.settings){
-							that.props.handleSettings(response.settings, response.characters);
-							that.props.setUser(username, md5(password));
-							that.closeModal(ind);
-						} else {
-							that.setState({loginmessage: response.code || response});
-						}
-					});
-				}
-			},
-
-			startDrag: function(e){
-				if(e.target.getAttribute('class') == "modal"){//only START for the modal containers.
-					e.stopPropagation();
-					e.preventDefault();
-					this.setState({currentDrag: e.target.getAttribute('id'), initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-					document.addEventListener('mousemove', this.drag);
-					document.addEventListener('mouseup', this.stopDrag);
-				}
-			},
-
-			drag: function(e){
-				e.stopPropagation();
-				e.preventDefault();
-				var pos = this.state.positions;
-				var initpos = this.state.initialposition;
-				var x = e.clientX-initpos.x;
-				var y = e.clientY-initpos.y;
-				var rect = this.refs[this.state.currentDrag].getBoundingClientRect();
-				if(x < 0){x=0;} if(y < 0){y=0;}
-				if(x+rect.width > document.body.clientWidth){x=document.body.clientWidth-rect.width;}
-				if(y+rect.height > document.body.clientHeight){y=document.body.clientHeight-rect.height;}
-				pos[this.state.currentDrag] = {x: x, y: y};
-				this.setState({positions: pos});
-			},
-
-			stopDrag: function(e){
-				e.stopPropagation();
-				e.preventDefault();
-				this.setState({currentDrag: null});
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-			},
-
-			handleFIs: function(e){
-				var list = e.target.files;
-				var id = e.target.parentNode.getAttribute('id');//current index
-				var img = [];
-				for(var i=0; i<list.length; i++){
-					if (list[i].type.match(/image.*/)) {
-						img.push(window.URL.createObjectURL(list[i]));
-					};
-				}
-				var images = this.state.images || [];
-				images[id] = img;
-				this.setState({images: images});
-			},
-
-			enterCheck: function(e){
-				if(e.keyCode == 13 && !e.shiftKey){//hit enter
-					this.post(e);
-				}
-			},
-
-			post: function(e){
-				var modal = e.target.parentNode;
-				var id = modal.getAttribute('id');
-				var modata = this.props.modal[id];
-				var post = this.refs['text'+id].value;
-				if(modata.name == 'Set Room'){//should allow null
-						if(this.props.settings.room && !this.props.settings.rooms[this.props.settings.room]){//we were in a room and we have no characters in it
-							this.props.socket.emit('Leave Room', this.props.settings.room);
-						}
-						this.props.settings.room = post;
-						if(post){
-							this.props.socket.emit('Join Room', post);
-						}
-						this.props.handleSettings(this.props.settings, this.props.characters);
-				} else if(post){
-					if(modata.name == 'Edit'){
-						if(modata.post != post){
-							this.props.socket.emit('ICedit', post, modata.id);
-						}
-					} else if(modata.name == 'Whisper'){
-						this.props.socket.emit('Whisper', post, modata.id);
-					} else if(modata.name == 'Narrate'){
-						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
-					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info'].indexOf(modata.name) > -1){
-						this.props.socket.emit(modata.name, post);
-					} else if(modata.name == 'Set Profile'){
-						this.props.socket.emit(modata.name, post, modata.charid);
-					} else if(modata.name == 'Join Room'){
-						var settings = this.props.settings;
-						if(!settings.rooms[post]){//not in this room yet
-							this.props.socket.emit('Join Room', post);
-							settings.rooms[post] = [];
-						}
-						//need to remove them from their previous room too if applicable
-						var rooms = Object.keys(settings.rooms);
-						var ind = -1;
-						for(var i=0; i < rooms.length && ind < 0; i++){//stop if we find it
-							ind = settings.rooms[rooms[i]].indexOf(modata.charid);
-						}
-						if(ind > -1){//it's in this room
-							i--;
-							settings.rooms[rooms[i]].splice(ind, 1);
-							if(settings.rooms[rooms[i]].length < 1){
-								this.props.socket.emit('Leave Room', rooms[i]);
-								delete settings.rooms[rooms[i]];
-							}
-						}
-						settings.rooms[post].push(modata.charid);
-						this.props.handleSettings(settings, this.props.characters);
-					} else {//find the right id
-						var trueid = this.verifyID(modata.charid, modata.id, modata.icpos);
-						var room = null;
-						if(modata.name == 'Say' || modata.name == 'Action'){//only for IC posts.
-							var rooms = Object.keys(this.props.settings.rooms);
-							for(var i=0; i < rooms.length && !room; i++){
-								if(this.props.settings.rooms[rooms[i]].indexOf(modata.charid) > -1){//it's in this room
-									room = rooms[i];
-								}
-							}
-						}
-						if(trueid){
-							var deriv = this.props.characters[trueid[0]][trueid[1]][trueid[2]];
-							this.props.socket.emit('characterPost', post, deriv, modata.name, room);
-						}//if it's undefined the character doesn't exist.
-					}
-				}
-
-				this.closeModal(id);
-			},
-
 			verifyID: function(charid, id, icpos){
 				var i, j, k;
 				var characters = this.props.characters;
@@ -817,6 +703,124 @@
 				}
 			},
 
+			render: function(){
+				var that = this;
+				var modals=this.props.modal.map(function (modal, index){
+					if(modal){
+						switch(modal.type){
+							case 'login'://basically hardcoded and single-purpose.
+								return(<LoginModal key={index} id={index} socket={that.props.socket} handleSettings={that.props.handleSettings} setUser={that.props.setUser} closeModal={that.props.closeModal}/>);
+							case 'character'://character creation/edit modal.
+								//TODO: Figure out how not to need to send settings.
+								return(<CharacterModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+							case 'group'://group creation/edit modal.
+								return(<GroupModal key={index} id={index} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+							case 'delete'://'are you sure?'
+								return(<DeleteModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+							case 'action':
+								return(<ActionModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+							case 'notifications':
+								return(<NotificationModal key={index} id={index} modal={modal} characters={that.props.characters} settings={that.props.settings} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+						}
+					} else {
+						return(<div key={index} className="modal" style={{display:'none'}}></div>);
+					}
+				});
+				return (
+					<div className="modalContainer" style={{width:'100%', height:'100%'}}>{modals}</div>
+				);
+			}
+		});
+
+		var startDrag = function(e){
+			if(e.target.getAttribute('class') == "modal"){//only START for the modal containers.
+				e.stopPropagation();
+				e.preventDefault();
+				this.setState({initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+			}
+		};
+
+		var drag = function(e){
+			e.stopPropagation();
+			e.preventDefault();
+			var initpos = this.state.initialposition;
+			var x = e.clientX-initpos.x;
+			var y = e.clientY-initpos.y;
+			var rect = this.refs['this'].getBoundingClientRect();
+			if(x < 0){x=0;} if(y < 0){y=0;}
+			if(x+rect.width > document.body.clientWidth){x=document.body.clientWidth-rect.width;}
+			if(y+rect.height > document.body.clientHeight){y=document.body.clientHeight-rect.height;}
+			this.setState({x: x, y: y});
+		};
+
+		var stopDrag = function(e){
+			e.stopPropagation();
+			e.preventDefault();
+			document.removeEventListener('mousemove', this.drag);
+			document.removeEventListener('mouseup', this.stopDrag);
+		};
+
+		var LoginModal = React.createClass({
+			getInitialState: function(){
+				return {loginmessage: 'Please input a username and password of at least 6 characters.'};
+			},
+
+			submission: function (e){
+				var type = e.target.getAttribute('id');
+				e.preventDefault();
+				var that=this;
+				var username = this.refs.username.value;
+				var password = this.refs.password.value;
+				if(username.length >= 6 && password.length >= 6){
+					var ind = e.target.parentNode.getAttribute('id');
+					this.props.socket.emit(type, username, md5(password), function (response){
+						if(response.settings){
+							that.props.handleSettings(response.settings, response.characters);
+							that.props.setUser(username, md5(password));
+							that.props.closeModal(ind);
+						} else {
+							that.setState({loginmessage: response.code || response});
+						}
+					});
+				}
+			},
+
+			render: function(){
+				return(<div id={this.props.id} className="modal" style={{textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
+						<input type="text" name="username" ref="username" placeholder="Username" required /><br/>
+						<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
+						<button type="submit" id="login" onClick={this.submission}>Login</button>
+						<button type="submit" id="register" onClick={this.submission}>Register</button><br/>
+						<b>{this.state.loginmessage}</b><br/><br/>
+						<iframe src='/worldinfo' style={{width:'95%', height:'85%'}}/>
+					</div>);
+			}
+		});
+
+		var CharacterModal = React.createClass({
+			getInitialState: function(){
+				return {x: '25%', y: '25%'};
+			},
+
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag,
+
+			handleFIs: function(e){
+				var list = e.target.files;
+				var img = [];
+				for(var i=0; i<list.length; i++){
+					if (list[i].type.match(/image.*/)) {
+						img.push(window.URL.createObjectURL(list[i]));
+					};
+				}
+				this.setState({images: img});
+			},
+
 			testFont: function(e){
 				try{
 					var d = new Detector();
@@ -846,71 +850,15 @@
 				}
 			},
 
-			closeChar: function(id){
-				var images = this.state.images;
-				if(images){
-					images[id] = null;
-					this.setState({images: images});
-				}
-				this.closeModal(id);
-			},
-
-			charDelete: function(e){
-				var modal = e.target.parentNode;
-				var id = modal.getAttribute('id');
-				var modata = this.props.modal[id];
-				var trueid;
-				//modata.id contains the ids involved.
-				var characters = this.props.characters.slice();
-				if(modata.id.length === 1){//group delete
-					if((characters[modata.id[0]] && modata.groupname == characters[modata.id[0]][0])){//the name hasn't changed
-						var salvage = characters.splice(modata.id[0], 1)[0];
-						salvage.shift();//remove the name
-						salvage.forEach(function(slv){
-							characters[0].push(slv);
-						});//add the characters to the ungrouped section.
-					}
-				} else if(modata.id.length === 2 || characters[modata.id[0]][modata.id[1]].length == 1){//character delete
-					trueid = this.verifyID(modata.charid, modata.id, modata.icpos);
-					if(trueid){
-						characters[trueid[0]].splice(trueid[1], 1);
-						//have to remove it from the room as well
-						var rooms = Object.keys(this.props.settings.rooms);
-						var ind = -1;
-						for(var i=0; i < rooms.length && ind < 0; i++){
-							ind = this.props.settings.rooms[rooms[i]].indexOf(modata.charid);
-						}
-						if(ind > -1){
-							i--;
-							this.props.settings.rooms[rooms[i]].splice(ind, 1);
-							if(this.props.settings.rooms[rooms[i]].length < 1){
-								this.props.socket.emit('Leave Room', rooms[i]);
-								delete this.props.settings.rooms[rooms[i]];
-							}
-						}
-					}
-					//tell it to delete the profile too.
-					this.props.socket.emit('Delete Profile', modata.charid);
-				} else {
-					trueid = this.verifyID(modata.charid, modata.id, modata.icpos);
-					if(trueid){
-						characters[trueid[0]][trueid[1]].splice(trueid[2], 1);
-					}
-				}
-				this.props.handleSettings(this.props.settings, characters);
-				this.closeModal(id);
-			},
-
 			charEdit: function(e){
 				var modal = e.target.parentNode;//the modal containing the save button
-				var id = modal.getAttribute('id');//I'll be using this frequently, so I'd best.
-				var name = this.refs['name'+id].value;
-				var icons = this.refs['faceicons'+id].children;
-				if((name && icons.length) || this.props.modal[id].id.length > 1){//do nothing if they didn't put a name in if it's new
-					var fontStyle = this.refs['font'+id].value;
-					var nameColor = this.refs['nameColor'+id].value;
-					var customHTML = this.refs['html'+id].value;
-					var color = this.refs['color'+id].value;
+				var name = this.refs['name'].value;
+				var icons = this.refs['faceicons'].children;
+				if((name && icons.length) || this.props.modal.id.length > 1){//do nothing if they didn't put a name in if it's new
+					var fontStyle = this.refs['font'].value;
+					var nameColor = this.refs['nameColor'].value;
+					var customHTML = this.refs['html'].value;
+					var color = this.refs['color'].value;
 					var canvas;
 					var convertedicons = [];
 					var spritecanvas = document.createElement('canvas');
@@ -928,17 +876,17 @@
 					}
 					var that=this;
 					this.props.socket.emit('sendimage', spritecanvas.toDataURL("image/png"), function(picid, un){
-						var modata = that.props.modal[id];
+						var modata = that.props.modal;
 						var settings = that.props.settings;
 						var characters = that.props.characters;
 						var character;
 						var trueid = [];
 						if(modata.id.length === 1){//new char only
-							trueid[0] = that.refs['group'+id].value;
+							trueid[0] = that.refs['group'].value;
 							trueid.push(characters[trueid[0]].length);//put it at the end of the group
 							character = [];
 						} else {//i1 is group, i2 is character
-							trueid = that.verifyID(modata.charid, modata.id, modata.icpos);
+							trueid = that.props.verifyID(modata.charid, modata.id, modata.icpos);
 							if(trueid){
 								character = characters[trueid[0]][trueid[1]];
 							}
@@ -956,20 +904,96 @@
 						characters[trueid[0]][trueid[1]] = character;//adds new if new, otherwise overwrites
 						that.props.handleSettings(settings, characters);
 						that.props.socket.emit('Update Character', character[0]);
-						that.closeChar(id);
+						that.props.closeModal(that.props.id);
 					});
 				}
 				
 			},
 
+			render: function(){
+				var modal = this.props.modal;
+				var groupdropdown = null;
+				var FIs = (<input type='file' ref={'FIs'} style={{width:'100%',marginBottom:'1px'}} multiple onChange={this.handleFIs}/>);//by default it allows multiple
+				var nameColor; var color; var fontStyle; var customHTML;
+				var character;
+				var trueid;
+				var name;
+				if(modal.id.length == 1){//new character
+					nameColor = '#ffffff';
+					color = '#ffffff';
+					fontStyle = 'Times New Roman';
+					customHTML = '';
+					var grouption = this.props.characters.map(function(group, ind){
+						if(!ind){
+							return (<option key={ind} value={ind}>None</option>);
+						} else {
+							return (<option key={ind} value={ind}>{group[0]}</option>);
+						}
+					});
+					groupdropdown = (<select className="char" ref={'group'}>{grouption}</select>);
+					name = modal.name;
+				} else {
+					trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
+					if(trueid){
+						character = this.props.characters[trueid[0]][trueid[1]];
+						nameColor = character[0].nameColor;
+						color = character[0].color;
+						fontStyle = character[0].fontStyle;
+						customHTML = character[0].customHTML;
+						name = modal.name+' - '+character[0].name;
+					} else {
+						this.props.closeModal(this.props.id);
+					}
+				}
+				if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
+					FIs = <input type='file' ref={'FIs'} style={{width:'100%', marginBottom:'1px'}} onChange={this.handleFIs}/>;
+					color = character[trueid[2]].color || color;
+					nameColor = character[trueid[2]].nameColor || nameColor;
+					fontStyle = character[trueid[2]].fontStyle || fontStyle;
+					customHTML = character[trueid[2]].customHTML || customHTML;
+					name = modal.name+' - '+character[trueid[2]].name;
+				}
+				var previews = null;
+				var im = this.state.images;
+				if(im && im.length){
+					previews = im.map(function(img, index){
+						return(<img src={img} key={index} width='50px' height='50px'/>);
+					});
+				}
+				return(
+					<div className="modal" ref="this" style={{left: this.state.x, top: this.state.y, width:'300px'}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					{FIs}<br/>
+					<span ref={'faceicons'}>{previews}</span><br/>
+					Name: <input type="text" className="char" ref={'name'} placeholder="Character Name" required style={{marginBottom:'1px'}}/><br/>
+					Name Color: <input type="color" className="char" ref={'nameColor'} defaultValue={nameColor}/><br/>
+					Text Color: <input type="color" className="char" ref={'color'} defaultValue={color}/><br/>
+					Font: <input type="text" className="char" ref={'font'} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={this.testFont} onKeyDown={this.fontTest}/><br/>
+					Custom HTML: <input type="text" className="char" ref={'html'} placeholder="Custom HTML" defaultValue={customHTML} style={{marginBottom:'1px'}}/><br/>
+					{groupdropdown ? 'Select a group: ' : ''}{groupdropdown}<br/>
+					<button type="submit" id="save" onClick={this.charEdit}>Save</button>
+						<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button></div>
+				);
+			}
+		});
+
+		var GroupModal = React.createClass({
+			getInitialState: function(){
+				return {x: '25%', y: '25%'};
+			},
+
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag,
+
 			groupEdit: function(e){
 				var modal = e.target.parentNode;//the modal containing the save button
-				var id = modal.getAttribute('id');
-				var name = this.refs['name'+id].value;
+				var name = this.refs['name'].value;
 				if(name){
-					var modata = this.props.modal[id];
+					var modata = this.props.modal;
 					var characters = this.props.characters.slice();
-					var checks = [].slice.call(this.refs['chars'+id].children);
+					var checks = [].slice.call(this.refs['chars'].children);
 					if(!modata.name.startsWith('Edit') || (characters[modata.id[0]] && modata.groupname == characters[modata.id[0]][0])){//the name hasn't changed
 						var group = modata.name.startsWith('Edit') ? characters[modata.id[0]] : [];
 						group[0] = name;
@@ -990,142 +1014,272 @@
 						}
 						this.props.handleSettings(this.props.settings, characters);
 					}
-					this.closeModal(id);
+					this.props.closeModal(this.props.id);
 				}
-			},
-			closeModal: function(id){
-				this.state.positions[id] = null;
-				this.props.closeModal(id);
-				this.setState({positions: this.state.positions});
 			},
 
 			render: function(){
-				var that = this;
-				var modals=this.props.modal.map(function (modal, index){
-					if(modal){
-						var x = '25%';
-						var y = '25%';
-						if(that.state.positions[index]){
-							x = that.state.positions[index].x+'px';
-							y = that.state.positions[index].y+'px';
+				var modal = this.props.modal;
+				var chars = this.props.characters[0].map(function(ch, index){
+					return(<div key={'c'+index} className='Command' onClick={function(e){e.target.style.fontWeight=(e.target.style.fontWeight=='bold')? 'normal' : 'bold';}}>{ch[0].name}</div>);
+				});//go through the ungrouped characters.
+				var def = '';
+				var name = modal.name;
+				if(modal.id[0] > 0){def = this.props.characters[modal.id[0]][0]; name += ' - '+def;}
+				return(<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					<input type='text' ref={'name'} placeholder='Group Name' defaultValue={def} required style={{width:'100%'}}/><br/>
+					Add characters to the group?<br/>
+					<form ref={"chars"}>
+					{chars}
+					</form>
+					<button type="submit" id="save" onClick={this.groupEdit}>Save</button>
+						<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button>
+					</div>);
+			}
+		});
+
+		var DeleteModal = React.createClass({
+			getInitialState: function(){
+				return {x: '25%', y: '25%'};
+			},
+
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag,
+
+			charDelete: function(e){
+				var modal = e.target.parentNode;
+				var modata = this.props.modal;
+				var trueid;
+				//modata.id contains the ids involved.
+				var characters = this.props.characters.slice();
+				if(modata.id.length === 1){//group delete
+					if((characters[modata.id[0]] && modata.groupname == characters[modata.id[0]][0])){//the name hasn't changed
+						var salvage = characters.splice(modata.id[0], 1)[0];
+						salvage.shift();//remove the name
+						salvage.forEach(function(slv){
+							characters[0].push(slv);
+						});//add the characters to the ungrouped section.
+					}
+				} else if(modata.id.length === 2 || characters[modata.id[0]][modata.id[1]].length == 1){//character delete
+					trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
+					if(trueid){
+						characters[trueid[0]].splice(trueid[1], 1);
+						//have to remove it from the room as well
+						var rooms = Object.keys(this.props.settings.rooms);
+						var ind = -1;
+						for(var i=0; i < rooms.length && ind < 0; i++){
+							ind = this.props.settings.rooms[rooms[i]].indexOf(modata.charid);
 						}
-						switch(modal.type){
-							case 'login'://basically hardcoded and single-purpose.
-								return(<div key={index} id={index} ref={index} className="modal" style={{textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
-										<input type="text" name="username" ref="username" placeholder="Username" required /><br/>
-										<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
-										<button type="submit" id="login" onClick={that.submission}>Login</button>
-										<button type="submit" id="register" onClick={that.submission}>Register</button><br/>
-										<b>{that.state.loginmessage}</b><br/><br/>
-										<iframe src='/worldinfo' style={{width:'95%', height:'85%'}}/>
-									</div>);
-							case 'character'://character creation/edit modal.
-								var groupdropdown = null;
-								var FIs = (<input type='file' ref={'FIs'+index} style={{width:'100%',marginBottom:'1px'}} multiple onChange={that.handleFIs}/>);//by default it allows multiple
-								var nameColor; var color; var fontStyle; var customHTML;
-								var character;
-								var trueid;
-								var name;
-								if(modal.id.length == 1){//new character
-									nameColor = '#ffffff';
-									color = '#ffffff';
-									fontStyle = 'Times New Roman';
-									customHTML = '';
-									var grouption = that.props.characters.map(function(group, ind){
-										if(!ind){
-											return (<option key={ind} value={ind}>None</option>);
-										} else {
-											return (<option key={ind} value={ind}>{group[0]}</option>);
-										}
-									});
-									groupdropdown = (<select className="char" ref={'group'+index}>{grouption}</select>);
-									name = modal.name;
-								} else {
-									trueid = that.verifyID(modal.charid, modal.id, modal.icpos);
-									if(trueid){
-										character = that.props.characters[trueid[0]][trueid[1]];
-										nameColor = character[0].nameColor;
-										color = character[0].color;
-										fontStyle = character[0].fontStyle;
-										customHTML = character[0].customHTML;
-										name = modal.name+' - '+character[0].name;
-									} else {
-										that.closeChar(index);
-									}
-								}
-								if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
-									FIs = <input type='file' ref={'FIs'+index} style={{width:'100%',marginBottom:'1px'}} onChange={that.handleFIs}/>;
-									color = character[trueid[2]].color || color;
-									nameColor = character[trueid[2]].nameColor || nameColor;
-									fontStyle = character[trueid[2]].fontStyle || fontStyle;
-									customHTML = character[trueid[2]].customHTML || customHTML;
-									name = modal.name+' - '+character[trueid[2]].name;
-								}
-								var previews = null;
-								var im = that.state.images;
-								if(im && im[index]){
-									previews = im[index].map(function(img, index){
-										return(<img src={img} key={index} width='50px' height='50px'/>);
-									});
-								}
-								return(
-									<div key={index} id={index} ref={index} className="modal" style={{left: x, top: y, width:'300px'}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
-									{FIs}<br/>
-									<span ref={'faceicons'+index}>{previews}</span><br/>
-									Name: <input type="text" className="char" ref={'name'+index} placeholder="Character Name" required style={{marginBottom:'1px'}}/><br/>
-									Name Color: <input type="color" className="char" ref={'nameColor'+index} defaultValue={nameColor}/><br/>
-									Text Color: <input type="color" className="char" ref={'color'+index} defaultValue={color}/><br/>
-									Font: <input type="text" className="char" ref={'font'+index} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={that.testFont} onKeyDown={that.fontTest}/><br/>
-									Custom HTML: <input type="text" className="char" ref={'html'+index} placeholder="Custom HTML" defaultValue={customHTML} style={{marginBottom:'1px'}}/><br/>
-									{groupdropdown ? 'Select a group: ' : ''}{groupdropdown}<br/>
-									<button type="submit" id="save" onClick={that.charEdit}>Save</button>
-										<button type="submit" id="cancel" onClick={that.closeChar.bind(null, index)}>Cancel</button></div>
-								);
-							case 'group'://group creation/edit modal.
-								var chars = that.props.characters[0].map(function(ch, index){
-									return(<div key={'c'+index} className='Command' onClick={function(e){e.target.style.fontWeight=(e.target.style.fontWeight=='bold')? 'normal' : 'bold';}}>{ch[0].name}</div>);
-								});//go through the ungrouped characters.
-								var def = '';
-								var name = modal.name;
-								if(modal.id[0] > 0){def = that.props.characters[modal.id[0]][0]; name += ' - '+def;}
-								return(<div key={index} id={index} ref={index} className="modal" style={{left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
-									<input type='text' ref={'name'+index} placeholder='Group Name' defaultValue={def} required style={{width:'100%'}}/><br/>
-									Add characters to the group?<br/>
-									<form ref={"chars"+index}>
-									{chars}
-									</form>
-									<button type="submit" id="save" onClick={that.groupEdit}>Save</button>
-										<button type="submit" id="cancel" onClick={that.closeModal.bind(null, index)}>Cancel</button>
-									</div>);
-							case 'delete'://'are you sure?'
-								var name = modal.name;
-								if(modal.groupname){name += ' - '+modal.groupname;
-								} else if(modal.charid){
-									var trueid = that.verifyID(modal.charid, modal.id, modal.icpos);
-									if(trueid){name+=' - '+that.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {that.closeModal(index);}
-								}
-								return(
-									<div key={index} id={index} ref={index} className="modal" style={{left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
-									Are you sure?<br/><button type="submit" onClick={that.charDelete}>Yes</button><button type="submit" onClick={that.closeModal.bind(null, index)}>No</button></div>
-								);
-							case 'action':
-								var name = modal.name;
-								if(modal.charid){
-									var trueid = that.verifyID(modal.charid, modal.id, modal.icpos);
-									if(trueid){name+=' - '+that.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {that.closeModal(index);}
-								}
-								return(
-									<div key={index} id={index} ref={index} className="modal" style={{left: x, top: y}} onMouseDown={that.startDrag}><span className="mtitle">{name}</span><br/>
-									<textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'+index} onKeyDown={that.enterCheck}></textarea><br/><button type="submit" onClick={that.post}>OK</button><button type="submit" onClick={that.closeModal.bind(null, index)}>Cancel</button></div>
-								);
+						if(ind > -1){
+							i--;
+							this.props.settings.rooms[rooms[i]].splice(ind, 1);
+							if(this.props.settings.rooms[rooms[i]].length < 1){
+								this.props.socket.emit('Leave Room', rooms[i]);
+								delete this.props.settings.rooms[rooms[i]];
+							}
 						}
+					}
+					//tell it to delete the profile too.
+					this.props.socket.emit('Delete Profile', modata.charid);
+				} else {
+					trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
+					if(trueid){
+						characters[trueid[0]][trueid[1]].splice(trueid[2], 1);
+					}
+				}
+				this.props.handleSettings(this.props.settings, characters);
+				this.props.closeModal(this.props.id);
+			},
+
+			render: function(){
+				var modal = this.props.modal;
+				var name = modal.name;
+				if(modal.groupname){name += ' - '+modal.groupname;
+				} else if(modal.charid){
+					var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
+					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+				}
+				return(
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					Are you sure?<br/><button type="submit" onClick={this.charDelete}>Yes</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>No</button></div>
+				);
+			}
+		});
+
+		var ActionModal = React.createClass({
+			getInitialState: function(){
+				return {x: '25%', y: '25%'};
+			},
+
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag,
+
+			enterCheck: function(e){
+				if(e.keyCode == 13 && !e.shiftKey){//hit enter
+					this.post(e);
+				}
+			},
+
+			post: function(e){
+				var modal = e.target.parentNode;
+				var modata = this.props.modal;
+				var post = this.refs['text'].value;
+				if(modata.name == 'Set Room'){//should allow null
+						if(this.props.settings.room && !this.props.settings.rooms[this.props.settings.room]){//we were in a room and we have no characters in it
+							this.props.socket.emit('Leave Room', this.props.settings.room);
+						}
+						this.props.settings.room = post;
+						if(post){
+							this.props.socket.emit('Join Room', post);
+						}
+						this.props.handleSettings(this.props.settings, this.props.characters);
+				} else if(post){
+					if(modata.name == 'Edit'){
+						if(modata.post != post){
+							this.props.socket.emit('ICedit', post, modata.id);
+						}
+					} else if(modata.name == 'Whisper'){
+						this.props.socket.emit('Whisper', post, modata.id);
+					} else if(modata.name == 'Narrate'){
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
+					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info'].indexOf(modata.name) > -1){
+						this.props.socket.emit(modata.name, post);
+					} else if(modata.name == 'Set Profile'){
+						this.props.socket.emit(modata.name, post, modata.charid);
+					} else if(modata.name == 'Join Room'){
+						var settings = this.props.settings;
+						if(!settings.rooms[post]){//not in this room yet
+							this.props.socket.emit('Join Room', post);
+							settings.rooms[post] = [];
+						}
+						//need to remove them from their previous room too if applicable
+						var rooms = Object.keys(settings.rooms);
+						var ind = -1;
+						for(var i=0; i < rooms.length && ind < 0; i++){//stop if we find it
+							ind = settings.rooms[rooms[i]].indexOf(modata.charid);
+						}
+						if(ind > -1){//it's in this room
+							i--;
+							settings.rooms[rooms[i]].splice(ind, 1);
+							if(settings.rooms[rooms[i]].length < 1){
+								this.props.socket.emit('Leave Room', rooms[i]);
+								delete settings.rooms[rooms[i]];
+							}
+						}
+						settings.rooms[post].push(modata.charid);
+						this.props.handleSettings(settings, this.props.characters);
+					} else {//find the right id
+						var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
+						var room = null;
+						if(modata.name == 'Say' || modata.name == 'Action'){//only for IC posts.
+							var rooms = Object.keys(this.props.settings.rooms);
+							for(var i=0; i < rooms.length && !room; i++){
+								if(this.props.settings.rooms[rooms[i]].indexOf(modata.charid) > -1){//it's in this room
+									room = rooms[i];
+								}
+							}
+						}
+						if(trueid){
+							var deriv = this.props.characters[trueid[0]][trueid[1]][trueid[2]];
+							this.props.socket.emit('characterPost', post, deriv, modata.name, room);
+						}//if it's undefined the character doesn't exist.
+					}
+				}
+
+				this.props.closeModal(this.props.id);
+			},
+
+			render: function(){
+				var modal = this.props.modal;
+				var name = modal.name;
+				if(modal.charid){
+					var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
+					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+				}
+				return(
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					<textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
+					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button></div>
+				);
+			}
+		});
+
+		var NotificationModal = React.createClass({
+			getInitialState: function(){
+				var not = [{name: '', OOC: false, IC: false}];
+				if(this.props.settings.notify){//notify is an object with usernames mapped to objects with OOC and IC
+					var notify = this.props.settings.notify
+					var not = Object.keys(notify).map(function(username){
+						return {name: username, OOC: notify[username].OOC, IC: notify[username].IC};
+					});
+				}
+				return {x: '25%', y: '25%', notify: not.slice()};//not an anti-pattern for this use case.
+			},//We don't WANT it to update with the props, we want it to have its own set for editing.
+
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag,
+
+			remove: function(e){
+				var id = e.target.parentNode.id;
+				this.state.notify.splice(id, 1);
+				this.setState({notify: this.state.notify});
+			},
+
+			increment: function(e){
+				this.state.notify.push({name: '', OOC: false, IC: false});
+				this.setState({notify: this.state.notify});
+			},
+
+			test: function(e){
+				var id = e.target.parentNode.id;
+				if(e.target.type == 'radio'){
+					if(e.target.id == 'Both'){
+						this.state.notify[id].IC = true;
+						this.state.notify[id].OOC = true;
 					} else {
-						return(<div key={index} className="modal" style={{display:'none'}}></div>);
+						var t = (e.target.id == 'IC');
+						this.state.notify[id].IC = t;
+						this.state.notify[id].OOC = !t;
+					}
+				} else {
+					this.state.notify[id].name = e.target.value;
+				}
+				this.setState({notify: this.state.notify});
+			},
+
+			save: function(e){
+				var ret = {};
+				this.state.notify.forEach(function(note){
+					if(note.name.length >= 6 && (note.OOC || note.IC)){//only valid ones
+						ret[note.name] = {OOC: note.OOC, IC: note.IC};
 					}
 				});
-				return (
-					<div className="modalContainer" style={{width:'100%', height:'100%'}}>{modals}</div>
-				);
+				this.props.settings.notify = ret;
+				this.props.handleSettings(this.props.settings, this.props.characters);
+				this.props.closeModal(this.props.id);
+			},
+
+			render: function(){
+				var notify = this.state.notify;
+				var name = this.props.modal.name;
+				var that = this;
+				var listitems = notify.map(function(note, i){//TODO: Switch the div to have the onChange handler when you go into production and the warning stops being there.
+					return(<div key={i} id={i}><input style={{width:'177px'}} type="text" ref={'name'+i} id={i} value={note.name} onChange={that.test}/><input type="radio" checked={note.IC && !note.OOC} id="IC" onChange={that.test}/>IC<input type="radio" checked={note.OOC && !note.IC} id="OOC" onChange={that.test}/>OOC<input type="radio" checked={note.IC && note.OOC} id="Both" onChange={that.test}/>Both <button className="Red Button" type="button" onClick={that.remove}>X</button></div>);
+				});
+				return(
+					<div ref="this" className="modal" style={{width:'350px', left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>{listitems}<br/>
+					<button type="button" className="Green Button" style={{width: '100%'}} onClick={this.increment}>+</button><br/>
+					<button type="button" onClick={this.save}>Save</button><button type="button" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button></div>
+					);
 			}
 		});
 
@@ -1175,6 +1329,8 @@
 					} else {
 						this.props.socket.emit('Show '+type, res);
 					}
+				} else if(type == 'Notifications'){
+					this.props.modalpush({id: [], name: name, type: 'notifications'});
 				} else if(['Player', 'Admin'].indexOf(this.props.permissions) > -1){//Narrate or Set Room
 					this.props.modalpush({id: [], name: name, type: 'action'});
 				}
@@ -1348,14 +1504,14 @@
 					case 'players'://case for the players online tab
 						var players = this.props.players;
 						currenttab = Object.keys(players).map(function(player, index){
-							return (<div id={player} key={index} data={['Whisper', 'Make Player*admin', 'Make Admin*admin', 'Make Guest*admin', 'Boot*admin', 'Ban*admin']} className='PLentry'>{player + ' - ' + players[player].permissions}</div>);
+							return (<div id={player} key={index} data={['Whisper', 'Make Player*admin', 'Make Admin*admin', 'Make Guest*admin', 'Boot*admin', 'Ban*admin']} className='PLentry'>{players[player].afk ? '(AFK) ' : ''}{player + ' - ' + players[player].permissions}</div>);
 						});
 						break;
 					case 'commands'://case for player commands tab
-						currenttab = [<div key='0' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor: 'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='2' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='5' className='Command' onClick={this.show}>Show Rules</div>, <div key='6' className='Command' onClick={this.show}>Show MOTD</div>, <div key='7' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='8' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='9' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='10' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width: '10%', textAlign: 'center'}}/>d<input type="number" ref='dN' min="1" style={{width: '10%', textAlign: 'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab=[<div key='0' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='2' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='5' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='6' className='Command' onClick={this.show}>Show Rules</div>, <div key='7' className='Command' onClick={this.show}>Show MOTD</div>, <div key='8' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='9' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='10' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='11' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={11+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
+							currenttab.push(<div key={12+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
@@ -1377,7 +1533,6 @@
 		});
 
 		var Message = React.createClass({
-
 			htmlupdate: function(){//modify content to innerHTML
 				var message = this.props.message;
 				var classparam = message.className.split(" ")[1];
@@ -1397,7 +1552,7 @@
 					}
 					this.refs.post.innerHTML = post;
 				}
-				if(this.refs.name && message.character.customHTML){//only for character posts
+				if(this.refs.name){
 					var name = message.character.customHTML || message.character.name;
 					switch(classparam){
 						case 'say':
@@ -1405,12 +1560,33 @@
 						case 'action':
 							name += ' ';
 					}
-					this.refs.name.innerHTML = name;
+					if(message.character.customHTML){
+						this.refs.name.innerHTML = name;
+					} else {
+						this.refs.name.textContent = name;
+					}
 				}
 			},
 
 			componentDidMount: function(){
+				if(this.props.highlight){
+					var node = ReactDOM.findDOMNode(this);
+					node.style['transition'] = '0.5s';
+					node.style['background-color'] = 'rgba(255,255,0,0.3)';
+					setTimeout(this.read, 4000);
+				}
 				this.htmlupdate();
+			},
+
+			read: function(){
+				var node = ReactDOM.findDOMNode(this);
+				var box = document.getElementById(this.props.message.className.split(" ")[0]).getBoundingClientRect();
+				var postbox = node.getBoundingClientRect()
+				if(postbox.bottom < box.top || postbox.top > box.bottom){//above or below view
+					setTimeout(this.read, 4000);
+				} else {
+					node.style['background-color'] = null;
+				}
 			},
 
 			componentDidUpdate: function(){
@@ -1435,7 +1611,6 @@
 					case 'system'://just the post itself.
 						return (<div className={message.className}><span ref="post"></span>{'\r'}</div>);
 					case 'say':
-						character.name +=':';
 					case 'action':
 						var charid = character.id.split('-');
 						var d = charid.pop();
@@ -1443,7 +1618,7 @@
 						var profileopen = function(e){window.open('/characters/'+charid+'/'+d+'.html');}
 						var edit = '';
 						if(message.id){edit = 'Edit*'+charid;}//worst case message.id is undefined
-						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}>{character.name+' '}</span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
+						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
 				}
 			}
 		});
@@ -1471,7 +1646,15 @@
 					var newm = that.state.messages.slice();
 					var ids = that.state.ids;
 					ids[message.id] = newm.length;//index this post to its id
-					newm.push(<Message key={newm.length} message={message}/>);
+					var highlight = false;
+					if(that.props.notify[message.username] && that.props.notify[message.username].IC){
+						highlight = true;
+						if(document.visibilityState != 'visible'){
+							document.title = "New IC Post!";
+							//change icon
+						}
+					}
+					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
 					that.setState({messages: newm, ids: ids, height: that.refs.box.scrollHeight});
 				});
 
@@ -1524,7 +1707,15 @@
 				var that = this;
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
-					newm.push(<Message key={newm.length} message={message}/>);
+					var highlight = false;
+					if(message.character && that.props.notify[message.username] && that.props.notify[message.username].OOC){
+						highlight = true;
+						if(document.visibilityState != 'visible'){
+							document.title = "New OOC Post!";
+							//change icon
+						}
+					}
+					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
 					that.setState({messages: newm, height: that.refs.box.scrollHeight});
 				});
 				this.props.socket.on('disconnect', function(){
