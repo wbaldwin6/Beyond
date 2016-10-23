@@ -56,6 +56,8 @@ try{//make the faceicons folder if it doesn't exist BEFORE proceeding.
 	fs.mkdirSync(__dirname+'/faceicons');
 	fs.writeFile(__dirname+'/faceicons/num.txt', 0);
 	fs.writeFile(__dirname+'/faceicons/img_trans.gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+	fs.writeFile(__dirname+'/faceicons/favicon.png', 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAADXUAAA11AFeZeUIAAACKElEQVQ4jaWTO2hUURCGvzn33t272TW7S7QwGpVtTBSxsLAUUwYhiPjCQhQLBdFCNFiJoIWFCGonCmITNKCFUYlCiCIp1CJFJGgwaHEjJIImxn3dc8Yi7iY+EhEHBg5T/Od/zAhAc3Oz8g8VRZHU3j7A5MTH19fOdbY1pBtIJAM830OMAcBZh41jKuUK32aK+mjgjXZH0TugUAdIJQPWFZqk8/iDBX/tvrzdLc2lzMbW5cTWrerpG7kKHPUBUEdp6utv9ObXnmN39entA4Cyu2MDPX0jHQAGQICZz1/+ql2MwU8kyObSBgjrEhAozxSBhQ19eH2XqqoYYxh48QFgcA4AQYxw5eBq1LnaCM8PSC3JkGnKQxyLi632D45y6cazIrBjHgMhzKQR0Gq5LC62qFO1Gku1VKZaKuvE5JScOdvL85djAOkas1kPjJDOZ0llG0mmG/ASgRqvFqPFVmNpTPl0Hd7Cob2b8X3zqQbwIwVI53PsPN1fS+CnJG52bcJZS2FlXk4daWdtYVnu5Pn7w8B6A6DOEWZmWUVRJL/2/guvEM+ggDplW3ubFFryrXUJxhi8wF80wiAMESOoczhrpdCSn/MAI9g4XhQgkQoxxsNaS7Vc0bdjk1L3II4tpenZTfzTHjy+tU89EXHWYisV7vQO8X58aqhulu/J8MUTW9ckU2EQhEkTJALj+T4YAVW11qmNrZueLpr+wVFz78nIuCor6gD/c87fAZie5tVJv8TeAAAAAElFTkSuQmCC', 'base64');
+	fs.writeFile(__dirname+'/faceicons/notice.png', 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAADXUAAA11AFeZeUIAAAB4ElEQVQ4jaWTP28TQRDFf7u+851ln+0EEzmKiE5BigAXSOgsCtoI0QEdJR+Amu9AzzegoaWJKKhoQPJJKMWVECkKAoTDv9g+27feobj4EkchCDHF7hYzb957M6sAoigS/iHiOFbztwKoQXJ4Y+0q9QAcF7wS+E6eMbYwnsBkAoOhvNj/Kff6oz1gA8ABWFYKBpnq6toZ/TRQodcuW2oVfVccnousPzhInwKPAFiHRKolOU9KFEUi97sitzsinbYBPszh82M4+7t4R0PFh3pFA34h4Zjqnw3tNUYCgUJrUscHeANHJoaQ7MI1cE+UzBlZaDiweQnay4KGi9vv0n5mq0VqCImACNoKrgieCJ7Nby3iYqWzKo832jZHPMVbuwpaPmgLZEAmC3kZitGUJ5cv8PbWJj4cFLYAYICwTTdszRdEcSJ6cQyTDIxRN1sB6Z3rTfVyJwE6DoAVgVYD+otbNo9uFEnv2/sjaywoUVuV8pVX6TSX4AD47um6xWgG+RiNhalRW3Xv2AO8Ekyz8wGWqlByYGZgPJbtL4eqaD42M/j8HfTKmXvQWzVCVlYYA4OU9MeA17BTmOVDki65Ic26y0qg8T2N7+XMslk+4aGxZFP9bO+rfvjx1ycLawXA/3zn3yXMuSxJ72rcAAAAAElFTkSuQmCC', 'base64');
 } catch(e){//do nothing if it already exists.
 	if(e.code != 'EEXIST'){throw e;} else {
 		fs.readFile(__dirname+'/faceicons/num.txt', 'utf8', function(err, num){
@@ -129,7 +131,7 @@ app.get('/characters/:user/:name', function(req, res){
 app.get('/characters', function(req, res){
 	fs.readdir(__dirname+'/characters', function(err, files){
 		if(!err){
-			var ret = '<body style="background-color:black;">';
+			var ret = '<head><title>Character Database</title><link rel="icon" href="/faceicons/favicon.png"></head><body style="background-color:black;">';
 			files = files.sort();
 			files.forEach(function(file, index){
 				if(!file.endsWith('.json')){
@@ -147,7 +149,7 @@ app.get('/characters/:user', function(req, res){
 			fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, charindex){
 				if(!err){
 					charindex = JSON.parse(charindex);
-					var ret = '<body style="background-color:black;">';
+					var ret = '<head><title>'+req.params.user+'\'s Characters</title><link rel="icon" href="/faceicons/favicon.png"></head><body style="background-color:black;">';
 					files.forEach(function(file, index){
 						var id=req.params.user+'-'+file.slice(0, -5);
 						var name = charindex[id].name;
@@ -165,7 +167,7 @@ app.get('/characters/:user', function(req, res){
 app.get('/logs', function(req, res){
 	fs.readdir(__dirname+'/logs', function(err, files){
 		if(!err){
-			var ret = '<body style="background-color:black;">';
+			var ret = '<head><title>Logs</title><link rel="icon" href="/faceicons/favicon.png"></head><body style="background-color:black;">';
 			files.forEach(function(file, index){
 				if(file.endsWith('.html')){
 					ret += '<a href="/logs/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a><br><br>';
@@ -189,7 +191,7 @@ var openLog = function (logfile){//takes in a Date object
 		var script = '<script>function OOC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "none"; x[7].style.display = "initial";} function IC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[7].style.display = "none"; x[6].style.display = "initial";}function Both(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "initial"; x[7].style.display = "initial";}</script>'
 		var body = '<body><div class="buttons" style="width: auto; position:fixed; bottom: 0; right: 0;"><button onclick="OOC()">OOC Only</button><button onclick="IC()">IC Only</button><button onclick="Both()">Both</button></div>'+script+'</body>';
 		var initialhtml = '<html><head><title>Logs for '+new Date().toLocaleString('en-us', {month: "long", day:"2-digit"})+
-		'</title>'+style+'</head>'+body+'</html>';
+		'</title>'+style+'<link rel="icon" href="/faceicons/favicon.png"></head>'+body+'</html>';
 		fs.writeFileSync(logfile, initialhtml);
 		htm = jsdom.jsdom(initialhtml);
 	}

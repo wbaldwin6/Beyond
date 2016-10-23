@@ -1,7 +1,7 @@
 <html>
 	<head>
 		<title>Beyond</title>
-		<link rel="icon" href="">
+		<link rel="icon" href="/faceicons/favicon.png">
 		<style>
 			body {
 				background-color: black;
@@ -381,7 +381,7 @@
 		window.onfocus = function(e){
 			if(!idleInterval){socket.emit('AFK', false); timersetup();}
 			document.title = "Beyond";
-			//change icon
+			document.getElementsByTagName('link')[0].href = "/faceicons/favicon.png";
 		};
 
 		timersetup();
@@ -789,8 +789,8 @@
 
 			render: function(){
 				return(<div id={this.props.id} className="modal" style={{textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
-						<input type="text" name="username" ref="username" placeholder="Username" required /><br/>
-						<input type="text" name="password" ref="password" placeholder="Password" required /><br/>
+						<input type="text" name="username" ref="username" placeholder="Username"/><br/>
+						<input type="text" name="password" ref="password" placeholder="Password"/><br/>
 						<button type="submit" id="login" onClick={this.submission}>Login</button>
 						<button type="submit" id="register" onClick={this.submission}>Register</button><br/>
 						<b>{this.state.loginmessage}</b><br/><br/>
@@ -964,7 +964,7 @@
 					<div className="modal" ref="this" style={{left: this.state.x, top: this.state.y, width:'300px'}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					{FIs}<br/>
 					<span ref={'faceicons'}>{previews}</span><br/>
-					Name: <input type="text" className="char" ref={'name'} placeholder="Character Name" required style={{marginBottom:'1px'}}/><br/>
+					Name: <input type="text" className="char" ref={'name'} placeholder="Character Name" style={{marginBottom:'1px'}}/><br/>
 					Name Color: <input type="color" className="char" ref={'nameColor'} defaultValue={nameColor}/><br/>
 					Text Color: <input type="color" className="char" ref={'color'} defaultValue={color}/><br/>
 					Font: <input type="text" className="char" ref={'font'} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={this.testFont} onKeyDown={this.fontTest}/><br/>
@@ -1027,7 +1027,7 @@
 				var name = modal.name;
 				if(modal.id[0] > 0){def = this.props.characters[modal.id[0]][0]; name += ' - '+def;}
 				return(<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
-					<input type='text' ref={'name'} placeholder='Group Name' defaultValue={def} required style={{width:'100%'}}/><br/>
+					<input type='text' ref={'name'} placeholder='Group Name' defaultValue={def} style={{width:'100%'}}/><br/>
 					Add characters to the group?<br/>
 					<form ref={"chars"}>
 					{chars}
@@ -1273,7 +1273,7 @@
 				var name = this.props.modal.name;
 				var that = this;
 				var listitems = notify.map(function(note, i){//TODO: Switch the div to have the onChange handler when you go into production and the warning stops being there.
-					return(<div key={i} id={i}><input style={{width:'177px'}} type="text" ref={'name'+i} id={i} value={note.name} onChange={that.test}/><input type="radio" checked={note.IC && !note.OOC} id="IC" onChange={that.test}/>IC<input type="radio" checked={note.OOC && !note.IC} id="OOC" onChange={that.test}/>OOC<input type="radio" checked={note.IC && note.OOC} id="Both" onChange={that.test}/>Both <button className="Red Button" type="button" onClick={that.remove}>X</button></div>);
+					return(<div key={i} id={i}><input style={{width:'172px'}} type="text" ref={'name'+i} id={i} value={note.name} onChange={that.test}/><input type="radio" checked={note.IC && !note.OOC} id="IC" onChange={that.test}/>IC<input type="radio" checked={note.OOC && !note.IC} id="OOC" onChange={that.test}/>OOC<input type="radio" checked={note.IC && note.OOC} id="Both" onChange={that.test}/>Both <button style={{width:'30px'}} className="Red Button" type="button" onClick={that.remove}>X</button></div>);
 				});
 				return(
 					<div ref="this" className="modal" style={{width:'350px', left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>{listitems}<br/>
@@ -1401,6 +1401,7 @@
 			dragstart: function(e){
 				e.stopPropagation();
 				var handler;
+				e.dataTransfer.setData("text", 'n');
 				if(e.target.className == 'derivative'){handler = e.target.parentNode;} else {handler = document.getElementsByClassName('charlist')[0];}
 				handler.addEventListener("dragover", this.dragover, false);
 				handler.addEventListener("dragend", this.dragend, false);
@@ -1418,6 +1419,7 @@
 			},
 
 			dragend: function(e){
+				e.preventDefault();
 				var handler;
 				if(e.target.className == 'derivative'){handler = e.target.parentNode;} else {handler = document.getElementsByClassName('charlist')[0];}
 				handler.removeEventListener("dragover", this.dragover, false);
@@ -1427,6 +1429,7 @@
 			},
 
 			drop: function(e){//should only work if we prevented the default.
+				e.preventDefault();
 				var rect = e.target.getBoundingClientRect();
 				var where = (e.clientY - rect.top)/(rect.bottom-rect.top) > 0.5;//if it's greater it's below
 				var id1 = this.state.dragEl.id.split(',');
@@ -1649,9 +1652,9 @@
 					var highlight = false;
 					if(that.props.notify[message.username] && that.props.notify[message.username].IC){
 						highlight = true;
-						if(document.visibilityState != 'visible'){
-							document.title = "New IC Post!";
-							//change icon
+						if(document.visibilityState != 'visible'){//don't do this if they're in window
+							document.title = "Post from "+message.username+"!";
+							document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
 						}
 					}
 					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
@@ -1708,11 +1711,11 @@
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
 					var highlight = false;
-					if(message.character && that.props.notify[message.username] && that.props.notify[message.username].OOC){
+					if(message.className.split(" ")[1] == 'whisper' || (message.character && that.props.notify[message.username] && that.props.notify[message.username].OOC)){
 						highlight = true;
 						if(document.visibilityState != 'visible'){
-							document.title = "New OOC Post!";
-							//change icon
+							document.title = "Post from "+message.username+"!";
+							document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
 						}
 					}
 					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
