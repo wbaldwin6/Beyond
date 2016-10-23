@@ -1650,7 +1650,7 @@
 					var ids = that.state.ids;
 					ids[message.id] = newm.length;//index this post to its id
 					var highlight = false;
-					if(that.props.notify[message.username] && that.props.notify[message.username].IC){
+					if(that.props.notify && that.props.notify[message.username] && that.props.notify[message.username].IC){
 						highlight = true;
 						if(document.visibilityState != 'visible'){//don't do this if they're in window
 							document.title = "Post from "+message.username+"!";
@@ -1711,7 +1711,7 @@
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
 					var highlight = false;
-					if(message.className.split(" ")[1] == 'whisper' || (message.character && that.props.notify[message.username] && that.props.notify[message.username].OOC)){
+					if(message.className.split(" ")[1] == 'whisper' || (message.character && that.props.notify && that.props.notify[message.username] && that.props.notify[message.username].OOC)){
 						highlight = true;
 						if(document.visibilityState != 'visible'){
 							document.title = "Post from "+message.username+"!";
