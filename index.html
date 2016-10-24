@@ -437,12 +437,9 @@
 			handleEnter: function(e){
 				if(e.key === 'Enter'){
 					//placeholder test function, will be added to the options menu later.
-					if(this.refs.OOCbar.value.startsWith("/setcolor ")){
-						var set = this.state.settings;
-						set.textcolor = this.refs.OOCbar.value.split(" ")[1];
-						this.setState({settings: set});
+					if(this.refs.OOCbar.value){
+						this.props.socket.emit('OOCmessage', this.refs.OOCbar.value, this.state.settings.textcolor);
 					}
-					this.props.socket.emit('OOCmessage', this.refs.OOCbar.value, this.state.settings.textcolor);
 					this.refs.OOCbar.value = '';
 				}
 			},

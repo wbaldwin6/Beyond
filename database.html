@@ -175,7 +175,13 @@
 			},
 			
 			RenameDirectory: function(e) {
-				var modal = <RenameDirectoryModal socket={this.props.socket} path={this.state.context.path} outerarea={this} />;
+				var modal = <RenameDirectoryModal socket={this.props.socket} path={this.state.context.path} outerarea={this} locked={this.state.context.locked} />;
+				this.setState({context: null, modal: modal});
+			},
+			
+			LockDirectory: function(e) {
+				var path = this.state.context.path;
+				var modal = <LockDirectoryModal socket={this.props.socket} path={path} outerarea={this} locked={this.state.context.locked} />;
 				this.setState({context: null, modal: modal});
 			},
 			
@@ -190,7 +196,7 @@
 						contextOptions.push(<div key="AddEntry" onClick={this.AddEntry}>Add Entry</div>);
 					}
 					if(this.state.context.functions.includes("RenameDirectory")) {
-						contextOptions.push(<div key="RenameDirectory" onClick={this.RenameDirectory}>Rename</div>);
+						contextOptions.push(<div key="RenameDirectory" onClick={this.RenameDirectory}>Edit</div>);
 					}
 					if(this.state.context.functions.includes("Delete")) {
 						contextOptions.push(<div key="Delete" onClick={this.DeleteEntry}>Delete</div>);
@@ -204,9 +210,12 @@
 					if(this.state.context.functions.includes("Open")) {
 						contextOptions.push(<div key="Open" onClick={this.OpenEntry}>Open in New Tab</div>);
 					}
+					if(this.state.context.functions.includes("Lock/Unlock")) {
+						contextOptions.push(<div key="Lock/Unlock" onClick={this.LockDirectory}>{this.state.context.locked ? 'Unlock' : 'Lock'}</div>);
+					}
 					context = <div className="contextMenu" style={{left: this.state.context.x + "px", top: this.state.context.y + "px"}}>{contextOptions}</div>;
 				}
-				var dir = (<div key="Directory" id="Directory" style={{height: "100%", overflowY: "auto"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} parents={[]} /></div>);
+				var dir = (<div key="Directory" id="Directory" style={{height: "100%", overflowY: "auto"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} parents={[]} /></div>);
 				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
 				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}</div>);
 			}
@@ -235,20 +244,23 @@
 			onContextMenu: function(e) {
 				e.preventDefault();
 				e.stopPropagation();
-				if(this.props.outerarea.state.modal)
+				if(this.props.outerarea.state.modal || (this.props.locked && this.props.outerarea.state.permissions !== 'Admin')) {
+					this.props.outerarea.setState({context: null});
 					return;
+				}
 				var path = this.props.parents.concat([this.props.name]);
 				path.splice(0, 1);
 				var funcs = ["AddEntry"];
 				if(this.props.outerarea.state.permissions === 'Admin') {
 					funcs.push("AddDirectory");
+					funcs.push("Lock/Unlock");
 					if(this.props.parents.length) {
 						funcs.push("Delete");
 						funcs.push("Move");
 						funcs.push("RenameDirectory");
 					}
 				}
-				var context = {x: e.clientX, y: e.clientY, path: path, functions: funcs};
+				var context = {x: e.clientX, y: e.clientY, path: path, functions: funcs, locked: this.props.locked};
 				this.props.outerarea.setState({context: context});
 			},
 			
@@ -260,7 +272,7 @@
 					for(var entry_name in this.props.contents) {
 						var entry = this.props.contents[entry_name];
 						if("contents" in entry) {
-							children.push(<DirectoryList key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} contents={entry.contents} parents={parents} />)
+							children.push(<DirectoryList key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} contents={entry.contents} locked={entry.locked} parents={parents} />)
 						} else {
 							children.push(<Entry key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} parents={parents} />)
 						}
@@ -477,7 +489,7 @@
 			OKButton: function(e) {
 				var newname = this.refs.inputName.value;
 				if(newname.length) {
-					this.props.socket.emit('AddDirectory', this.props.path, newname, this.props.outerarea.state.username);
+					this.props.socket.emit('AddDirectory', this.props.path, newname, this.props.outerarea.state.username, this.refs.checkLocked.checked);
 				}
 				this.props.outerarea.setState({modal: null});
 			},
@@ -495,9 +507,11 @@
 				var inputName = <input key='inputName' ref='inputName' type="text" style={{width: "80%", height: "24px", margin: "4 0"}}></input>;
 				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
 				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
+				var checkLocked = <div><input key='checkLocked' ref='checkLocked' type="checkbox" style={{color: "white"}}></input>Locked?</div>;
 				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelName}{inputName}<br />
+							{checkLocked}<br />
 							{buttonOK}{buttonCancel}
 						</div>);
 			},
@@ -615,9 +629,13 @@
 			
 			OKButton: function(e) {
 				var newname = this.refs.inputName.value;
-				if(newname.length) {
-					var path = this.props.path;
+				var path = this.props.path;
+				if(newname.length && newname !== path[path.length-1]) {
 					this.props.socket.emit('RenameDirectory', path, newname);
+					path[path.length-1] = newname;
+				}
+				if(this.refs.checkLocked.checked) {
+					this.props.socket.emit('LockDirectory', path);
 				}
 				this.props.outerarea.setState({modal: null});
 			},
@@ -633,9 +651,11 @@
 				var inputName = <input key='inputName' ref='inputName' type="text" style={{width: "80%", height: "24px", margin: "4 0"}}></input>;
 				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
 				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
+				var checkLocked = <div><input key='checkLocked' ref='checkLocked' type="checkbox" style={{color: "white"}}></input>{this.props.locked ? 'Unlock' : 'Lock'}</div>;
 				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelName}{inputName}<br />
+							{checkLocked}<br />
 							{buttonOK}{buttonCancel}
 						</div>);
 			},
@@ -672,7 +692,64 @@
 			}
 		});
 		
-		
+		var LockDirectoryModal = React.createClass({
+			getInitialState: function() {
+				return {x: 100, y: 100};
+			},
+			
+			YesButton: function(e) {
+				this.props.socket.emit('LockDirectory',this.props.path);
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			NoButton: function(e) {
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			render: function() {
+				var filename = this.props.path[this.props.path.length-1];
+				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{(this.props.locked ? 'Unlock ' : 'Lock ') + filename}</div>;
+				var labelAreYouSure = <div key='labelAreYouSure' style={{margin: "4 0"}}>{'Are you sure you want to ' + (this.props.locked ? 'unlock ' : 'lock ') + filename + '?'}</div>;
+				var buttonYes = <button key='buttonYes' type="button" onClick={this.YesButton}>Yes</button>;
+				var buttonNo = <button key='buttonNo' type="button" onClick={this.NoButton}>No</button>;
+				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+							{titlebar}<br />
+							{labelAreYouSure}<br />
+							{buttonYes}{buttonNo}
+						</div>);
+			},
+			
+			startDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+			
+			drag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var initpos = this.state.initpos;
+				var x = e.clientX - initpos.x;
+				var y = e.clientY - initpos.y;
+				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
+				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
+				if(x < 0) x = 0;
+				if(y < 0) y = 0;
+				this.setState({x: x, y: y});
+			},
+			
+			stopDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "auto";
+			}
+		});
 
 		ReactDOM.render(<OuterArea socket={socket} />, document.getElementById("main"));
 		</script>
