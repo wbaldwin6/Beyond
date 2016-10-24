@@ -535,8 +535,10 @@ var Setconnections = function(socket){//username will definitely be present or s
 		var username = sessions[socket.request.connection.remoteAddress];
 		message = processHTML(message);
 		var msg = {className: 'OOC message', username: username, post: message, color: color};
-		io.emit('OOCmessage', msg);
-		toLog(msg);
+		if(msg.post){
+			io.emit('OOCmessage', msg);
+			toLog(msg);
+		}
 	});
 	socket.on('Narrate', function(message, color, room){
 		var username = sessions[socket.request.connection.remoteAddress];

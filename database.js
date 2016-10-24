@@ -1,9 +1,10 @@
 fs = require('fs');
 
-function Directory(name, creator) {
+function Directory(name, creator, locked) {
 	this.name = name;
 	this.creator = creator;
 	this.contents = {};
+	this.locked = locked;
 }
 
 function Entry(name, creator) {
@@ -16,11 +17,11 @@ var entries;
 var databaseSockets = [];
 
 module.exports = {
-AddDirectory: function(path, name, creator) {
+AddDirectory: function(path, name, creator, locked) {
 	var dir = this.GetDirectoryFromPath(path);
 	if(!("contents" in dir) || name in dir.contents)
 		return undefined;
-	dir.contents[name] = new Directory(name, creator);
+	dir.contents[name] = new Directory(name, creator, locked);
 	this.SaveDatabase();
 	return dir.contents[name];
 },
@@ -185,6 +186,14 @@ LoadDatabase: function() {
 	}
 },
 
+ToggleDirectoryLock: function(dir) {
+	if(!dir || !("contents" in dir))
+		return false;
+	dir.locked = !dir.locked;
+	this.SaveDatabase();
+	return true;
+},
+
 SaveDatabase: function() {
 	fs.writeFile('./database/database.json', JSON.stringify(toplevel), 'utf8', function (err) {
 		if(err) throw err;
@@ -202,12 +211,12 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 	socket.on('disconnect', function() {
 		databaseSockets.splice(databaseSockets.indexOf(user), 1);
 	});
-	socket.on('AddDirectory', function(path, name, creator) {
+	socket.on('AddDirectory', function(path, name, creator, locked) {
 		if(user[2] !== 'Admin') {
 			socket.emit('UpdateError', 'You do not have permission to create directories!');
 			return;
 		}
-		var dir = that.AddDirectory(path, name, creator);
+		var dir = that.AddDirectory(path, name, creator, locked);
 		if(dir) {
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
@@ -217,6 +226,10 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 	});
 	socket.on('AddEntry', function(path, name, creator, content) {
+		if(user[2] !== 'Admin' && that.GetDirectoryFromPath(path).locked) {
+			socket.emit('UpdateError', 'You do not have permission to create entries in that directory.');
+			return;
+		}
 		var dir = that.AddEntry(path, name, creator, content);
 		if(dir) {
 			for(var i = 0; i < databaseSockets.length; i++) {
@@ -304,6 +317,15 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			}
 		} else {
 			socket.emit('UpdateError', 'The directory could not be renamed to the given name.');
+		}
+	});
+	socket.on('LockDirectory', function(path) {
+		if(user[2] === 'Admin' && that.ToggleDirectoryLock(that.GetDirectoryFromPath(path))) {
+			for(var i = 0; i < databaseSockets.length; i++) {
+				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
+			}
+		} else {
+			socket.emit('UpdateError', 'You cannot change the locked status of that directory.');
 		}
 	});
 }
