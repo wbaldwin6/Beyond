@@ -313,7 +313,7 @@
 			},
 			
 			render: function() {
-				return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name} (Created by {this.props.creator})</span></div>);
+				return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name} (By {this.props.creator})</span></div>);
 			}
 		});
 		
@@ -351,7 +351,7 @@
 						if(content === this.state.defaultText) {
 							content = null;
 						}
-						if(!name.length || name === oldname) {
+						if(name === oldname) {
 							name = null;
 						}
 						if(name || content)
@@ -488,7 +488,7 @@
 			
 			OKButton: function(e) {
 				var newname = this.refs.inputName.value;
-				if(newname.length) {
+				if(newname) {
 					this.props.socket.emit('AddDirectory', this.props.path, newname, this.props.outerarea.state.username, this.refs.checkLocked.checked);
 				}
 				this.props.outerarea.setState({modal: null});
@@ -630,7 +630,7 @@
 			OKButton: function(e) {
 				var newname = this.refs.inputName.value;
 				var path = this.props.path;
-				if(newname.length && newname !== path[path.length-1]) {
+				if(newname && newname !== path[path.length-1]) {
 					this.props.socket.emit('RenameDirectory', path, newname);
 					path[path.length-1] = newname;
 				}

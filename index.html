@@ -91,9 +91,23 @@
 				border: 0;
 			}
 			input.OOCbar {
-				background-color: red;
+				background-color: #8080FF;
 				color: black;
-				height: 15px;
+				height: 19px;
+				width: 100%;
+				padding: 0 0 0 0;
+				border-style: solid;
+				border-width: 2px 0px;
+				border-color: #d3d3d3;
+			}
+			input[type=text].OOCbar::-webkit-input-placeholder {
+				color: black;
+			}
+			input[type=text].OOCbar::-moz-placeholder {
+				color: black;
+			}
+			input[type=text].OOCbar:-moz-placeholder {
+				color: black;
 			}
 			input.OOCbar:focus {
 				outline-width: 0;
@@ -441,6 +455,7 @@
 						this.props.socket.emit('OOCmessage', this.refs.OOCbar.value, this.state.settings.textcolor);
 					}
 					this.refs.OOCbar.value = '';
+					this.refs.OOCbar.placeholder = '';
 				}
 			},
 
@@ -550,6 +565,8 @@
 						//fallthrough
 					case 'Test Action':
 						//fallthrough
+					case 'Narrate':
+						//fallthrough
 					case 'Join Room':
 						newmodal.type = 'action';
 						break;
@@ -627,7 +644,7 @@
 				}
 
 				return (
-					<div style={{height: "calc(100vh - 15px)"}} onContextMenu={this.contextMenu} onClick={this.closeContext}>
+					<div style={{height: "calc(100vh - 19px)"}} onContextMenu={this.contextMenu} onClick={this.closeContext}>
 						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings}/>
 						{context}
 						<div id="left">
@@ -641,7 +658,7 @@
 								<OOChandler ref="OOCbox" socket={this.props.socket} notify={this.state.settings.notify}/>
 							</div>
 						</div>
-						<input className="OOCbar" style={{width: '100%', padding: '0 0 0 0', border: '0'}} type="text" ref="OOCbar" placeholder="Input an OOC message" onKeyPress={this.handleEnter}/>
+						<input className="OOCbar" type="text" ref="OOCbar" placeholder="Input an OOC message" onKeyPress={this.handleEnter}/>
 					</div>
 				);
 			}
@@ -1198,6 +1215,8 @@
 				if(modal.charid){
 					var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
 					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+				} else if(modal.name == 'Whisper') {
+					name+=' - '+modal.id;
 				}
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
@@ -1599,11 +1618,15 @@
 				var classparam = message.className.split(" ")[1];
 				switch(classparam){
 					case 'message'://ooc message
-						return (<div className={message.className}>( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> ){'\r'}</div>);
+						return (<div id={message.username} data={'Whisper'} className={message.className}>( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> ){'\r'}</div>);
 					case 'whisper'://ooc whisper
-						return (<div className={message.className}>( <b>{message.username+' sent you a message: '}</b><span ref="post"></span> ){'\r'}</div>);
+						if(message.username){
+							return (<div id={message.username} data={'Whisper'} className={message.className}>( <b>{message.username+' whispered to you: '}</b><span ref="post"></span> ){'\r'}</div>);
+						} else if(message.target){
+							return (<div className={message.className}>( <b>{'You whispered to '+message.target+': '}</b><span ref="post"></span> ){'\r'}</div>);
+						}
 					case 'narration'://ic narration message
-						return (<div id={message.id} data={'Edit*'+message.username} className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
+						return (<div id={message.id} data={['Edit*'+message.username, 'Narrate']} className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
 					case 'dice'://ooc dice message
 						return (<div className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
 					case 'log':
@@ -1675,7 +1698,7 @@
 
 			render: function(){
 				return (
-					<div ref='box' className='ICbox'>
+					<div ref='box' className='ICbox' id='ICbox' data={'Narrate'}>
 						{this.state.messages}
 					</div>
 				);
@@ -1708,7 +1731,7 @@
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
 					var highlight = false;
-					if(message.className.split(" ")[1] == 'whisper' || (message.character && that.props.notify && that.props.notify[message.username] && that.props.notify[message.username].OOC)){
+					if((message.className.split(" ")[1] == 'whisper' && message.username) || (message.character && that.props.notify && that.props.notify[message.username] && that.props.notify[message.username].OOC)){
 						highlight = true;
 						if(document.visibilityState != 'visible'){
 							document.title = "Post from "+message.username+"!";

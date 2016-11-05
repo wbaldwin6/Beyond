@@ -560,8 +560,8 @@ var Setconnections = function(socket){//username will definitely be present or s
 		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && users[target]){//if they logged out midwhisper or they send an invalid one somehow we need to stop that.
 			message = processHTML(message);
-			var msg = {className: 'OOC whisper', username: username, post: message};
-			users[target].emit('OOCmessage', msg);
+			socket.emit('OOCmessage', {className: 'OOC whisper', target: target, post:message});
+			users[target].emit('OOCmessage', {className: 'OOC whisper', username: username, post: message});
 		}//no logging, OBVIOUSLY. What's an admin window?
 	});
 	socket.on('AFK', function(on){
@@ -810,12 +810,16 @@ io.on('connection', function(socket){
 			socket.emit('OOCmessage', msg);
 		}
 	}
-	console.log('a user connected');
 	var username = sessions[socket.request.connection.remoteAddress]
 	if(username){//logged in, probably a database access
 		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
 	} else {
+		console.log('a user connected');
 		socket.on('login', function(username, password, callback){
+			if(username.endsWith(' ')){
+				callback("Please do not end your username with a space.");
+				return;
+			}
 			fs.readFile('logins.json', 'utf8', function(err, logins){
 				if(err){callback(err);} else {
 					logins = JSON.parse(logins);
@@ -860,10 +864,18 @@ io.on('connection', function(socket){
 			});
 		});
 		socket.on('register', function(username, password, callback){
+			if(username.endsWith(' ')){
+				callback("Please do not end your username with a space.");
+				return;
+			}
 			fs.readFile('logins.json', 'utf8', function(err, logins){
 				if(err){callback(err);} else {
 					logins = JSON.parse(logins);
-					if(logins[username]){//username in use
+					var loginstest = {};
+					Object.keys(logins).forEach(function(key){
+						loginstest[key.toLowerCase()] = true;
+					});//fill it with lowercased
+					if(loginstest[username.toLowerCase()]){//username in use
 						callback("Username already in use.");
 					} else {//new username
 						logins[username] = {password: password, permissions: 'Guest'};
