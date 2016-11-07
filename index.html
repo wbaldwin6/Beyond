@@ -79,10 +79,12 @@
 			}
 			div.OOCbox{
 				overflow-y: auto;
+				overflow-x: hidden;
 				height: 100%;
 			}
 			div.ICbox{
 				overflow-y: auto;
+				overflow-x: hidden;
 				height: 100%;
 			}
 			input {
@@ -383,8 +385,8 @@
 		var idleInterval;// = new Worker("idle.js");
 		var idleresponse = function(e){//sends only when the timer hits the designated point
 			socket.emit('AFK', true); idleInterval.terminate(); idleInterval = null;
-			document.onmousemove = null;
-			document.onkeypress = null;
+			document.onmousemove = back;
+			document.onkeypress = back;
 			document.title = "(AFK) Beyond";
 		};
 
@@ -392,13 +394,20 @@
 
 		var timersetup = function(){idleInterval = new Worker("idle.js"); idleInterval.onmessage = idleresponse; document.onmousemove = resetTimer; document.onkeypress = resetTimer;}
 
-		window.onfocus = function(e){
+		var back = function(e){
 			if(!idleInterval){socket.emit('AFK', false); timersetup();}
 			document.title = "Beyond";
 			document.getElementsByTagName('link')[0].href = "/faceicons/favicon.png";
 		};
 
+		window.onfocus = back;
+
 		timersetup();
+
+		var sanitize = function(string){
+			string = string.replace(/<br( \/)?>/g, '\n');
+			return string;
+		};
 
 		var Outercontainer = React.createClass({
 			getInitialState: function(){
@@ -548,7 +557,7 @@
 						if(newmodal.post.endsWith(" (Edited)")){
 							newmodal.post = newmodal.post.slice(0, -9);
 						}
-						newmodal.post = newmodal.post.replace(/<br( \/)?>/g, '\n');
+						newmodal.post = sanitize(newmodal.post);
 						//fallthrough
 					case 'Whisper':
 						newmodal.id = id.join(',');//doesn't harm edit as long as you make modata.id[0] into modata.id there, it should only be one number
@@ -573,7 +582,7 @@
 					case 'Set Profile':
 						var that=this;
 						this.props.socket.emit('Show Profile', newmodal.charid, function(response){
-							newmodal.post = response.replace(/<br( \/)?>/g, '\n');
+							newmodal.post = sanitize(response);
 							newmodal.type = 'action';
 							that.modalpush(newmodal);//async is just fine thanks to this function.
 						});
@@ -670,7 +679,7 @@
 				var characters = this.props.characters;
 				if(characters[id[0]] && (id[0] == 0 && characters[0][0] || characters[id[0]][1])){//group exists and isn't empty.
 					if(characters[id[0]][id[1]] && characters[id[0]][id[1]][0].id == charid){//id is occupied by the right character
-						if(icpos && (!(characters[id[0]][id[1]][id[2]].icpos.left == icpos.left) || !(characters[id[0]][id[1]][id[2]].icpos.top == icpos.top))){
+						if(icpos && (!characters[id[0]][id[1]][id[2]] || !(characters[id[0]][id[1]][id[2]].icpos.left == icpos.left) || !(characters[id[0]][id[1]][id[2]].icpos.top == icpos.top))){
 							for(k=0; k < characters[id[0]][id[1]].length; k++){//for each deriv in char
 								if(characters[id[0]][id[1]][k].icpos.left == icpos.left && characters[id[0]][id[1]][k].icpos.top == icpos.top){//same deriv position
 									return [id[0], id[1], k];
@@ -683,7 +692,7 @@
 					} else {//wrong character or wrong length
 						for(i=0; i < characters[id[0]].length; i++){//for each char in group
 							if(characters[id[0]][i][0].id == charid){
-								if(icpos && (!(characters[id[0]][i][id[2]].icpos.left == icpos.left) || !(characters[id[0]][i][id[2]].icpos.top == icpos.top))){
+								if(icpos && (!characters[id[0]][i][id[2]] || !(characters[id[0]][i][id[2]].icpos.left == icpos.left) || !(characters[id[0]][i][id[2]].icpos.top == icpos.top))){
 									for(k=0; k < characters[id[0]][i].length; k++){//for each deriv in char
 										if(characters[id[0]][i][k].icpos.left == icpos.left && characters[id[0]][i][k].icpos.top == icpos.top){//same deriv position
 											return [id[0], i, k];
@@ -701,7 +710,7 @@
 					if(characters[i] != id[0]){//again, doesn't exist, is empty, or doesn't contain it.
 						for(j=0; j < characters[i].length; j++){//for each char ([i][j]) in group
 							if(characters[i][j][0].id == charid){
-								if(icpos && (!(characters[i][j][id[2]].icpos.left == icpos.left) || !(characters[i][j][id[2]].icpos.top == icpos.top))){
+								if(icpos && (!characters[i][j][id[2]] || !(characters[i][j][id[2]].icpos.left == icpos.left) || !(characters[i][j][id[2]].icpos.top == icpos.top))){
 									for(k=0; k < characters[i][j].length; k++){//for each deriv in char
 										if(characters[i][j][k].icpos.left == icpos.left && characters[i][j][k].icpos.top == icpos.top){//same deriv position
 											return [i, j, k];
@@ -1337,7 +1346,7 @@
 				var that = this;
 				if(['Rules', 'MOTD', 'Profile', 'Info'].indexOf(type) > -1 && this.props.permissions == 'Admin'){
 					var res = function(response){
-						if(response){response = response.replace(/<br( \/)?>/g, '\n');}
+						if(response){response = sanitize(response);}
 						that.props.modalpush({id: [], name: name, type: 'action', post: response});
 					};
 					if(type == 'Profile'){

@@ -361,19 +361,21 @@ var generatePost = function (message, username, post, character, say, omit){
 };
 
 var processHTML = function(message){
-	//message = message.replace(/</g, "&lt;");
-	//message = message.replace(/>/g, "&gt;");
 	var test = /<|>/.test(message);
+	message = message.replace(/(\s|^)(https?:\/\/\S+)/ig, "$1<a href=\"$2\" target=\"_blank\">$2</a>");
 	message = message.replace(/\r\n?|\n/g, "<br />");
-	message = message.replace(/(https?:\/\/\S+)/ig, "<a href=\"$1\" target=\"_blank\">$1</a>");
 	if(test){//we skip it if we don't even find any tags (prior to potentially adding them ourselves)
-		message = sanitizeHtml(message, {allowedTags: ['a', 'b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
+		message = sanitizeHtml(message, {allowedTags: ['a', 'b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'sub', 'u'],
 		allowedAttributes: {
 			'a': ['href', 'target'],
 			'span': ['style'],
 			'font': ['color', 'style']
 		}});
-		message = message.replace(/(^|"|;)((?!(text-decoration|text-shadow|font-.*|outline-.*))[-A-Za-z])*:.+?\b/g, "");
+		message = message.replace(/<(.*?)>/g, function(match, p1, offset, string) {
+		    return "<" + p1.replace(/style\s*=\s*"(.*?)"/g, function(match, p1, offset, string) {
+		        return 'style="' + p1.replace(/(^|;)((?!(text-decoration|text-shadow|font-.*|outline-.*|color))[-A-Za-z])*:.+?\b/g, "") + '"'
+		    }) + ">";
+		});
 	}
 	return message;
 };
@@ -566,7 +568,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('AFK', function(on){
 		var username = sessions[socket.request.connection.remoteAddress];
-		if(on != playerlist[username].afk){
+		if(playerlist[username] && on != playerlist[username].afk){
 			playerlist[username].afk = on;
 			io.emit('PlayerList', playerlist);
 		}
@@ -794,13 +796,20 @@ var Setconnections = function(socket){//username will definitely be present or s
 		toLog(msg);
 		removePlayer(socket.request.connection.remoteAddress);
 		io.emit('PlayerList', playerlist);
+		console.log(username + ' ('+socket.request.connection.remoteAddress+') has disconnected.');
 	});
 };
 
 io.on('connection', function(socket){
 	if(banlist.ips.indexOf(socket.request.connection.remoteAddress) > -1){//banned IP
 		socket.disconnect();
+		return;
+	}
+	var username = sessions[socket.request.connection.remoteAddress]
+	if(username){//logged in, probably a database access
+		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
 	} else {
+		console.log('a user connected');
 		if(serversettings.rules){
 			var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
 			socket.emit('OOCmessage', msg);
@@ -809,12 +818,6 @@ io.on('connection', function(socket){
 			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
 			socket.emit('OOCmessage', msg);
 		}
-	}
-	var username = sessions[socket.request.connection.remoteAddress]
-	if(username){//logged in, probably a database access
-		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
-	} else {
-		console.log('a user connected');
 		socket.on('login', function(username, password, callback){
 			if(username.endsWith(' ')){
 				callback("Please do not end your username with a space.");
