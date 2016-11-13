@@ -200,6 +200,7 @@
 			.mtitle, div.PLentry{
 				text-align: center;
 				cursor: default;
+				pointer-events: none;
 				-webkit-user-select: none;
 				-moz-user-select: none;
 				-ms-user-select: none;
@@ -404,6 +405,8 @@
 
 		timersetup();
 
+		var rectimer;
+
 		var sanitize = function(string){
 			string = string.replace(/<br( \/)?>/g, '\n');
 			return string;
@@ -434,13 +437,16 @@
 				});
 				this.props.socket.on('reconnect', function(){
 					if(that.state.username){
-						that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
-							if(res.settings){
-								that.handleSettings(res.settings, res.characters);
-							} else {
-								console.log(res);
-							}
-						});
+						if(rectimer){rectimer.clearTimeout();}
+						rectimer = setTimeout(function(){
+							that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
+								if(res.settings){
+									that.handleSettings(res.settings, res.characters);
+								} else {
+									console.log(res);
+								}
+							});
+						}, 100);
 					}
 				});
 				window.onbeforeunload = function (e){
@@ -578,6 +584,9 @@
 						//fallthrough
 					case 'Join Room':
 						newmodal.type = 'action';
+						break;
+					case 'Set Active Character':
+						newmodal.type = 'active';//two part charid already in place
 						break;
 					case 'Set Profile':
 						var that=this;
@@ -742,6 +751,8 @@
 								return(<DeleteModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
 							case 'action':
 								return(<ActionModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+							case 'active':
+								return(<ActiveModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} closeModal={that.props.closeModal}/>);
 							case 'notifications':
 								return(<NotificationModal key={index} id={index} modal={modal} characters={that.props.characters} settings={that.props.settings} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
 						}
@@ -1235,6 +1246,118 @@
 			}
 		});
 
+		var ActiveModal = React.createClass({
+			getInitialState: function(){
+				return {x: '25%', y: '25%', width: '150px'};
+			},
+
+			dragTest: function(e){
+				if(e.target.getAttribute('class') == "modal"){//only START for the modal containers.
+					this.startDrag(e);
+				} else if(e.target.tagName == 'TEXTAREA'){//the textarea
+					document.addEventListener('mousemove', this.resize);
+					document.addEventListener('mouseup', this.stopResize);
+				}
+			},
+
+			startDrag: startDrag,
+
+			resize: function(e){
+				this.setState({width: this.refs['text'].getBoundingClientRect().width});
+			},
+
+			stopResize: function(e){
+				document.removeEventListener('mousemove', this.resize);
+				document.removeEventListener('mouseup', this.stopResize);
+			},
+
+			drag: drag,
+
+			stopDrag: stopDrag,
+
+			enterCheck: function(e){
+				if(e.keyCode == 13 && !e.shiftKey){//hit enter
+					this.post(e);
+				}
+			},
+
+			post: function(e){
+				var modal = e.target.parentNode;
+				var modata = this.props.modal;
+				var post = this.refs['text'].value;
+				var name = this.refs['type'].textContent;
+				var win = this.refs['win'].textContent;
+				//something to determine the specific derivative here. Probably just alter the charid we pass to verifyID to be 3 long instead of 2. We also need to use whatever our check for type is instead of modata.name.
+				if(post && this.state.id){//find the right id
+					var did = this.state.id.id;
+					var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
+					var room = null;
+					if(win == 'IC'){//only for IC posts.
+						var rooms = Object.keys(this.props.settings.rooms);
+						for(var i=0; i < rooms.length && !room; i++){
+							if(this.props.settings.rooms[rooms[i]].indexOf(modata.charid) > -1){//it's in this room
+								room = rooms[i];
+							}
+						}
+					} else {//omits
+						name = 'Omit '+name;
+					}
+					if(trueid){
+						var deriv = this.props.characters[trueid[0]][trueid[1]][did];
+						this.props.socket.emit('characterPost', post, deriv, name, room);
+					}//if it's undefined the character doesn't exist.
+
+					this.refs['text'].value = ''; //just empty it.
+				}
+				e.preventDefault();
+			},
+
+			select: function(e){
+				if(e.target.tagName == 'IMG'){
+					if(this.state.id){this.state.id.src = '/faceicons/img_trans.gif';}
+					e.target.src='/faceicons/box.png';
+					this.setState({id: e.target});//we grab the id later to determine the derivative, hopefully.
+				}
+				
+			},
+
+			toggle: function(e){
+				switch(e.target.textContent){
+					case 'IC':
+						e.target.textContent = 'OOC';
+						break;
+					case 'OOC':
+						e.target.textContent = 'IC';
+						break;
+					case 'Action':
+						e.target.textContent = 'Say';
+						break;
+					case 'Say':
+						e.target.textContent = 'Action';
+						break;
+				}
+			},
+
+			render: function(){
+				var modal = this.props.modal;
+				var name = 'Active Character';
+				var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
+				if(modal.charid){
+					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+				}
+				var images = this.props.characters[trueid[0]][trueid[1]].map(function(deriv, i3){
+					return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);
+				});//grab the derivatives in here
+				return(
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width}} onMouseDown={this.dragTest}><span className="mtitle">{name}</span><br/>
+					<div onClick={this.select} style={{maxWidth:'100%', backgroundColor: 'rgba(50,50,50,0)'}}>{images}</div><br/>
+					<div ref='win' style={{width:'auto', paddingRight: '5px', backgroundColor: 'rgba(50,50,50,0)'}} className='Command' onClick={this.toggle}>IC</div><div ref='type' style={{width:'auto', backgroundColor: 'rgba(50,50,50,0)'}} className='Command' onClick={this.toggle}>Action</div><br/>
+					<textarea defaultValue={modal.post || ''} autoFocus rows='4' style={{width:'150px'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
+					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button></div>
+				);
+			}
+		});
+
 		var NotificationModal = React.createClass({
 			getInitialState: function(){
 				var not = [{name: '', OOC: false, IC: false}];
@@ -1500,7 +1623,7 @@
 						var characters = this.props.characters;
 						var charlist = characters.map(function(group, i){//groups loop
 							if(i==0 || that.state.open.groups[group[0]]){//open group
-								var charop = ['Create Derivative', 'Delete Character', 'Set Profile', 'Join Room*player', 'Leave Room*player'];
+								var charop = ['Create Derivative', 'Delete Character', 'Set Active Character', 'Set Profile', 'Join Room*player', 'Leave Room*player'];
 								var chars = characters[i].map(function(chr, i2){//characters loop
 									if(typeof chr !== 'string'){//make sure it's not the name.
 										if(that.state.open.characters[chr[0].id]){//open derivative list
