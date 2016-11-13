@@ -812,6 +812,54 @@ io.on('connection', function(socket){
 		socket.disconnect();
 		return;
 	}
+	socket.on('login', function(username, password, callback){
+		if(username.endsWith(' ')){
+			callback("Please do not end your username with a space.");
+			return;
+		}
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){callback(err);} else {
+				logins = JSON.parse(logins);
+				if(logins[username]){//valid username
+					if(users[username]){//already on the list?
+						callback("User already logged in!");
+					} else if(logins[username].password == password){//valid login
+						addPlayer(username, socket, logins[username].permissions);
+						if(banlist.users[username]){//this is so mean.
+							Commands['Ban'](username);
+							callback("You're still banned.");
+						} else {
+							//pull up user info
+							fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
+								if(err){callback(err);} else {
+									setImmediate(function() {Setconnections(socket);});
+									info = JSON.parse(info);
+									callback(info);
+									if(info.settings.room){
+										socket.join(info.settings.room);
+									}
+									Object.keys(info.settings.rooms).forEach(function(room){
+										if(typeof room === 'string'){
+											socket.join(room);
+										}
+									});
+									console.log(socket.id+" has logged in as "+username);
+									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+									io.emit('OOCmessage', msg);
+									io.emit('PlayerList', playerlist);
+									toLog(msg);
+								}
+							});
+						}
+					} else {//invalid login
+						callback("Password does not match the given username.");
+					}
+				} else {//invalid username
+					callback(username+" is not in our list yet.");
+				}
+			}
+		});
+	});
 	var username = sessions[socket.request.connection.remoteAddress]
 	if(username){//logged in, probably a database access
 		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
@@ -825,54 +873,6 @@ io.on('connection', function(socket){
 			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
 			socket.emit('OOCmessage', msg);
 		}
-		socket.on('login', function(username, password, callback){
-			if(username.endsWith(' ')){
-				callback("Please do not end your username with a space.");
-				return;
-			}
-			fs.readFile('logins.json', 'utf8', function(err, logins){
-				if(err){callback(err);} else {
-					logins = JSON.parse(logins);
-					if(logins[username]){//valid username
-						if(users[username]){//already on the list?
-							callback("User already logged in!");
-						} else if(logins[username].password == password){//valid login
-							addPlayer(username, socket, logins[username].permissions);
-							if(banlist.users[username]){//this is so mean.
-								Commands['Ban'](username);
-								callback("You're still banned.");
-							} else {
-								//pull up user info
-								fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
-									if(err){callback(err);} else {
-										setImmediate(function() {Setconnections(socket);});
-										info = JSON.parse(info);
-										callback(info);
-										if(info.settings.room){
-											socket.join(info.settings.room);
-										}
-										Object.keys(info.settings.rooms).forEach(function(room){
-											if(typeof room === 'string'){
-												socket.join(room);
-											}
-										});
-										console.log(socket.id+" has logged in as "+username);
-										var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-										io.emit('OOCmessage', msg);
-										io.emit('PlayerList', playerlist);
-										toLog(msg);
-									}
-								});
-							}
-						} else {//invalid login
-							callback("Password does not match the given username.");
-						}
-					} else {//invalid username
-						callback(username+" is not in our list yet.");
-					}
-				}
-			});
-		});
 		socket.on('register', function(username, password, callback){
 			if(username.endsWith(' ')){
 				callback("Please do not end your username with a space.");
