@@ -407,6 +407,8 @@
 
 		var rectimer;
 
+		var reconnected = false;
+
 		var sanitize = function(string){
 			string = string.replace(/<br( \/)?>/g, '\n');
 			return string;
@@ -435,18 +437,35 @@
 					if(players[that.state.username]){ret.permissions = players[that.state.username].permissions;}
 					that.setState(ret);
 				});
-				this.props.socket.on('reconnect', function(){
-					if(that.state.username){
-						if(rectimer){window.clearTimeout(rectimer); rectimer = null;}
-						rectimer = setTimeout(function(){
+				var recfun = function(){
+					console.log('Checking if connected...');
+					if(that.props.socket.connected){
+						if(!reconnected){
+							console.log('Connected, logging in...');
 							that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
 								if(res.settings){
+									console.log('Logged in successfully (as far as I can tell).');
 									that.handleSettings(res.settings, res.characters);
+									reconnected = true;//we made it in, stop retrying.
 								} else {
 									console.log(res);
 								}
 							});
-						}, 100);
+							rectimer = setTimeout(recfun, 1000);// we keep trying as long as we're not connected.
+						}//if connected it just stops.
+					} else {
+						console.log('Not connected, relogging...');
+						that.props.socket.io.reconnect();
+					}
+				};
+				this.props.socket.on('disconnect', function(){
+					console.log('Disconnected.');
+					reconnected = false;
+				});
+				this.props.socket.on('reconnect', function(){
+					if(that.state.username){
+						if(rectimer){clearTimeout(rectimer);}
+						rectimer = setTimeout(recfun, 100);
 					}
 				});
 				window.onbeforeunload = function (e){
@@ -814,6 +833,7 @@
 							that.props.handleSettings(response.settings, response.characters);
 							that.props.setUser(username, md5(password));
 							that.props.closeModal(ind);
+							reconnected = true;
 						} else {
 							that.setState({loginmessage: response.code || response});
 						}

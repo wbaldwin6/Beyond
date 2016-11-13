@@ -141,7 +141,7 @@ app.get('/characters', function(req, res){
 						if(!file.endsWith('.json')){
 							var f = fs.readdirSync(__dirname+'/characters/'+file);
 							ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+file+'\')">'+file+' ('+f.length+')</h2>';
-							ret += '<div id='+file+' style="display: none;">';
+							ret += '<div id="'+file+'" style="display: none;">';
 							f.forEach(function(chr){
 								var id=file+'-'+chr.slice(0, -5);
 								var name = charindex[id].name;
