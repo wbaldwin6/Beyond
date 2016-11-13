@@ -455,6 +455,7 @@
 						}//if connected it just stops.
 					} else {
 						console.log('Not connected, relogging...');
+						rectimer = setTimeout(recfun, 1000);
 						that.props.socket.io.reconnect();
 					}
 				};
