@@ -132,30 +132,24 @@ app.get('/characters/:user/:name', function(req, res){
 app.get('/characters', function(req, res){
 	fs.readdir(__dirname+'/characters', function(err, files){
 		if(!err){
-			var ret = '<head><title>Character Database</title><link rel="icon" href="/faceicons/favicon.png"></head><body style="background-color:black;">';
-			files = files.sort();
-			files.forEach(function(file, index){
-				if(!file.endsWith('.json')){
-					ret += '<a href="/characters/'+file+'" style="color:blue;">'+file+'</a><br><br>';
-				}
-			});
-			ret += '</body>';
-			res.send(ret);
-		}
-	});
-});
-app.get('/characters/:user', function(req, res){
-	fs.readdir(__dirname+'/characters/'+req.params.user, function(err, files){
-		if(!err){
 			fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, charindex){
 				if(!err){
 					charindex = JSON.parse(charindex);
-					var ret = '<head><title>'+req.params.user+'\'s Characters</title><link rel="icon" href="/faceicons/favicon.png"></head><body style="background-color:black;">';
+					var ret = '<head><title>Character Database</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
+					files = files.sort();
 					files.forEach(function(file, index){
-						var id=req.params.user+'-'+file.slice(0, -5);
-						var name = charindex[id].name;
-						ret += '<a href="/characters/'+req.params.user+'/'+file+'" style="color:blue;">'+
-						'<img src="/faceicons/img_trans.gif" height="50px" width="50px" style="background-image:url(/faceicons/'+charindex[id].icon+'.png);">'+name+'</a><br><br>';
+						if(!file.endsWith('.json')){
+							var f = fs.readdirSync(__dirname+'/characters/'+file);
+							ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+file+'\')">'+file+' ('+f.length+')</h2>';
+							ret += '<div id='+file+' style="display: none;">';
+							f.forEach(function(chr){
+								var id=file+'-'+chr.slice(0, -5);
+								var name = charindex[id].name;
+								ret += '<a href="/characters/'+file+'/'+chr+'" style="color:blue;">'+
+								'<img src="/faceicons/img_trans.gif" height="50px" width="50px" style="background-image:url(/faceicons/'+charindex[id].icon+'.png);">'+name+'</a><br><br>';
+							});
+							ret += '</div>';
+						}
 					});
 					ret += '</body>';
 					res.send(ret);
@@ -165,12 +159,24 @@ app.get('/characters/:user', function(req, res){
 	});
 });
 
+var monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 app.get('/logs', function(req, res){
 	fs.readdir(__dirname+'/logs', function(err, files){
 		if(!err){
-			var ret = '<head><title>Logs</title><link rel="icon" href="/faceicons/favicon.png"></head><body style="background-color:black;">';
+			var ret = '<head><title>Logs</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
+			var months = {};
 			files.forEach(function(file, index){
-				if(file.endsWith('.html')){
+				if(file.endsWith('.html')){//make a separate header for each month, THEN worry about collapsibility
+					var month = file.substring(0, 7);
+					if(!months[month]){
+						months[month] = true;
+						ret += '</div>';
+						var monthname = monthenum[month.split('_')[1]]+' '+month.split('_')[0];
+						ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+month+'\')">'+monthname+'</h2>';
+						//Make a div starting here and ending when we hit the next month or the end
+						ret += '<div id='+month+' style="display: none;">';
+					}
 					ret += '<a href="/logs/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a><br><br>';
 				}
 			});
@@ -791,8 +797,8 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('disconnect', function(){
-		removePlayer(socket.request.connection.remoteAddress);
 		var username = sessions[socket.request.connection.remoteAddress];
+		removePlayer(socket.request.connection.remoteAddress);
 		var msg = {className: 'OOC log message', username: username, post: "has logged off"}
 		io.emit('OOCmessage', msg);
 		toLog(msg);

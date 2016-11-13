@@ -437,7 +437,7 @@
 				});
 				this.props.socket.on('reconnect', function(){
 					if(that.state.username){
-						if(rectimer){rectimer.clearTimeout();}
+						if(rectimer){window.clearTimeout(rectimer); rectimer = null;}
 						rectimer = setTimeout(function(){
 							that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
 								if(res.settings){
@@ -1318,7 +1318,6 @@
 					e.target.src='/faceicons/box.png';
 					this.setState({id: e.target});//we grab the id later to determine the derivative, hopefully.
 				}
-				
 			},
 
 			toggle: function(e){
