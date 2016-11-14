@@ -438,13 +438,10 @@
 					that.setState(ret);
 				});
 				var recfun = function(){
-					console.log('Checking if connected...');
 					if(that.props.socket.connected){
 						if(!reconnected){
-							console.log('Connected, logging in...');
 							that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
 								if(res.settings){
-									console.log('Logged in successfully (as far as I can tell).');
 									that.handleSettings(res.settings, res.characters);
 									reconnected = true;//we made it in, stop retrying.
 								} else {
@@ -454,13 +451,11 @@
 							rectimer = setTimeout(recfun, 1000);// we keep trying as long as we're not connected.
 						}//if connected it just stops.
 					} else {
-						console.log('Not connected, relogging...');
 						rectimer = setTimeout(recfun, 1000);
 						that.props.socket.io.reconnect();
 					}
 				};
 				this.props.socket.on('disconnect', function(){
-					console.log('Disconnected.');
 					reconnected = false;
 				});
 				this.props.socket.on('reconnect', function(){
@@ -505,35 +500,37 @@
 
 			contextMenu: function(e){
 				var target = e.target;
-				e.preventDefault();
-				e.stopPropagation();
-				//TODO: see if you can somehow combine the context menus to show all relevant options for a given rightclick and link them properly to their targets.
-				var options = target.getAttribute('data');
-				while(!options && target.parentNode.getAttribute('id') != 'main'){
-					target = target.parentNode;
-					options = target.getAttribute('data');
-				}
-				if(options){
-					var position = {x: e.nativeEvent.clientX, y: e.nativeEvent.clientY};
-					options = options.split(",");//a list of the option names
-					var processed = [];
-					var that=this;
-					options.forEach(function(option, index){
-						var check = option.split('*');
-						var ret = check.shift();
-						check = check[0];
-						if(check){//option has a condition
-							if((check == 'admin' && that.state.permissions == 'Admin'
-								|| check == 'player' && ['Player', 'Admin'].indexOf(that.state.permissions) > -1)
-								|| check == that.state.username){
+				if(target.tagName != 'TEXTAREA' && !(target.tagName == 'INPUT' && target.type == 'text')){
+					e.preventDefault();
+					e.stopPropagation();
+					//TODO: see if you can somehow combine the context menus to show all relevant options for a given rightclick and link them properly to their targets.
+					var options = target.getAttribute('data');
+					while(!options && target.parentNode.getAttribute('id') != 'main'){
+						target = target.parentNode;
+						options = target.getAttribute('data');
+					}
+					if(options){
+						var position = {x: e.nativeEvent.clientX, y: e.nativeEvent.clientY};
+						options = options.split(",");//a list of the option names
+						var processed = [];
+						var that=this;
+						options.forEach(function(option, index){
+							var check = option.split('*');
+							var ret = check.shift();
+							check = check[0];
+							if(check){//option has a condition
+								if((check == 'admin' && that.state.permissions == 'Admin'
+									|| check == 'player' && ['Player', 'Admin'].indexOf(that.state.permissions) > -1)
+									|| check == that.state.username){
+									processed.push(ret);
+								}
+							} else {
 								processed.push(ret);
 							}
-						} else {
-							processed.push(ret);
+						});
+						if(processed.length){
+							this.setState({context: {position: position, options: processed, target: target}});
 						}
-					});
-					if(processed.length){
-						this.setState({context: {position: position, options: processed, target: target}});
 					}
 				}
 			},
@@ -1269,7 +1266,7 @@
 
 		var ActiveModal = React.createClass({
 			getInitialState: function(){
-				return {x: '25%', y: '25%', width: '150px'};
+				return {x: '25%', y: '25%', width: '167px'};
 			},
 
 			dragTest: function(e){
@@ -1358,6 +1355,40 @@
 				}
 			},
 
+			componentDidMount: function(){
+				if(ReactDOM.findDOMNode(this).getBoundingClientRect().bottom > document.body.clientHeight){
+					this.mode();
+				}
+			},
+
+			mode: function(){
+				if(this.refs['scrollb'].textContent == 'Scroll'){
+					this.refs['scrollb'].textContent = 'Default';
+					this.refs['img'].style.height = '100px';
+					this.refs['img'].style['overflow-y'] = 'scroll';
+				} else {
+					this.refs['scrollb'].textContent = 'Scroll';
+					this.refs['img'].style.height = '';
+					this.refs['img'].style['overflow-y'] = 'auto';
+				}
+			},
+
+			componentDidUpdate: function(){
+				if(this.state.id){
+					var trueid = this.props.verifyID(this.props.modal.charid, this.props.modal.id, null);
+					var deriv = this.props.characters[trueid[0]][trueid[1]][this.state.id.id];
+					if(deriv){
+						this.refs['prev'].style.fontFamily = deriv.fontStyle;
+						this.refs['prev'].style.color = deriv.nameColor;
+						if(deriv.customHTML){
+							this.refs['prev'].innerHTML = deriv.customHTML;
+						} else {
+							this.refs['prev'].textContent = deriv.name;
+						}
+					}
+				}
+			},
+
 			render: function(){
 				var modal = this.props.modal;
 				var name = 'Active Character';
@@ -1370,10 +1401,10 @@
 				});//grab the derivatives in here
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width}} onMouseDown={this.dragTest}><span className="mtitle">{name}</span><br/>
-					<div onClick={this.select} style={{maxWidth:'100%', backgroundColor: 'rgba(50,50,50,0)'}}>{images}</div><br/>
-					<div ref='win' style={{width:'auto', paddingRight: '5px', backgroundColor: 'rgba(50,50,50,0)'}} className='Command' onClick={this.toggle}>IC</div><div ref='type' style={{width:'auto', backgroundColor: 'rgba(50,50,50,0)'}} className='Command' onClick={this.toggle}>Action</div><br/>
-					<textarea defaultValue={modal.post || ''} autoFocus rows='4' style={{width:'150px'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
-					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button></div>
+					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{images}</div><br/>
+					<div ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><div ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>IC</div><div ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>Action</div><br/>
+					<textarea defaultValue={modal.post || ''} autoFocus rows='4' style={{width:'167px', minWidth:'167px'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
+					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Close</button><button ref='scrollb' type="submit" onClick={this.mode}>Scroll</button></div>
 				);
 			}
 		});

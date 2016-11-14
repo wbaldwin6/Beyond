@@ -172,7 +172,7 @@ app.get('/logs', function(req, res){
 					if(!months[month]){
 						months[month] = true;
 						ret += '</div>';
-						var monthname = monthenum[month.split('_')[1]]+' '+month.split('_')[0];
+						var monthname = monthenum[month.split('_')[1]-1]+' '+month.split('_')[0];
 						ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+month+'\')">'+monthname+'</h2>';
 						//Make a div starting here and ending when we hit the next month or the end
 						ret += '<div id='+month+' style="display: none;">';
