@@ -621,6 +621,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 			}
 			msg.className = className;
 			if(type.startsWith('Test')){
+				msg.className = 'Test'+msg.className;
 				msg.post += ' (Test)';
 				socket.emit(call, msg);
 			} else if(typeof room === 'string' && call){

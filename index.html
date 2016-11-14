@@ -450,9 +450,6 @@
 							});
 							rectimer = setTimeout(recfun, 1000);// we keep trying as long as we're not connected.
 						}//if connected it just stops.
-					} else {
-						rectimer = setTimeout(recfun, 1000);
-						that.props.socket.io.reconnect();
 					}
 				};
 				this.props.socket.on('disconnect', function(){
@@ -1318,13 +1315,12 @@
 							}
 						}
 					} else {//omits
-						name = 'Omit '+name;
+						name = win+' '+name;
 					}
 					if(trueid){
 						var deriv = this.props.characters[trueid[0]][trueid[1]][did];
 						this.props.socket.emit('characterPost', post, deriv, name, room);
 					}//if it's undefined the character doesn't exist.
-
 					this.refs['text'].value = ''; //just empty it.
 				}
 				e.preventDefault();
@@ -1341,9 +1337,12 @@
 			toggle: function(e){
 				switch(e.target.textContent){
 					case 'IC':
-						e.target.textContent = 'OOC';
+						e.target.textContent = 'Omit';
 						break;
-					case 'OOC':
+					case 'Omit':
+						e.target.textContent = 'Test';
+						break;
+					case 'Test':
 						e.target.textContent = 'IC';
 						break;
 					case 'Action':
@@ -1824,7 +1823,7 @@
 						var profileopen = function(e){window.open('/characters/'+charid+'/'+d+'.html');}
 						var edit = [];
 						if(message.id){edit.push('Edit*'+charid);}//worst case message.id is undefined
-						if(!message.className.startsWith('O')){edit.push('Narrate');}//IC post
+						if(!message.className.startsWith('O') && !message.className.startsWith('T')){edit.push('Narrate');}//IC post
 						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
 				}
 			}
