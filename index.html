@@ -197,10 +197,14 @@
 			.Button{
 				outline:0;
 			}
-			.mtitle, div.PLentry{
+			.mtitle{
 				text-align: center;
 				cursor: default;
 				pointer-events: none;
+			}
+			div.PLentry{
+				text-align: center;
+				cursor: default;
 				-webkit-user-select: none;
 				-moz-user-select: none;
 				-ms-user-select: none;
@@ -438,10 +442,13 @@
 					that.setState(ret);
 				});
 				var recfun = function(){
+					console.log('Checking if connected...');
 					if(that.props.socket.connected){
 						if(!reconnected){
+							console.log('Connected, logging in...');
 							that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
 								if(res.settings){
+									console.log('Logged in successfully (as far as I can tell).');
 									that.handleSettings(res.settings, res.characters);
 									reconnected = true;//we made it in, stop retrying.
 								} else {
@@ -450,9 +457,11 @@
 							});
 							rectimer = setTimeout(recfun, 1000);// we keep trying as long as we're not connected.
 						}//if connected it just stops.
+						console.log('Not connected, reconnection should occur shortly.');
 					}
 				};
 				this.props.socket.on('disconnect', function(){
+					console.log('Disconnected.');
 					reconnected = false;
 				});
 				this.props.socket.on('reconnect', function(){
@@ -500,7 +509,6 @@
 				if(target.tagName != 'TEXTAREA' && !(target.tagName == 'INPUT' && target.type == 'text')){
 					e.preventDefault();
 					e.stopPropagation();
-					//TODO: see if you can somehow combine the context menus to show all relevant options for a given rightclick and link them properly to their targets.
 					var options = target.getAttribute('data');
 					while(!options && target.parentNode.getAttribute('id') != 'main'){
 						target = target.parentNode;
