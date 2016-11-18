@@ -442,23 +442,19 @@
 					that.setState(ret);
 				});
 				var recfun = function(){
-					console.log('Checking if connected...');
-					if(that.props.socket.connected){
-						if(!reconnected){
-							console.log('Connected, logging in...');
-							that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
-								if(res.settings){
-									console.log('Logged in successfully (as far as I can tell).');
-									that.handleSettings(res.settings, res.characters);
-									reconnected = true;//we made it in, stop retrying.
-								} else {
-									console.log(res);
-								}
-							});
-							rectimer = setTimeout(recfun, 1000);// we keep trying as long as we're not connected.
-						}//if connected it just stops.
-						console.log('Not connected, reconnection should occur shortly.');
-					}
+					if(!reconnected){
+						console.log('Connected, logging in...');
+						that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
+							if(res.settings){
+								console.log('Logged in successfully (as far as I can tell).');
+								that.handleSettings(res.settings, res.characters);
+								reconnected = true;//we made it in, stop retrying.
+							} else {
+								console.log(res);
+							}
+						});
+						rectimer = setTimeout(recfun, 1000);// we keep trying as long as we're not connected.
+					}//if connected it just stops.
 				};
 				this.props.socket.on('disconnect', function(){
 					console.log('Disconnected.');
@@ -844,10 +840,20 @@
 				}
 			},
 
+			enterCheck: function(e){
+				if(e.keyCode == 13){
+					if(e.target.name == 'password'){
+						this.submission(e);
+					} else if(e.target.value.length >= 6) {
+						this.refs.password.focus();
+					}
+				}
+			},
+
 			render: function(){
 				return(<div id={this.props.id} className="modal" style={{textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
-						<input type="text" name="username" ref="username" placeholder="Username"/><br/>
-						<input type="text" name="password" ref="password" placeholder="Password"/><br/>
+						<input type="text" name="username" ref="username" placeholder="Username" onKeyDown={this.enterCheck}/><br/>
+						<input id="login" type="text" name="password" ref="password" placeholder="Password" onKeyDown={this.enterCheck}/><br/>
 						<button type="submit" id="login" onClick={this.submission}>Login</button>
 						<button type="submit" id="register" onClick={this.submission}>Register</button><br/>
 						<b>{this.state.loginmessage}</b><br/><br/>
