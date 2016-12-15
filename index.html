@@ -449,6 +449,8 @@
 								console.log('Logged in successfully (as far as I can tell).');
 								that.handleSettings(res.settings, res.characters);
 								reconnected = true;//we made it in, stop retrying.
+								if(idleInterval){idleInterval.terminate();}
+								timersetup();//restart the afk timer.
 							} else {
 								console.log(res);
 							}
@@ -505,32 +507,69 @@
 				if(target.tagName != 'TEXTAREA' && !(target.tagName == 'INPUT' && target.type == 'text')){
 					e.preventDefault();
 					e.stopPropagation();
-					var options = target.getAttribute('data');
-					while(!options && target.parentNode.getAttribute('id') != 'main'){
+					var className = target.className;
+					while(!className && target.parentNode.getAttribute('id') != 'main'){
 						target = target.parentNode;
-						options = target.getAttribute('data');
+						className = target.className;
 					}
-					if(options){
+					if(className){
 						var position = {x: e.nativeEvent.clientX, y: e.nativeEvent.clientY};
-						options = options.split(",");//a list of the option names
-						var processed = [];
-						var that=this;
-						options.forEach(function(option, index){
-							var check = option.split('*');
-							var ret = check.shift();
-							check = check[0];
-							if(check){//option has a condition
-								if((check == 'admin' && that.state.permissions == 'Admin'
-									|| check == 'player' && ['Player', 'Admin'].indexOf(that.state.permissions) > -1)
-									|| check == that.state.username){
-									processed.push(ret);
+						//we don't go through the option list, we create it based on the clasname
+						var options = [];
+						switch(className){
+							case 'character':
+								//add a check for 'if we're in doubleclick mode' to put open/close here
+								options = ['Create Derivative', 'Delete Character', 'Set Active Character', 'Set Profile'];
+								if(['Player', 'Admin'].indexOf(this.state.permissions) > -1){
+									options.push('Join Room', 'Leave Room');
 								}
-							} else {
-								processed.push(ret);
-							}
-						});
-						if(processed.length){
-							this.setState({context: {position: position, options: processed, target: target}});
+								break;
+							case 'derivative':
+								options = ['Edit Derivative', 'Delete Derivative', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']
+								if(['Player', 'Admin'].indexOf(this.state.permissions) > -1){
+									options.splice(2, 0, 'Say', 'Action');
+								}
+								break;
+							case 'chargroup':
+								//add a check for 'if we're in doubleclick mode' to put open/close here
+								options = ['New Character', 'Edit Group', 'Delete Group'];
+								break;
+							case 'charlist':
+								//fallthrough
+							case 'chargroup ungrouped':
+								options = ['New Character', 'New Group'];
+								break;
+							case 'OOC message':
+								//fallthrough
+							case 'OOC whisper':
+								//fallthrough
+							case 'PLentry':
+								//add Whisper, check if admin for other commands
+								options = ['Whisper'];
+								if(this.state.permissions == 'Admin'){
+									options.push('Make Player', 'Make Admin', 'Make Guest', 'Boot', 'Ban');
+								}
+								break;
+							case 'IC say message':
+								//fallthrough
+							case 'IC action message':
+								//fallthrough
+							case 'IC narration message':
+								//check username in data, add edit if needed
+								if(target.getAttribute('data') == this.state.username){
+									options = ['Edit'];
+								}
+							case 'ICbox':
+								//add 'Narrate'
+								options.unshift('Narrate');
+								break;
+							case 'Dice Command':
+								//Delete
+								options = ['Delete'];
+								break;
+						}
+						if(options.length){
+							this.setState({context: {position: position, options: options, target: target}});
 						}
 					}
 				}
@@ -1084,7 +1123,7 @@
 			render: function(){
 				var modal = this.props.modal;
 				var chars = this.props.characters[0].map(function(ch, index){
-					return(<div key={'c'+index} className='Command' onClick={function(e){e.target.style.fontWeight=(e.target.style.fontWeight=='bold')? 'normal' : 'bold';}}>{ch[0].name}</div>);
+					return(<div key={'c'+index} style={{float: 'none'}} className='Command' onClick={function(e){e.target.style.fontWeight=(e.target.style.fontWeight=='bold')? 'normal' : 'bold';}}>{ch[0].name}</div>);
 				});//go through the ungrouped characters.
 				var def = '';
 				var name = modal.name;
@@ -1504,7 +1543,6 @@
 				this.setState({tab: e.target.getAttribute('id')});
 			},
 
-
 			toggleGroup: function(e){
 				var op = this.state.open;
 				var name = this.props.characters[e.target.getAttribute('id')][0];
@@ -1687,46 +1725,45 @@
 						var characters = this.props.characters;
 						var charlist = characters.map(function(group, i){//groups loop
 							if(i==0 || that.state.open.groups[group[0]]){//open group
-								var charop = ['Create Derivative', 'Delete Character', 'Set Active Character', 'Set Profile', 'Join Room*player', 'Leave Room*player'];
 								var chars = characters[i].map(function(chr, i2){//characters loop
 									if(typeof chr !== 'string'){//make sure it's not the name.
 										if(that.state.open.characters[chr[0].id]){//open derivative list
 											var derivs = characters[i][i2].map(function(deriv, i3){
-												return(<div draggable data={['Edit Derivative', 'Delete Derivative', 'Say*player', 'Action*player', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']} key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px', pointerEvents:'none'}}/><span>{deriv.name}</span></div>);
+												return(<div draggable key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px', pointerEvents:'none'}}/><span>{deriv.name}</span></div>);
 											});
-											return(<div draggable onDragStart={that.dragstart} onClick={that.toggleChar} data={charop} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [-]</span>{derivs}</div>);
+											return(<div draggable onDragStart={that.dragstart} onClick={that.toggleChar} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [-]</span>{derivs}</div>);
 										} else {//closed derivative list
-											return(<div draggable onClick={that.toggleChar} data={charop} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [+]</span></div>);
+											return(<div draggable onClick={that.toggleChar} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [+]</span></div>);
 										}
 									}
 								});
 								if(typeof group[0] === 'string'){//actual group
-									return(<div draggable onClick={that.toggleGroup} data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span style={{pointerEvents:'none'}} className='group'>{group[0]} [-]</span>{chars}</div>);
+									return(<div draggable onClick={that.toggleGroup} key={i} id={i} className="chargroup"><span style={{pointerEvents:'none'}} className='group'>{group[0]} [-]</span>{chars}</div>);
 								} else {//ungrouped
-									return(<div id={0} data={['New Character', 'New Group']} key={i} className="chargroup ungrouped">{chars}</div>);
+									return(<div id={0} key={i} className="chargroup ungrouped">{chars}</div>);
 								}
 							} else {//closed group
-								return(<div draggable onClick={that.toggleGroup} data={['New Character', 'Edit Group', 'Delete Group']} key={i} id={i} className="chargroup"><span className='group' style={{pointerEvents:'none'}}>{group[0]} [+]</span></div>);
+								return(<div draggable onClick={that.toggleGroup} key={i} id={i} className="chargroup"><span className='group' style={{pointerEvents:'none'}}>{group[0]} [+]</span></div>);
 							}
 						});
 						if(characters.length == 1 && characters[0].length == 0){//none
-							charlist = [<div id={0} data={['New Character', 'New Group']} key={0} className="chargroup ungrouped">Right-click to create a character!</div>];
+							charlist = [<div id={0} key={0} className="chargroup ungrouped">Right-click to create a character!</div>];
 						}
-						currenttab = (<div id={0} onDragStart={that.dragstart} data={['New Character', 'New Group']} className="charlist">
+						currenttab = (<div id={0} onDragStart={that.dragstart} className="charlist">
 							{charlist}
 							</div>);
 						break;
 					case 'players'://case for the players online tab
 						var players = this.props.players;
 						currenttab = Object.keys(players).map(function(player, index){
-							return (<div id={player} key={index} data={['Whisper', 'Make Player*admin', 'Make Admin*admin', 'Make Guest*admin', 'Boot*admin', 'Ban*admin']} className='PLentry'>{players[player].afk ? '(AFK) ' : ''}{player + ' - ' + players[player].permissions}</div>);
+							return (<div id={player} key={index} className='PLentry'>{players[player].afk ? '(AFK) ' : ''}{player + ' - ' + players[player].permissions}</div>);
 						});
 						break;
 					case 'commands'://case for player commands tab
 						currenttab=[<div key='0' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='2' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='5' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='6' className='Command' onClick={this.show}>Show Rules</div>, <div key='7' className='Command' onClick={this.show}>Show MOTD</div>, <div key='8' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='9' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='10' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='11' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={12+index} id={'Dice'+index} data={['Delete']} className='Dice Command' onClick={that.roll}>{dice}</div>);
+							currenttab.push(<div key={12+index} id={'Dice'+index} className='Dice Command' onClick={that.roll}>{dice}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
@@ -1814,15 +1851,15 @@
 				var classparam = message.className.split(" ")[1];
 				switch(classparam){
 					case 'message'://ooc message
-						return (<div id={message.username} data={'Whisper'} className={message.className}>( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> ){'\r'}</div>);
+						return (<div id={message.username} className={message.className}>( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> ){'\r'}</div>);
 					case 'whisper'://ooc whisper
 						if(message.username){
-							return (<div id={message.username} data={'Whisper'} className={message.className}>( <b>{message.username+' whispered to you: '}</b><span ref="post"></span> ){'\r'}</div>);
+							return (<div id={message.username} className={message.className}>( <b>{message.username+' whispered to you: '}</b><span ref="post"></span> ){'\r'}</div>);
 						} else if(message.target){
 							return (<div className={message.className}>( <b>{'You whispered to '+message.target+': '}</b><span ref="post"></span> ){'\r'}</div>);
 						}
 					case 'narration'://ic narration message
-						return (<div id={message.id} data={['Edit*'+message.username, 'Narrate']} className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
+						return (<div id={message.id} data={message.username} className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
 					case 'dice'://ooc dice message
 						return (<div className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
 					case 'log':
@@ -1836,8 +1873,8 @@
 						charid = charid.join('-');//catches names with - in them
 						var profileopen = function(e){window.open('/characters/'+charid+'/'+d+'.html');}
 						var edit = [];
-						if(message.id){edit.push('Edit*'+charid);}//worst case message.id is undefined
-						if(!message.className.startsWith('O') && !message.className.startsWith('T')){edit.push('Narrate');}//IC post
+						if(message.id){edit.push(charid);}//worst case message.id is undefined
+						//if(!message.className.startsWith('O') && !message.className.startsWith('T')){edit.push('Narrate');}//IC post
 						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
 				}
 			}
@@ -1895,7 +1932,7 @@
 
 			render: function(){
 				return (
-					<div ref='box' className='ICbox' id='ICbox' data={'Narrate'}>
+					<div ref='box' className='ICbox' id='ICbox'>
 						{this.state.messages}
 					</div>
 				);

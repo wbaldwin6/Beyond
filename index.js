@@ -182,6 +182,8 @@ app.get('/logs', function(req, res){
 			});
 			ret += '</body>';
 			res.send(ret);
+		} else {
+			res.send(err);
 		}
 	});
 });
@@ -453,7 +455,7 @@ var commands = {//console command list, formatted this way for convenience.
 				} else {
 					bans.users[name] = true; banlist.users[name] = true;
 				}
-				writeFile('bans.json', JSON.stringify(bans), function(err){
+				fs.writeFile('bans.json', JSON.stringify(bans), function(err){
 					if(err){console.log(err);} else {console.log(name+' has been banned.');}
 				});
 			}
@@ -470,7 +472,7 @@ var commands = {//console command list, formatted this way for convenience.
 					delete bans.users[name];
 					bans.ips.splice(bans.ips.indexOf(ip), 1);
 					banlist.ips.splice(banlist.ips.indexOf(ip), 1);
-					writeFile('bans.json', JSON.stringify(bans), function(err){
+					fs.writeFile('bans.json', JSON.stringify(bans), function(err){
 						if(err){console.log(err);} else {console.log(name+' has been unbanned.');}
 					});
 				}
