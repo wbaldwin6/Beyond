@@ -447,7 +447,7 @@
 						that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
 							if(res.settings){
 								console.log('Logged in successfully (as far as I can tell).');
-								that.handleSettings(res.settings, res.characters);
+								//that.handleSettings(res.settings, res.characters);this SHOULDN'T change.
 								reconnected = true;//we made it in, stop retrying.
 								if(idleInterval){idleInterval.terminate();}
 								timersetup();//restart the afk timer.
@@ -470,7 +470,10 @@
 				});
 				window.onbeforeunload = function (e){
 					e = e || window.event;
-					var message = "This will log you out.";
+					var message = "Logout";
+					if(that.state.username){//try to save!
+						that.handleSettings(that.state.settings, that.state.characters);
+					}
 					e.returnValue = message;
 					return message;
 				};
@@ -493,9 +496,9 @@
 				}
 			},
 
-			handleSettings: function(settings, characters){
+			handleSettings: function(settings, characters, ret){
 				this.setState({settings: settings, characters: characters});
-				this.props.socket.emit('save', JSON.stringify({settings: settings, characters: characters}));
+				this.props.socket.emit('save', JSON.stringify({settings: settings, characters: characters}), ret);
 			},
 
 			setUser: function(name, pass){
@@ -600,8 +603,8 @@
 						newmodal.type = 'delete';
 						break;
 					case 'Create Derivative'://fallthrough
-					case 'Edit Derivative':
-						//fallthrough
+					case 'Edit Derivatives'://fallthrough
+					case 'Edit Derivative'://fallthrough
 					case 'New Character':
 						newmodal.type = 'character';
 						break;
@@ -617,8 +620,8 @@
 						if(newmodal.post.charAt(0) === '"'){//This is really a bad check.
 							newmodal.post = newmodal.post.slice(1, -1);
 						}
-						if(newmodal.post.endsWith(" (Edited)")){
-							newmodal.post = newmodal.post.slice(0, -9);
+						if(newmodal.post.endsWith("*")){
+							newmodal.post = newmodal.post.slice(0, -1);
 						}
 						newmodal.post = sanitize(newmodal.post);
 						//fallthrough
@@ -879,6 +882,10 @@
 				}
 			},
 
+			componentDidMount: function(){
+				this.refs.username.focus();
+			},
+
 			enterCheck: function(e){
 				if(e.keyCode == 13){
 					if(e.target.name == 'password'){
@@ -1012,9 +1019,19 @@
 				
 			},
 
+			/*select: function(e){//grab a list of ids
+				//switch back to trans when one is removed
+				if(e.target.tagName == 'IMG' && !isNaN(e.target.id)){
+					if(this.state.id){this.state.id.src = '/faceicons/img_trans.gif';}
+					e.target.src='/faceicons/box.png';
+					this.setState({id: e.target});.
+				}
+			},*/
+
 			render: function(){
 				var modal = this.props.modal;
 				var groupdropdown = null;
+				var derivatives;
 				var FIs = (<input type='file' ref={'FIs'} style={{width:'100%',marginBottom:'1px'}} multiple onChange={this.handleFIs}/>);//by default it allows multiple
 				var nameColor; var color; var fontStyle; var customHTML;
 				var character;
@@ -1047,6 +1064,10 @@
 						this.props.closeModal(this.props.id);
 					}
 				}
+				/*if(modal.id.length == 2){//multi-edit
+					derivatives = this.props.characters[trueid[0]][trueid[1]].map(function(deriv, i3){
+						return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);});//grab the derivatives in here
+				}*/
 				if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
 					FIs = <input type='file' ref={'FIs'} style={{width:'100%', marginBottom:'1px'}} onChange={this.handleFIs}/>;
 					color = character[trueid[2]].color || color;
@@ -1064,6 +1085,7 @@
 				}
 				return(
 					<div className="modal" ref="this" style={{left: this.state.x, top: this.state.y, width:'300px'}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{derivatives}</div>
 					{FIs}<br/>
 					<span ref={'faceicons'}>{previews}</span><br/>
 					Name: <input type="text" className="char" ref={'name'} placeholder="Character Name" style={{marginBottom:'1px'}}/><br/>
@@ -1716,6 +1738,8 @@
 				this.props.handleSettings(this.props.settings, this.props.characters);
 			},
 
+			save: function(e){this.props.handleSettings(this.props.settings, this.props.characters, true);},
+
 			render: function(){
 				var currenttab = null;
 				var that=this;
@@ -1760,10 +1784,10 @@
 						});
 						break;
 					case 'commands'://case for player commands tab
-						currenttab=[<div key='0' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='1' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='2' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='3' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='4' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='5' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='6' className='Command' onClick={this.show}>Show Rules</div>, <div key='7' className='Command' onClick={this.show}>Show MOTD</div>, <div key='8' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='9' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='10' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='11' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab=[<div key='0' className='Command' onClick={this.save}>Save Data</div>, <div key='1' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='2' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='3' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='4' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='5' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='6' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='7' className='Command' onClick={this.show}>Show Rules</div>, <div key='8' className='Command' onClick={this.show}>Show MOTD</div>, <div key='9' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='10' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='11' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='12' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={12+index} id={'Dice'+index} className='Dice Command' onClick={that.roll}>{dice}</div>);
+							currenttab.push(<div key={13+index} id={'Dice'+index} className='Dice Command' onClick={that.roll}>{dice}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab

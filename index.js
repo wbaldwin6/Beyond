@@ -140,15 +140,17 @@ app.get('/characters', function(req, res){
 					files.forEach(function(file, index){
 						if(!file.endsWith('.json')){
 							var f = fs.readdirSync(__dirname+'/characters/'+file);
-							ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+file+'\')">'+file+' ('+f.length+')</h2>';
-							ret += '<div id="'+file+'" style="display: none;">';
-							f.forEach(function(chr){
-								var id=file+'-'+chr.slice(0, -5);
-								var name = charindex[id].name;
-								ret += '<a href="/characters/'+file+'/'+chr+'" style="color:blue;">'+
-								'<img src="/faceicons/img_trans.gif" height="50px" width="50px" style="background-image:url(/faceicons/'+charindex[id].icon+'.png);">'+name+'</a><br><br>';
-							});
-							ret += '</div>';
+							if(f.length !== 0){
+								ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+file+'\')">'+file+' ('+f.length+')</h2>';
+								ret += '<div id="'+file+'" style="display: none;">';
+								f.forEach(function(chr){
+									var id=file+'-'+chr.slice(0, -5);
+									var name = charindex[id].name;
+									ret += '<a href="/characters/'+file+'/'+chr+'" style="color:blue;">'+
+									'<img src="/faceicons/img_trans.gif" height="50px" width="50px" style="background-image:url(/faceicons/'+charindex[id].icon+'.png);">'+name+'</a><br><br>';
+								});
+								ret += '</div>';
+							}
 						}
 					});
 					ret += '</body>';
@@ -278,7 +280,7 @@ var editLog = function(message){
 		var edit = target.cloneNode(true);
 		//don't just do this naively.
 		//make the new timestamp
-		edit.children[0].textContent = '[ Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+		edit.children[0].textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 		if(type == 'say'){
 			edit.children[edit.children.length-1].innerHTML = '"'+message.post+'"';
 		} else {
@@ -557,7 +559,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 			message = processHTML(message);
 			var msg = {className: 'IC narration message', username: username, post: message, color: color};
 			msg.id = postnum++;
-			fs.writeFile(__dirname+'/logs/postid.txt', postnum);
+			fs.writeFile(__dirname+'/logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
 			if(room){
 				msg.post = '<span style="color:white;">['+room+']</span> '+msg.post;
 				io.to(room).emit('ICmessage', msg);
@@ -619,7 +621,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 				msg.id = postnum++;
 				className = 'IC ' + className;
 				call = 'ICmessage';
-				fs.writeFile(__dirname+'/logs/postid.txt', postnum);
+				fs.writeFile(__dirname+'/logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
 			}
 			msg.className = className;
 			if(type.startsWith('Test')){
@@ -641,7 +643,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 		var username = sessions[socket.request.connection.remoteAddress];
 		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			message = processHTML(message);
-			var msg = {id: postid, post: message+' (Edited)'};
+			var msg = {id: postid, post: message+'*'};
 			io.emit('ICedit', msg);
 			editLog(msg);
 		}
@@ -650,7 +652,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 		fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
 			index = JSON.parse(index);
 			index[character.id] = {name: character.name, icon: character.icon};
-			fs.writeFile(__dirname+'/characters/charindex.json', JSON.stringify(index));
+			fs.writeFileSync(__dirname+'/characters/charindex.json', JSON.stringify(index));
 		});
 	});
 	socket.on('sendimage', function(icons, callback){
@@ -660,9 +662,9 @@ var Setconnections = function(socket){//username will definitely be present or s
 			if(icons == 'data:,'){//no image
 				callback(null, username);
 			} else {//If this breaks something (makes icons load weird, etc), switch it back to sync.
-				fs.writeFile(__dirname+'/faceicons/'+iconnum+'.png', data, 'base64');
+				fs.writeFile(__dirname+'/faceicons/'+iconnum+'.png', data, 'base64', function(err){if(err){console.log(err);}});
 				var ids = iconnum++;
-				fs.writeFile(__dirname+'/faceicons/num.txt', iconnum);//update this
+				fs.writeFile(__dirname+'/faceicons/num.txt', iconnum, function(err){if(err){console.log(err);}});//update this
 				callback(ids, username);
 			}
 		}
@@ -733,7 +735,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 					fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
 						index = JSON.parse(index);
 						delete index[id];
-						fs.writeFile(__dirname+'/characters/charindex.json', JSON.stringify(index));
+						fs.writeFileSync(__dirname+'/characters/charindex.json', JSON.stringify(index));
 					});
 				}
 			});
@@ -829,7 +831,7 @@ io.on('connection', function(socket){
 					} else if(logins[username].password == password){//valid login
 						addPlayer(username, socket, logins[username].permissions);
 						if(banlist.users[username]){//this is so mean.
-							Commands['Ban'](username);
+							commands['Ban'](username);
 							callback("You're still banned.");
 						} else {
 							//pull up user info
@@ -917,11 +919,13 @@ io.on('connection', function(socket){
 				}
 			});
 		});
-		socket.on('save', function(settings){
+		socket.on('save', function(settings, ret){
 			var username = sessions[socket.request.connection.remoteAddress];
 			if(username){
 				fs.writeFile(__dirname+'/saves/'+username+'.json', settings, function(err){
-					if(!err){
+					if(!err && ret){
+						var msg = {className: 'OOC system message', post: '<font style="color:red;">Data for '+username+' successfully saved.</font>'};
+						socket.emit('OOCmessage', msg);
 					}
 				});
 			}
