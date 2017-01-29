@@ -22,7 +22,6 @@ AddDirectory: function(path, name, creator, locked) {
 	if(!("contents" in dir) || name in dir.contents)
 		return undefined;
 	dir.contents[name] = new Directory(name, creator, locked);
-	this.SaveDatabase();
 	return dir.contents[name];
 },
 
@@ -33,7 +32,6 @@ AddEntry: function(path, name, creator, content) {
 	var pathname = encodeURI(this.GetPathnameFromPath(path) + "/" + name + ".html");
 	dir.contents[name] = new Entry(name, creator);
 	entries[pathname] = content;
-	this.SaveDatabase();
 	return dir.contents[name];
 },
 
@@ -49,7 +47,6 @@ DeleteEntry: function(path) {
 		delete entries[pathname];
 	}
 	delete dir.contents[path[path.length-1]];
-	this.SaveDatabase();
 	return true;
 },
 
@@ -81,7 +78,6 @@ SetEntryContent: function(uri, content) {
 		return false;
 	}
 	entries[uri] = content;
-	this.SaveDatabase();
 	return true;
 },
 
@@ -102,7 +98,6 @@ RenameEntry: function(path, newname) {
 	dir.contents[newname] = dir.contents[oldname];
 	delete dir.contents[oldname];
 	dir.contents[newname].name = newname;
-	this.SaveDatabase();
 	return true;
 },
 
@@ -125,7 +120,6 @@ MoveEntry: function(oldpath, newpath) {
 	this.UpdateMovedEntries(olddir.contents[dirname], this.GetPathnameFromPath(oldpath.slice(0, -1)), this.GetPathnameFromPath(newpath));
 	newdir.contents[dirname] = olddir.contents[dirname];
 	delete olddir.contents[dirname];
-	this.SaveDatabase();
 	return true;
 },
 
@@ -143,7 +137,7 @@ UpdateMovedEntries: function(dir, oldpathname, newpathname) {
 	}
 },
 
-RenameDirectory: function(path, newname) {
+RenameDirectory: function(path, newname, togglelock) {
 	var oldname = path[path.length - 1];
 	if(oldname === newname)
 		return false;
@@ -160,7 +154,7 @@ RenameDirectory: function(path, newname) {
 	dir.contents[newname] = dir.contents[oldname];
 	dir.contents[newname].name = newname;
 	delete dir.contents[oldname];
-	this.SaveDatabase();
+	this.ToggleDirectoryLock(dir.contents[newname]);
 	return true;
 },
 
@@ -172,15 +166,16 @@ LoadDatabase: function() {
 			toplevel = new Directory('database', '');
 			entries = {};
 			fs.mkdirSync('./database', function(err) {
-				if(err.code !== 'EEXIST') throw err;
+				if(err && err.code != 'EEXIST') throw err;
 			});
 			this.SaveDatabase();
 		}
 	} catch(err) {
+		console.log(err.stack);
 		toplevel = new Directory('database', '');
 		entries = {};
-		fs.mkdirSync('./database', function(err) {
-			if(err.code !== 'EEXIST') throw err;
+		fs.mkdirSync('./database', function(er) {
+			if(er && er.code != 'EEXIST') throw er;
 		});
 		this.SaveDatabase();
 	}
@@ -190,17 +185,29 @@ ToggleDirectoryLock: function(dir) {
 	if(!dir || !("contents" in dir))
 		return false;
 	dir.locked = !dir.locked;
-	this.SaveDatabase();
 	return true;
 },
 
 SaveDatabase: function() {
+	savedToplevel = true;
+	that = this;
 	fs.writeFile('./database/database.json', JSON.stringify(toplevel), 'utf8', function (err) {
-		if(err) throw err;
+		if(err) {
+			console.log("Failed to save database directory.");
+			console.log(err.stack);
+			savedToplevel = false;
+			setTimeout(that.SaveDatabase, 1000);
+		}
 	});
-	fs.writeFile('./database/entries.json', JSON.stringify(entries), 'utf8', function (err) {
-		if(err) throw err;
-	});
+	if(savedToplevel) {
+		fs.writeFile('./database/entries.json', JSON.stringify(entries), 'utf8', function (err) {
+			if(err) {
+				console.log("Failed to save database entries.");
+				console.log(err.stack);
+				setTimeout(that.SaveDatabase, 1000);
+			}
+		});
+	}
 },
 
 InitializeDatabaseSocket: function(socket, username, permissions) {
@@ -218,6 +225,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 		var dir = that.AddDirectory(path, name, creator, locked);
 		if(dir) {
+			that.SaveDatabase();
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
@@ -232,6 +240,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 		var dir = that.AddEntry(path, name, creator, content);
 		if(dir) {
+			that.SaveDatabase();
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
@@ -251,6 +260,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 		var success = that.DeleteEntry(path);
 		if(success) {
+			that.SaveDatabase();
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
@@ -281,6 +291,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			}
 		}
 		if(success) {
+			that.SaveDatabase();
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
@@ -299,6 +310,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			return;
 		}
 		if(that.MoveEntry(oldpath, newpath)) {
+			that.SaveDatabase();
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
@@ -306,12 +318,13 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			socket.emit('UpdateError', 'That could not be moved into the selected directory.');
 		}
 	});
-	socket.on('RenameDirectory', function(path, newname) {
+	socket.on('RenameDirectory', function(path, newname, togglelock) {
 		if(user[2] !== 'Admin') {
 			socket.emit('UpdateError', 'You do not have permission to rename directories.');
 			return;
 		}
-		if(that.RenameDirectory(path, newname)) {
+		if(that.RenameDirectory(path, newname, togglelock)) {
+			that.SaveDatabase();
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
@@ -321,6 +334,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 	});
 	socket.on('LockDirectory', function(path) {
 		if(user[2] === 'Admin' && that.ToggleDirectoryLock(that.GetDirectoryFromPath(path))) {
+			that.SaveDatabase();
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}

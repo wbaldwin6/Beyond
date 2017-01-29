@@ -631,10 +631,9 @@
 				var newname = this.refs.inputName.value;
 				var path = this.props.path;
 				if(newname && newname !== path[path.length-1]) {
-					this.props.socket.emit('RenameDirectory', path, newname);
+					this.props.socket.emit('RenameDirectory', path, newname, this.refs.checkLocked.checked);
 					path[path.length-1] = newname;
-				}
-				if(this.refs.checkLocked.checked) {
+				} else if(this.refs.checkLocked.checked) {
 					this.props.socket.emit('LockDirectory', path);
 				}
 				this.props.outerarea.setState({modal: null});
@@ -751,6 +750,53 @@
 			}
 		});
 
+		var SearchDirectoryModal = React.createClass({
+			getInitialState: function() {
+				
+			},
+			
+			componentDidMount: function() {
+				
+			},
+			
+			render: function() {
+				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>Search the Database</div>;
+				var searchTitleLabel = <div key='searchTitleLabel'>Title: </div>;
+				return <div></div>;
+			},
+			
+			startDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+			
+			drag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				var initpos = this.state.initpos;
+				var x = e.clientX - initpos.x;
+				var y = e.clientY - initpos.y;
+				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
+				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
+				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
+				if(x < 0) x = 0;
+				if(y < 0) y = 0;
+				this.setState({x: x, y: y});
+			},
+			
+			stopDrag: function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "auto";
+			}
+		});
+		
 		ReactDOM.render(<OuterArea socket={socket} />, document.getElementById("main"));
 		</script>
 	</body>
