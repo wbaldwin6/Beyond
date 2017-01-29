@@ -407,7 +407,7 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('readable', function() {//support for console commands.
 	var res = process.stdin.read();
 	if(res){
-		res = (res.replace('\r\n','')).split(' ');
+		res = (res.replace(/\r\n?|\n/,'')).split(' ');
 		var command = res.shift();
 		if(commands[command]){
 			commands[command](res.join(' '));//SHOULD call the function at the given index. Hopefully.
@@ -464,22 +464,32 @@ var commands = {//console command list, formatted this way for convenience.
 		});
 	},
 	"Unban": function(name){
-		if(!banlist.users[name]){
+		if(!banlist.users[name] && (banlist.ips.indexOf(name) < 0)){
 			console.log(name + ' not found on banlist.');
 		} else {
 			fs.readFile('bans.json', 'utf8', function(err, bans){
 				if(err){console.log(err);} else {
 					bans = JSON.parse(bans);
-					var ip = bans.users[name];
-					delete bans.users[name];
-					bans.ips.splice(bans.ips.indexOf(ip), 1);
-					banlist.ips.splice(banlist.ips.indexOf(ip), 1);
+					if(name.startsWith(':')){
+						bans.ips.splice(bans.ips.indexOf(ip), 1);
+					} else {
+						var ip = bans.users[name];
+						delete bans.users[name];
+						delete banlist.users[name];
+						if(typeof ip === 'string'){
+							bans.ips.splice(bans.ips.indexOf(ip), 1);
+							banlist.ips.splice(banlist.ips.indexOf(ip), 1);
+						}
+					}
 					fs.writeFile('bans.json', JSON.stringify(bans), function(err){
 						if(err){console.log(err);} else {console.log(name+' has been unbanned.');}
 					});
 				}
 			});
 		}
+	},
+	"ListBans": function(){
+		console.log(banlist);
 	},
 	"Boot": function(name){//Just logs them out.
 		if(users[name]){users[name].disconnect();} else {
@@ -710,6 +720,10 @@ var Setconnections = function(socket){//username will definitely be present or s
 			}
 		});
 	});
+	socket.on('List Bans', function(callback){
+		var msg = {className: 'OOC system message', post: '<font style="color:red;">'+JSON.stringify(banlist)+'<br /></font>'};
+		socket.emit('OOCmessage', msg);
+	});
 	socket.on('Set Profile', function(profile, id){
 		var username = sessions[socket.request.connection.remoteAddress];
 		var n = id.split('-');
@@ -926,6 +940,9 @@ io.on('connection', function(socket){
 					if(!err && ret){
 						var msg = {className: 'OOC system message', post: '<font style="color:red;">Data for '+username+' successfully saved.</font>'};
 						socket.emit('OOCmessage', msg);
+					} else if(err) {
+						console.log(username);
+						console.log(err);
 					}
 				});
 			}

@@ -1274,6 +1274,8 @@
 						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
 					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
+					} else if(modata.name == 'Unban'){
+						this.props.socket.emit('AdminCommand', 'Unban', post);
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
 					} else if(modata.name == 'Join Room'){
@@ -1791,7 +1793,7 @@
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
-						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>]
+						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.show}>List Bans</div>, <div key='5' className='Command' onClick={this.genmodal}>Unban</div>]
 				}
 				var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 				return (
