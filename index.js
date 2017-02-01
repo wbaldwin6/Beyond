@@ -541,6 +541,20 @@ var commands = {//console command list, formatted this way for convenience.
 	},
 };
 
+var saveFile = function(filename, data, socket, username){
+	fs.writeFile(filename, data, function(err){
+		if(!err && socket){
+			var msg = {className: 'OOC system message', post: '<font style="color:red;">Data for '+username+' successfully saved.</font>'};
+			socket.emit('OOCmessage', msg);
+		} else if(err) {
+			console.log(err);
+			if(err.code == "UNKNOWN"){
+				setTimeout(function() {saveFile(filename, data, socket);}, 100);
+			}
+		}
+	});
+};
+
 var Setconnections = function(socket){//username will definitely be present or something is wrong enough to warrant throwing.
 	socket.on('Join Room', function(room){
 		var username = sessions[socket.request.connection.remoteAddress];
@@ -824,6 +838,16 @@ var Setconnections = function(socket){//username will definitely be present or s
 		io.emit('PlayerList', playerlist);
 		console.log(username + ' ('+socket.request.connection.remoteAddress+') has disconnected.');
 	});
+	socket.on('save', function(settings, ret){
+		var username = sessions[socket.request.connection.remoteAddress];
+		if(username){
+			if(ret){
+				saveFile(__dirname+'/saves/'+username+'.json', settings, socket, username);
+			} else {
+				saveFile(__dirname+'/saves/'+username+'.json', settings);
+			}
+		}
+	});
 };
 
 io.on('connection', function(socket){
@@ -932,20 +956,6 @@ io.on('connection', function(socket){
 					}
 				}
 			});
-		});
-		socket.on('save', function(settings, ret){
-			var username = sessions[socket.request.connection.remoteAddress];
-			if(username){
-				fs.writeFile(__dirname+'/saves/'+username+'.json', settings, function(err){
-					if(!err && ret){
-						var msg = {className: 'OOC system message', post: '<font style="color:red;">Data for '+username+' successfully saved.</font>'};
-						socket.emit('OOCmessage', msg);
-					} else if(err) {
-						console.log(username);
-						console.log(err);
-					}
-				});
-			}
 		});
 	}
 });

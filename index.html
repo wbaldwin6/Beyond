@@ -522,7 +522,7 @@
 						switch(className){
 							case 'character':
 								//add a check for 'if we're in doubleclick mode' to put open/close here
-								options = ['Create Derivative', 'Delete Character', 'Set Active Character', 'Set Profile'];
+								options = ['Modify Derivatives', 'Delete Character', 'Set Active Character', 'Set Profile'];
 								if(['Player', 'Admin'].indexOf(this.state.permissions) > -1){
 									options.push('Join Room', 'Leave Room');
 								}
@@ -602,7 +602,7 @@
 					case 'Delete Derivative':
 						newmodal.type = 'delete';
 						break;
-					case 'Create Derivative'://fallthrough
+					case 'Modify Derivatives'://fallthrough
 					case 'Edit Derivatives'://fallthrough
 					case 'Edit Derivative'://fallthrough
 					case 'New Character':
@@ -910,7 +910,7 @@
 
 		var CharacterModal = React.createClass({
 			getInitialState: function(){
-				return {x: '25%', y: '25%'};
+				return {x: '25%', y: '25%', ids: []};
 			},
 
 			startDrag: startDrag,
@@ -963,7 +963,7 @@
 				var modal = e.target.parentNode;//the modal containing the save button
 				var name = this.refs['name'].value;
 				var icons = this.refs['faceicons'].children;
-				if((name && icons.length) || this.props.modal.id.length > 1){//do nothing if they didn't put a name in if it's new
+				if((name && icons.length) || (this.props.modal.id.length > 1 && (!this.state.ids.length || !icons.length || this.state.ids.length == icons.length))){//do nothing if they didn't put a name in if it's new
 					var fontStyle = this.refs['font'].value;
 					var nameColor = this.refs['nameColor'].value;
 					var customHTML = this.refs['html'].value;
@@ -985,6 +985,11 @@
 					}
 					var that=this;
 					this.props.socket.emit('sendimage', spritecanvas.toDataURL("image/png"), function(picid, un){
+						var toedit = that.state.ids;
+						if(toedit){
+							toedit = toedit.map(function(x){return +x.id});
+							toedit.sort(function(a, b){return a-b});
+						}
 						var modata = that.props.modal;
 						var settings = that.props.settings;
 						var characters = that.props.characters;
@@ -1000,15 +1005,19 @@
 								character = characters[trueid[0]][trueid[1]];
 							}
 						}
-						if(modata.id[2]){//only in the edit case (we have a deriv) do we NOT add.
+						if(modata.id[2]){//only in the single edit case (we have a deriv) do we NOT add.
 							var deriv = character[trueid[2]];
 							character[trueid[2]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[0] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML};
+						} else if(modata.id.length === 2 && toedit.length){
+							for(i=0; i<toedit.length; i++){
+								var deriv = character[toedit[i]];
+								character[toedit[i]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[i] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML};
+							}
 						} else {//but in the add derivatives case we use the 0-ID.
 							var charid = character[0] ? character[0].id : un+'-'+settings.characterIDs++;
 							for(i=0; i<convertedicons.length; i++){
 								character.push({id: charid, name: name || character[0].name, icon: picid, icpos: convertedicons[i], nameColor: nameColor, color: color, fontStyle: fontStyle, customHTML: customHTML});
 							}
-
 						}//now we've added all the new derivatives or just modified the one.
 						characters[trueid[0]][trueid[1]] = character;//adds new if new, otherwise overwrites
 						that.props.handleSettings(settings, characters);
@@ -1019,14 +1028,38 @@
 				
 			},
 
-			/*select: function(e){//grab a list of ids
+			select: function(e){//grab a list of ids
 				//switch back to trans when one is removed
 				if(e.target.tagName == 'IMG' && !isNaN(e.target.id)){
-					if(this.state.id){this.state.id.src = '/faceicons/img_trans.gif';}
-					e.target.src='/faceicons/box.png';
-					this.setState({id: e.target});.
+					if(e.target.src.endsWith('/faceicons/img_trans.gif')){//unselected
+						e.target.src = '/faceicons/box.png';
+						var ids = this.state.ids;
+						ids.push(e.target);
+						this.setState({ids: ids});
+					} else {//deselect (or invalid and needs fixing)
+						e.target.src = '/faceicons/img_trans.gif';
+						var ids = this.state.ids;
+						ids.splice(ids.indexOf(e.target), 1);
+						this.setState({ids: ids});
+					}
 				}
-			},*/
+			},
+
+			selectAll: function(){
+				var res = [].slice.call(this.refs.img.children);
+				res.forEach(function(element){
+					element.src = '/faceicons/box.png';
+				});
+				this.setState({ids: res});
+			},
+
+			deselectAll: function(){
+				var res = [].slice.call(this.refs.img.children);
+				res.forEach(function(element){
+					element.src = '/faceicons/img_trans.gif';
+				});
+				this.setState({ids: []});
+			},
 
 			render: function(){
 				var modal = this.props.modal;
@@ -1064,10 +1097,10 @@
 						this.props.closeModal(this.props.id);
 					}
 				}
-				/*if(modal.id.length == 2){//multi-edit
+				if(modal.id.length == 2){//multi-edit
 					derivatives = this.props.characters[trueid[0]][trueid[1]].map(function(deriv, i3){
 						return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);});//grab the derivatives in here
-				}*/
+				}
 				if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
 					FIs = <input type='file' ref={'FIs'} style={{width:'100%', marginBottom:'1px'}} onChange={this.handleFIs}/>;
 					color = character[trueid[2]].color || color;
@@ -1086,6 +1119,7 @@
 				return(
 					<div className="modal" ref="this" style={{left: this.state.x, top: this.state.y, width:'300px'}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{derivatives}</div>
+					<button type="button" id="selectall" onClick={this.selectAll}>Select All</button><button type="button" id="delectall" onClick={this.deselectAll}>Deselect All</button><br/>
 					{FIs}<br/>
 					<span ref={'faceicons'}>{previews}</span><br/>
 					Name: <input type="text" className="char" ref={'name'} placeholder="Character Name" style={{marginBottom:'1px'}}/><br/>
