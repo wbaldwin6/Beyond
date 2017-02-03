@@ -136,7 +136,7 @@ app.get('/characters', function(req, res){
 				if(!err){
 					charindex = JSON.parse(charindex);
 					var ret = '<head><title>Character Database</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
-					files = files.sort();
+					files = files.sort(function (a, b){return a.toLowerCase().localeCompare(b.toLowerCase());});
 					files.forEach(function(file, index){
 						if(!file.endsWith('.json')){
 							var f = fs.readdirSync(__dirname+'/characters/'+file);

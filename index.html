@@ -1065,6 +1065,7 @@
 				var modal = this.props.modal;
 				var groupdropdown = null;
 				var derivatives;
+				var sel;
 				var FIs = (<input type='file' ref={'FIs'} style={{width:'100%',marginBottom:'1px'}} multiple onChange={this.handleFIs}/>);//by default it allows multiple
 				var nameColor; var color; var fontStyle; var customHTML;
 				var character;
@@ -1100,6 +1101,7 @@
 				if(modal.id.length == 2){//multi-edit
 					derivatives = this.props.characters[trueid[0]][trueid[1]].map(function(deriv, i3){
 						return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);});//grab the derivatives in here
+					sel = (<div style={{background: 'none'}}><button type="button" id="selectall" onClick={this.selectAll}>Select All</button><button type="button" id="delectall" onClick={this.deselectAll}>Deselect All</button></div>);
 				}
 				if(modal.id.length == 3){//only one FI allowed, as it's editing one derivative
 					FIs = <input type='file' ref={'FIs'} style={{width:'100%', marginBottom:'1px'}} onChange={this.handleFIs}/>;
@@ -1119,7 +1121,7 @@
 				return(
 					<div className="modal" ref="this" style={{left: this.state.x, top: this.state.y, width:'300px'}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{derivatives}</div>
-					<button type="button" id="selectall" onClick={this.selectAll}>Select All</button><button type="button" id="delectall" onClick={this.deselectAll}>Deselect All</button><br/>
+					{sel}
 					{FIs}<br/>
 					<span ref={'faceicons'}>{previews}</span><br/>
 					Name: <input type="text" className="char" ref={'name'} placeholder="Character Name" style={{marginBottom:'1px'}}/><br/>
@@ -1964,11 +1966,19 @@
 					var ids = that.state.ids;
 					ids[message.id] = newm.length;//index this post to its id
 					var highlight = false;
-					if(that.props.notify && that.props.notify[message.username] && that.props.notify[message.username].IC){
-						highlight = true;
-						if(document.visibilityState != 'visible'){//don't do this if they're in window
-							document.title = "Post from "+message.username+"!";
-							document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+					if(that.props.notify){
+						if(that.props.notify[message.username] && that.props.notify[message.username].IC){
+							highlight = true;
+							if(document.visibilityState != 'visible'){//don't do this if they're in window
+								document.title = "Post from "+message.username+"!";
+								document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+							}
+						} else if(message.character && that.props.notify[message.character.name] && that.props.notify[message.character.name].IC){
+							highlight = true;
+							if(document.visibilityState != 'visible'){//don't do this if they're in window
+								document.title = "Post from "+message.character.name+"!";
+								document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+							}
 						}
 					}
 					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
@@ -2025,7 +2035,7 @@
 				this.props.socket.on('OOCmessage', function(message){
 					var newm = that.state.messages.slice();
 					var highlight = false;
-					if((message.className.split(" ")[1] == 'whisper' && message.username) || (message.character && that.props.notify && that.props.notify[message.username] && that.props.notify[message.username].OOC)){
+					if((message.className.split(" ")[1] == 'whisper' && message.username) || (message.character && that.props.notify && (that.props.notify[message.username] && that.props.notify[message.username].OOC) || (message.character && that.props.notify[message.character.name] && that.props.notify[message.character.name].OOC))){
 						highlight = true;
 						if(document.visibilityState != 'visible'){
 							document.title = "Post from "+message.username+"!";
