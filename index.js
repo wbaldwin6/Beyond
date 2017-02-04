@@ -608,7 +608,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 			io.emit('PlayerList', playerlist);
 		}
 	});
-	socket.on('Dice', function(dice, result, color){
+	socket.on('Dice', function(dice, result, color, priv){
 		var username = sessions[socket.request.connection.remoteAddress];
 		if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
@@ -617,9 +617,14 @@ var Setconnections = function(socket){//username will definitely be present or s
 				post +=' ('+total+')';
 			}
 			var msg = {className: 'OOC dice', post: post, color: color};
-			io.emit('OOCmessage', msg);
+			if(priv){
+				msg.post = msg.post + ' (Private)';
+				socket.emit('OOCmessage', msg);
+			} else {
+				io.emit('OOCmessage', msg);
+			}
 		}
-	})
+	});
 	socket.on('characterPost', function(message, character, type, room){
 		var username = sessions[socket.request.connection.remoteAddress];
 		if(username){
