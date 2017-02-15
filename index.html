@@ -573,7 +573,7 @@
 								//add Whisper, check if admin for other commands
 								options = ['Whisper'];
 								if(this.state.permissions == 'Admin'){
-									options.push('Make Player', 'Make Admin', 'Make Guest', 'Boot', 'Ban');
+									options.push('Make Player', 'Make Admin', 'Make Guest', 'Mute', 'Unmute', 'Boot', 'Ban');
 								}
 								break;
 							case 'IC say message':
@@ -694,13 +694,19 @@
 						if(ind > -1){//it's in this room
 							i--;
 							settings.rooms[rooms[i]].splice(ind, 1);
-							if(settings.rooms[rooms[i]].length < 1){
-								this.props.socket.emit('Leave Room', rooms[i]);
+							if(settings.rooms[rooms[i]].length < 1){//no characters remaining in room
+								if(settings.room != rooms[i]){//not narrating here either
+									this.props.socket.emit('Leave Room', rooms[i]);
+								}
 								delete settings.rooms[rooms[i]];
 							}
 						}
 						this.handleSettings(settings, this.state.characters);
 						break;
+					case 'Mute':
+						//fallthrough
+					case 'Unmute':
+						//fallthrough
 					case 'Ban':
 						//fallthrough
 					case 'Boot':
@@ -1338,14 +1344,16 @@
 						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
 					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
-					} else if(modata.name == 'Unban'){
-						this.props.socket.emit('AdminCommand', 'Unban', post);
+					} else if(['Ban', 'Mute', 'Unban', 'Unmute'].indexOf(modata.name) > -1){
+						this.props.socket.emit('AdminCommand', modata.name, post);
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
 					} else if(modata.name == 'Join Room'){
 						var settings = this.props.settings;
 						if(!settings.rooms[post]){//not in this room yet
-							this.props.socket.emit('Join Room', post);
+							if(settings.room != post){//not narrating in it either.
+								this.props.socket.emit('Join Room', post);
+							}
 							settings.rooms[post] = [];
 						}
 						//need to remove them from their previous room too if applicable
@@ -1357,8 +1365,10 @@
 						if(ind > -1){//it's in this room
 							i--;
 							settings.rooms[rooms[i]].splice(ind, 1);
-							if(settings.rooms[rooms[i]].length < 1){
-								this.props.socket.emit('Leave Room', rooms[i]);
+							if(settings.rooms[rooms[i]].length < 1){//no characters remaining in room
+								if(settings.room != rooms[i]){//not narrating here either
+									this.props.socket.emit('Leave Room', rooms[i]);
+								}
 								delete settings.rooms[rooms[i]];
 							}
 						}
@@ -1397,7 +1407,7 @@
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
-					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle"/></div>
+					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/></div>
 				);
 			}
 		});
@@ -1544,7 +1554,7 @@
 					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{images}</div><br/>
 					<div ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><div ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>IC</div><div ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>Action</div><br/>
 					<textarea defaultValue={modal.post || ''} autoFocus rows='4' style={{width:'167px', minWidth:'167px'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
-					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Close</button><button ref='scrollb' type="submit" onClick={this.mode}>Scroll</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle"/></div>
+					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Close</button><button ref='scrollb' type="submit" onClick={this.mode}>Scroll</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/></div>
 				);
 			}
 		});
@@ -1650,6 +1660,12 @@
 			setColor: function(e){
 				var settings = this.props.settings;
 				settings.textcolor = this.refs.OOCcolor.value;
+				this.props.handleSettings(settings, this.props.characters);
+			},
+
+			toggleecheck: function(e){
+				var settings = this.props.settings;
+				settings.echeck = !settings.echeck;//works even if completely unset.
 				this.props.handleSettings(settings, this.props.characters);
 			},
 
@@ -1832,14 +1848,14 @@
 						});
 						break;
 					case 'commands'://case for player commands tab
-						currenttab=[<div key='0' className='Command' onClick={this.save}>Save Data</div>, <div key='1' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='2' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='3' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='4' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='5' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='6' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='7' className='Command' onClick={this.show}>Show Rules</div>, <div key='8' className='Command' onClick={this.show}>Show MOTD</div>, <div key='9' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='10' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='11' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='12' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.save}>Save Data</div>, <div key='2' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='3' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='4' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='5' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='6' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='7' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='8' className='Command' onClick={this.show}>Show Rules</div>, <div key='9' className='Command' onClick={this.show}>Show MOTD</div>, <div key='10' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='11' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='12' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='13' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={13+index} id={'Dice'+index} className='Dice Command' onClick={that.roll}>{dice}</div>);
+							currenttab.push(<div key={14+index} id={'Dice'+index} className='Dice Command' onClick={that.roll}>{dice}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
-						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.show}>List Bans</div>, <div key='5' className='Command' onClick={this.genmodal}>Unban</div>]
+						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Mute</div>, <div key='5' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='6' className='Command' onClick={this.show}>List Bans</div>, <div key='7' className='Command' onClick={this.genmodal}>Ban</div>, <div key='8' className='Command' onClick={this.genmodal}>Unban</div>]
 				}
 				var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 				return (
