@@ -29,7 +29,7 @@ AddEntry: function(path, name, creator, content) {
 	var dir = this.GetDirectoryFromPath(path);
 	if(!("contents" in dir) || name in dir.contents)
 		return undefined;
-	var pathname = encodeURI(this.GetPathnameFromPath(path) + "/" + name + ".html");
+	var pathname = this.GetPathnameFromPath(path) + "/" + encodeURIComponent(name) + ".html";
 	dir.contents[name] = new Entry(name, creator);
 	entries[pathname] = content;
 	return dir.contents[name];
@@ -42,7 +42,7 @@ DeleteEntry: function(path) {
 	if(!("contents" in dir) || !(path[path.length-1] in dir.contents)) {
 		return false;
 	}
-	var pathname = encodeURI(this.GetPathnameFromPath(path)) + ".html";
+	var pathname = this.GetPathnameFromPath(path) + ".html";
 	if(pathname in entries) {
 		delete entries[pathname];
 	}
@@ -64,7 +64,7 @@ GetDirectoryFromPath: function(path) {
 GetPathnameFromPath: function(path) {
 	var pathname = "/database"
 	for(var i = 0; i < path.length; i++) {
-		pathname += "/" + path[i];
+		pathname += "/" + encodeURIComponent(path[i]);
 	}
 	return pathname;
 },
@@ -89,9 +89,9 @@ RenameEntry: function(path, newname) {
 	if(!("contents" in dir) || newname in dir.contents || !(oldname in dir.contents)) {
 		return false;
 	}
-	var oldpath = encodeURI(dirpath + "/" + oldname + ".html");
+	var oldpath = dirpath + "/" + encodeURIComponent(oldname) + ".html";
 	if(oldpath in entries) {
-		var newpath = encodeURI(dirpath + "/" + newname + ".html");
+		var newpath = dirpath + "/" + encodeURIComponent(newname) + ".html";
 		entries[newpath] = entries[oldpath];
 		delete entries[oldpath];
 	}
@@ -124,8 +124,8 @@ MoveEntry: function(oldpath, newpath) {
 },
 
 UpdateMovedEntries: function(dir, oldpathname, newpathname) {
-	var oldpath = encodeURI(oldpathname + "/" + dir.name + ".html");
-	var newpath = encodeURI(newpathname + "/" + dir.name + ".html");
+	var oldpath = oldpathname + "/" + encodeURIComponent(dir.name) + ".html";
+	var newpath = newpathname + "/" + encodeURIComponent(dir.name) + ".html";
 	if(oldpath in entries) {
 		entries[newpath] = entries[oldpath];
 		delete entries[oldpath];
@@ -276,7 +276,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 		var success = false;
 		if(content) {
-			var pathname = encodeURI(that.GetPathnameFromPath(path) + ".html");
+			var pathname = that.GetPathnameFromPath(path) + ".html";
 			if(!that.SetEntryContent(pathname, content)) {
 				socket.emit('UpdateError', 'That page could not be editted.');
 			} else {

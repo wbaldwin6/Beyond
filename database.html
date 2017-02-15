@@ -185,6 +185,11 @@
 				this.setState({context: null, modal: modal});
 			},
 			
+			OpenSearchModal: function(e) {
+				var modal = <SearchDirectoryModal socket={this.props.socket} outerarea={this} />;
+				this.setState({context: null, modal: modal});
+			},
+			
 			render: function() {
 				var context = null;
 				if(this.state.context) { //context should have keys x, y, path, functions; functions include AddDirectory, AddEntry, Delete, Edit
@@ -215,9 +220,10 @@
 					}
 					context = <div className="contextMenu" style={{left: this.state.context.x + "px", top: this.state.context.y + "px"}}>{contextOptions}</div>;
 				}
+				var searchButton = <button key="SearchButton" onClick={this.OpenSearchModal} disabled={this.state.modal ? true : false} style={{zIndex: "500", position: "fixed", left: "0px", bottom: "0px"}}>Search</button>;
 				var dir = (<div key="Directory" id="Directory" style={{height: "100%", overflowY: "auto"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} parents={[]} /></div>);
 				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
-				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}</div>);
+				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}</div>);
 			}
 		});
 		
@@ -266,7 +272,7 @@
 			
 			render: function() {
 				if(this.state.open) {
-					var name = <div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [&#8209;]</span></div>
+					var name = <b><i><u><div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [&#8209;]</span></div></u></i></b>
 					var children = [];
 					var parents = this.props.parents.concat([this.props.name]);
 					for(var entry_name in this.props.contents) {
@@ -279,7 +285,7 @@
 					}
 					return(<div>{name}<br />{children}</div>);
 				} else {
-					return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [+]</span><br /></div>);
+					return(<b><i><u><div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [+]</span><br /></div></u></i></b>);
 				}
 			}
 		});
@@ -289,9 +295,9 @@
 			navigateTo: function(e) {
 				var pathname = "/";
 				for(var i = 0; i < this.props.parents.length; i++) {
-					pathname += this.props.parents[i] + "/";
+					pathname += encodeURIComponent(this.props.parents[i]) + "/";
 				}
-				this.props.outerarea.setState({page: encodeURI(pathname + this.props.name + ".html")});
+				this.props.outerarea.setState({page: pathname + encodeURIComponent(this.props.name) + ".html"});
 			},
 			
 			onContextMenu: function(e) {
@@ -324,8 +330,8 @@
 					var path = this.props.path;
 					var pathname = '/database';
 					for(var i = 0; i < path.length; i++)
-						pathname += '/' + path[i];
-					pathname = encodeURI(pathname + '.html');
+						pathname += '/' + encodeURIComponent(path[i]);
+					pathname = pathname + '.html';
 					var that = this;
 					this.props.socket.emit('RequestEntry', pathname, function(page) {
 						that.setState({defaultText: page.replace(/<br \/>/g, "\n")});
@@ -752,17 +758,70 @@
 
 		var SearchDirectoryModal = React.createClass({
 			getInitialState: function() {
-				
+				return {x: 100, y: 100, searchResults: []};
 			},
 			
 			componentDidMount: function() {
-				
+				Split(["#Options", "#Results"], {minSize: [0, 0]});
+			},
+			
+			CloseButton: function(e) {
+				this.props.outerarea.setState({modal: null});
+			},
+			
+			SearchButton: function(e) {
+				var database_queue = [[["database"], this.props.outerarea.state.directory]];
+				var titleSearchTrie = BuildTrie(this.refs.searchTitleInput.value);
+				var bodySearchTrie = BuildTrie(this.refs.searchBodyInput.value);
+				this.setState({searchResults: []});
+				while(database_queue.length) {
+					var cur = database_queue.shift();
+					var cur_pathname = cur[0];
+					var cur_entry = cur[1];
+					if(cur_entry.hasOwnProperty("contents")) {
+						for(var key in cur_entry.contents) {
+							database_queue.push([cur_pathname.concat([key]), cur_entry.contents[key]]);
+						}
+					} else {
+						if(SearchForTrie(cur_pathname[cur_pathname.length-1], titleSearchTrie[1], titleSearchTrie[0])) {
+							this.SearchBody(cur_pathname, bodySearchTrie);
+						}
+					}
+				}
+			},
+			
+			SearchBody: function(dirs, bodySearchTrie) {
+				var that = this;
+				var uri = "";
+				for(var i = 0; i < dirs.length; i++) {
+					uri += "/" + encodeURIComponent(dirs[i]);
+				}
+				this.props.socket.emit('RequestEntry', uri + ".html", function(body) {
+					if(SearchForTrie(body, bodySearchTrie[1], bodySearchTrie[0])) {
+						that.setState({searchResults: that.state.searchResults.concat([<SearchResultDiv outerarea={that.props.outerarea} dirs={dirs} key={uri} />])})
+					}
+				});
 			},
 			
 			render: function() {
 				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>Search the Database</div>;
 				var searchTitleLabel = <div key='searchTitleLabel'>Title: </div>;
-				return <div></div>;
+				var searchTitleInput = <input key='searchTitleInput' ref='searchTitleInput' type='text'></input>;
+				var searchBodyLabel = <div key='searchBodyLabel'>Content: </div>;
+				var searchBodyInput = <input key='searchBodyInput' ref='searchBodyInput' type='text'></input>;
+				var searchButton = <button type='button' onClick={this.SearchButton}>Search</button>;
+				var closeButton = <button type='button' onClick={this.CloseButton}>Close</button>;
+				
+				var options = <div key='Options' id='Options'>
+								{searchTitleLabel}{searchTitleInput}<br />
+								{searchBodyLabel}{searchBodyInput}<br />
+								{searchButton}{closeButton}
+							  </div>;
+				var results = <div key='Results' id='Results' style={{overflowY: 'auto', overflowX: 'auto'}}>{this.state.searchResults}</div>;
+				return <div className="modal" style={{left: this.state.x, top: this.state.y}}>
+						{titlebar}<br />
+						{options}{results}
+					   </div>;
 			},
 			
 			startDrag: function(e) {
@@ -796,6 +855,94 @@
 				document.getElementById('iFrame').style.pointerEvents = "auto";
 			}
 		});
+		
+		var SearchResultDiv = React.createClass({
+			render: function() {
+				var dirs = this.props.dirs;
+				var pagename = dirs[dirs.length - 1];
+				return <div onClick={this.linkPage}>{pagename}</div>;
+			},
+			
+			linkPage: function(e) {
+				var dirs = this.props.dirs;
+				var uri = "";
+				for(var i = 0; i < dirs.length; i++) {
+					uri += "/" + encodeURIComponent(dirs[i]);
+				}
+				this.props.outerarea.setState({page: uri + ".html"});
+			}
+		});
+		
+		function TrieNode(value) {
+			this.value = value;
+			this.end_state = false;
+			this.children = {};
+		}
+
+		function BuildTrie(wordstring) {
+			var count = 0;
+			var in_quotes = false;
+			var root = new TrieNode('', null);
+			var cur = root;
+			for(var i = 0; i < wordstring.length; i++) {
+				var c = wordstring[i].toLowerCase();
+				if(c == '"') {
+					in_quotes = !in_quotes;
+					if(cur !== root) {
+						cur.end_state = true;
+						count++;
+						cur = root;
+					}
+				} else if(!in_quotes && !c.match(/[0-9A-Za-z]/)) {
+					if(cur !== root) {
+						cur.end_state = true;
+						count++;
+						cur = root;
+					}
+				} else {
+					if(!(cur.children.hasOwnProperty(c))) {
+						cur.children[c] = new TrieNode(c);
+					}
+					cur = cur.children[c];
+				}
+			}
+			if(cur !== root) {
+				cur.end_state = true;
+				count++;
+			}
+			return [count, JSON.stringify(root)];
+		}
+
+		function SearchForTrie(strToSearch, strTrie, numwords) {
+			var root = JSON.parse(strTrie);
+			var cur = root;
+			var count = 0;
+			for(var i = 0; i < strToSearch.length; i++) {
+				var c = strToSearch[i].toLowerCase();
+				if(!c.match(/[0-9A-Za-z]/)) {
+					if(cur.end_state) {
+						cur.end_state = false;
+						count++;
+					}
+					if(cur.children.hasOwnProperty(c)) {
+						cur = cur.children[c];
+					} else {
+						cur = root;
+					}
+				} else {
+					if(cur.children.hasOwnProperty(c)) {
+						cur = cur.children[c];
+					} else {
+						while(++i < strToSearch.length && strToSearch[i].match(/[0-9A-Za-z]/));
+						cur = root;
+					}
+				}
+			}
+			if(cur.end_state) {
+				count++;
+			}
+			return numwords == count;
+		}
 		
 		ReactDOM.render(<OuterArea socket={socket} />, document.getElementById("main"));
 		</script>
