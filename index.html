@@ -162,7 +162,7 @@
 				position: fixed;
 				display: block;
 				width: auto;
-				overflow: auto;
+				overflow: hidden;
 				background-color: rgb(0,0,0);
 				background-color: rgba(50,50,50,0.8);
 			}
@@ -201,6 +201,7 @@
 				text-align: center;
 				cursor: default;
 				pointer-events: none;
+				white-space: nowrap;
 			}
 			div.PLentry{
 				text-align: center;
@@ -626,9 +627,9 @@
 						newmodal.type = 'delete';
 						break;
 					case 'Private Roll':
-						var dice = this.state.context.target.textContent.split('d');
+						var dice = this.state.context.target.getAttribute('data').split('d');
 						var result = roll(dice);
-						this.props.socket.emit('Dice', this.state.context.target.textContent, result, this.state.settings.textcolor, true);
+						this.props.socket.emit('Dice', this.state.context.target.getAttribute('data'), result, this.state.settings.textcolor, true);
 						break;
 					case 'Modify Derivatives'://fallthrough
 					case 'Edit Derivatives'://fallthrough
@@ -760,7 +761,7 @@
 						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings}/>
 						{context}
 						<div id="left">
-							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions} systemmessage={this.refs.OOCbox ? this.refs.OOCbox.systemmessage : null}/>
+							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions} systemmessage={this.refs.OOCbox ? this.refs.OOCbox.systemmessage : null} contextMenu={this.contextMenu}/>
 						</div>
 						<div id="OI">
 							<div id="IC">
@@ -864,7 +865,12 @@
 			if(e.target.getAttribute('class') == "modal"){//only START for the modal containers.
 				e.stopPropagation();
 				e.preventDefault();
-				this.setState({initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
+				var rect = this.refs['this'].getBoundingClientRect();
+				if(rect.right-e.clientX < 20 && rect.bottom-e.clientY < 20){
+					this.setState({initialposition: {x: e.clientX, y: e.clientY}, resize: true});
+				} else {
+					this.setState({initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}, resize: false});
+				}
 				document.addEventListener('mousemove', this.drag);
 				document.addEventListener('mouseup', this.stopDrag);
 			}
@@ -877,10 +883,20 @@
 			var x = e.clientX-initpos.x;
 			var y = e.clientY-initpos.y;
 			var rect = this.refs['this'].getBoundingClientRect();
-			if(x < 0){x=0;} if(y < 0){y=0;}
-			if(x+rect.width > document.body.clientWidth){x=document.body.clientWidth-rect.width;}
-			if(y+rect.height > document.body.clientHeight){y=document.body.clientHeight-rect.height;}
-			this.setState({x: x, y: y});
+			if(this.state.resize){
+				x = x+this.state.width;
+				y = y+(this.state.height || 0);
+				if(this.state.minwidth > +x){x = this.state.minwidth;}
+				if(this.state.minheight && this.state.minheight > +y){y = this.state.minheight;}
+				if(x+rect.left > document.body.clientWidth){x=document.body.clientWidth-rect.left;}
+				if(y+rect.top > document.body.clientHeight){y=document.body.clientHeight-rect.top;}
+				this.setState({width: x, height: y, initialposition: {x: e.clientX, y: e.clientY}});
+			} else {
+				if(x < 0){x=0;} if(y < 0){y=0;}
+				if(x+rect.width > document.body.clientWidth){x=document.body.clientWidth-rect.width;}
+				if(y+rect.height > document.body.clientHeight){y=document.body.clientHeight-rect.height;}
+				this.setState({x: x, y: y});
+			}
 		};
 
 		var stopDrag = function(e){
@@ -944,7 +960,7 @@
 
 		var CharacterModal = React.createClass({
 			getInitialState: function(){
-				return {x: '25%', y: '25%', ids: []};
+				return {x: '25%', y: '25%', width: 300, minwidth: 260, ids: []};
 			},
 
 			startDrag: startDrag,
@@ -1153,7 +1169,7 @@
 					});
 				}
 				return(
-					<div className="modal" ref="this" style={{left: this.state.x, top: this.state.y, width:'300px'}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					<div className="modal" ref="this" style={{left: this.state.x, top: this.state.y, width:this.state.width}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{derivatives}</div>
 					{sel}
 					{FIs}<br/>
@@ -1165,7 +1181,7 @@
 					Custom HTML: <input type="text" className="char" ref={'html'} placeholder="Custom HTML" defaultValue={customHTML} style={{marginBottom:'1px'}}/><br/>
 					{groupdropdown ? 'Select a group: ' : ''}{groupdropdown}<br/>
 					<button type="submit" id="save" onClick={this.charEdit}>Save</button>
-						<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button></div>
+						<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/></div>
 				);
 			}
 		});
@@ -1305,7 +1321,27 @@
 
 		var ActionModal = React.createClass({
 			getInitialState: function(){
-				return {x: '25%', y: '25%'};
+				var width = 300;
+				return {x: '25%', y: '25%', width: width, minwidth: 140, height: 'auto'};
+			},
+
+			componentDidMount: function(){
+				var y = '25%';
+				var w = 300;
+				var def = this.refs['this'].getBoundingClientRect().height;//initial minimum box size
+				var h = def-this.refs['text'].getBoundingClientRect().height;//initial size of non-textarea content
+				this.refs['text'].style.height = 'calc(100% - '+h+'px)';
+				h += this.refs['text'].scrollHeight+2;
+				var sh = this.refs['text'].scrollHeight;
+				//if scrollheight is over 50% of the client height, make it increase width too.
+				if(h > document.body.clientHeight/2){
+					w = this.state.width*2;
+				}
+				if(h > document.body.clientHeight*0.75){//cannot fit without moving it upward.
+					h = document.body.clientHeight*0.6;
+					w = document.body.clientWidth*0.6;
+				}
+				this.setState({height: h, minheight: def, width: w});
 			},
 
 			startDrag: startDrag,
@@ -1405,37 +1441,19 @@
 					name+=' - '+modal.id;
 				}
 				return(
-					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
-					<textarea defaultValue={modal.post || ''} autoFocus rows='4' cols='40' ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
-					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/></div>
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:'auto'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
+					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> </div>
 				);
 			}
 		});
 
 		var ActiveModal = React.createClass({
 			getInitialState: function(){
-				return {x: '25%', y: '25%', width: '167px'};
-			},
-
-			dragTest: function(e){
-				if(e.target.getAttribute('class') == "modal"){//only START for the modal containers.
-					this.startDrag(e);
-				} else if(e.target.tagName == 'TEXTAREA'){//the textarea
-					document.addEventListener('mousemove', this.resize);
-					document.addEventListener('mouseup', this.stopResize);
-				}
+				return {x: '25%', y: '25%', width: 217, minwidth: 167, height: 'auto'};
 			},
 
 			startDrag: startDrag,
-
-			resize: function(e){
-				this.setState({width: this.refs['text'].getBoundingClientRect().width});
-			},
-
-			stopResize: function(e){
-				document.removeEventListener('mousemove', this.resize);
-				document.removeEventListener('mouseup', this.stopResize);
-			},
 
 			drag: drag,
 
@@ -1509,6 +1527,9 @@
 				if(ReactDOM.findDOMNode(this).getBoundingClientRect().bottom > document.body.clientHeight){
 					this.mode();
 				}
+				var h = this.refs['this'].getBoundingClientRect().height;
+				var unc = h - this.refs['img'].getBoundingClientRect().height - 34;
+				this.setState({height: h, unc: unc, minheight: unc+100+34});
 			},
 
 			mode: function(){
@@ -1537,9 +1558,17 @@
 						}
 					}
 				}
+				var h = this.state.unc + this.refs['img'].getBoundingClientRect().height + 34;
+				if(this.state.height < h){
+					this.setState({height: h});
+				}
 			},
 
 			render: function(){
+				var hei='auto';
+				if(this.refs['img']){
+					hei = 'calc(100% - '+(this.refs['img'].getBoundingClientRect().height+this.state.unc)+'px)';
+				}
 				var modal = this.props.modal;
 				var name = 'Active Character';
 				var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
@@ -1550,11 +1579,11 @@
 					return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);
 				});//grab the derivatives in here
 				return(
-					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width}} onMouseDown={this.dragTest}><span className="mtitle">{name}</span><br/>
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{images}</div><br/>
-					<div ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><div ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>IC</div><div ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>Action</div><br/>
-					<textarea defaultValue={modal.post || ''} autoFocus rows='4' style={{width:'167px', minWidth:'167px'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
-					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Close</button><button ref='scrollb' type="submit" onClick={this.mode}>Scroll</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/></div>
+					<div style={{width: '100%', whiteSpace: 'nowrap', background:'none'}}><span ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><span ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>IC</span><span ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>Action</span></div><br/>
+					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:hei, minHeight:32}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
+					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Close</button><button ref='scrollb' type="submit" onClick={this.mode}>Scroll</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/></div>
 				);
 			}
 		});
@@ -1642,6 +1671,7 @@
 			},
 
 			toggleGroup: function(e){
+				e.stopPropagation();
 				var op = this.state.open;
 				var name = this.props.characters[e.target.getAttribute('id')][0];
 				op.groups[name] = !op.groups[name];//works even on undefined!
@@ -1666,6 +1696,12 @@
 			toggleecheck: function(e){
 				var settings = this.props.settings;
 				settings.echeck = !settings.echeck;//works even if completely unset.
+				this.props.handleSettings(settings, this.props.characters);
+			},
+
+			togglembut: function(e){
+				var settings = this.props.settings;
+				settings.buttons = !settings.buttons;//works even if completely unset.
 				this.props.handleSettings(settings, this.props.characters);
 			},
 
@@ -1729,9 +1765,9 @@
 			},
 
 			roll: function(e){
-				var dice = e.target.textContent.split('d');// dice[0] is the number, dice[1] is faces (plus ! if it's there)
+				var dice = e.target.getAttribute('data').split('d');// dice[0] is the number, dice[1] is faces (plus ! if it's there)
 				var result = roll(dice);
-				this.props.socket.emit('Dice', e.target.textContent, result, this.props.settings.textcolor);
+				this.props.socket.emit('Dice', e.target.getAttribute('data'), result, this.props.settings.textcolor);
 			},
 
 			dragstart: function(e){
@@ -1807,9 +1843,12 @@
 			render: function(){
 				var currenttab = null;
 				var that=this;
+				var menu = null;
+				if(this.props.settings.buttons){
+					menu = (<button onClick={that.props.contextMenu} style={{float:'right', pointerEvents:'auto'}}>Menu</button>);
+				}
 				switch(this.state.tab){//use this to acquire the jsx for each tab
 					case 'characters'://case for the characters tab
-						//TODO: Consider making the [+] and [-] float right or something.
 						var characters = this.props.characters;
 						var charlist = characters.map(function(group, i){//groups loop
 							if(i==0 || that.state.open.groups[group[0]]){//open group
@@ -1817,41 +1856,41 @@
 									if(typeof chr !== 'string'){//make sure it's not the name.
 										if(that.state.open.characters[chr[0].id]){//open derivative list
 											var derivs = characters[i][i2].map(function(deriv, i3){
-												return(<div draggable key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px', pointerEvents:'none'}}/><span>{deriv.name}</span></div>);
+												return(<div draggable key={i3} id={i+','+i2+','+i3} className="derivative"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px', pointerEvents:'none'}}/><span>{deriv.name}{menu}</span></div>);
 											});
-											return(<div draggable onDragStart={that.dragstart} onClick={that.toggleChar} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [-]</span>{derivs}</div>);
+											return(<div draggable onDragStart={that.dragstart} onClick={that.toggleChar} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [-]</span>{menu}{derivs}</div>);
 										} else {//closed derivative list
-											return(<div draggable onClick={that.toggleChar} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [+]</span></div>);
+											return(<div draggable onClick={that.toggleChar} key={i2} id={i+','+i2} className="character"><span style={{pointerEvents:'none'}}>{chr[0].name} [+]</span>{menu}</div>);
 										}
 									}
 								});
 								if(typeof group[0] === 'string'){//actual group
-									return(<div draggable onClick={that.toggleGroup} key={i} id={i} className="chargroup"><span style={{pointerEvents:'none'}} className='group'>{group[0]} [-]</span>{chars}</div>);
+									return(<div draggable onClick={that.toggleGroup} key={i} id={i} className="chargroup"><span style={{pointerEvents:'none'}} className='group'>{group[0]} [-]</span>{menu}{chars}</div>);
 								} else {//ungrouped
 									return(<div id={0} key={i} className="chargroup ungrouped">{chars}</div>);
 								}
 							} else {//closed group
-								return(<div draggable onClick={that.toggleGroup} key={i} id={i} className="chargroup"><span className='group' style={{pointerEvents:'none'}}>{group[0]} [+]</span></div>);
+								return(<div draggable onClick={that.toggleGroup} key={i} id={i} className="chargroup"><span className='group' style={{pointerEvents:'none'}}>{group[0]} [+]</span>{menu}</div>);
 							}
 						});
 						if(characters.length == 1 && characters[0].length == 0){//none
 							charlist = [<div id={0} key={0} className="chargroup ungrouped">Right-click to create a character!</div>];
 						}
-						currenttab = (<div id={0} onDragStart={that.dragstart} className="charlist">
+						currenttab = (<div id={0} onDragStart={that.dragstart} onClick={this.props.settings.buttons ? that.props.contextMenu : null} className="charlist">
 							{charlist}
 							</div>);
 						break;
 					case 'players'://case for the players online tab
 						var players = this.props.players;
 						currenttab = Object.keys(players).map(function(player, index){
-							return (<div id={player} key={index} className='PLentry'>{players[player].afk ? '(AFK) ' : ''}{player + ' - ' + players[player].permissions}</div>);
+							return (<div id={player} key={index} className='PLentry'>{players[player].afk ? '(AFK) ' : ''}{player + ' - ' + players[player].permissions}{menu}</div>);
 						});
 						break;
 					case 'commands'://case for player commands tab
-						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.save}>Save Data</div>, <div key='2' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='3' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='4' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='5' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='6' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='7' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='8' className='Command' onClick={this.show}>Show Rules</div>, <div key='9' className='Command' onClick={this.show}>Show MOTD</div>, <div key='10' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='11' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='12' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='13' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglembut}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.save}>Save Data</div>, <div key='3' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='4' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='5' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='6' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='7' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='8' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='9' className='Command' onClick={this.show}>Show Rules</div>, <div key='10' className='Command' onClick={this.show}>Show MOTD</div>, <div key='11' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='12' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='13' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='14' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={14+index} id={'Dice'+index} className='Dice Command' onClick={that.roll}>{dice}</div>);
+							currenttab.push(<div key={15+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
