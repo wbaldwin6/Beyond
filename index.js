@@ -261,19 +261,44 @@ var toLog = function (message){
 var editLog = function(message){
 	var today = new Date();
 	var target = htm.getElementById(message.id);
-	if(target){//the message might be from yesterday and then you're just done.
-		var type = target.className.split(" ")[1];
-		var edit = target.cloneNode(true);
-		//don't just do this naively.
-		//make the new timestamp
-		edit.children[0].textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
-		if(type == 'say'){
-			edit.children[edit.children.length-1].innerHTML = '"'+message.post+'"';
-		} else {
-			edit.children[edit.children.length-1].innerHTML = message.post;
+	if(target){
+		var logmsg;
+		if(message.className){
+			logmsg = htm.createElement('div');
+			logmsg.className = message.className;
+			if(message.id){//no need to do a complicated 'is this an IC post' check if I can do this.
+				logmsg.id = message.id;
+			}
+			//the time stamp is added in all cases.
+			var ts=htm.createElement('span');
+			ts.setAttribute("class", "timestamp");
+			ts.textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+			logmsg.appendChild(ts);
+			var classparam = message.className.split(" ")[1];
+			switch(classparam){
+				case 'say':
+					generatePost(logmsg, message.username, message.post, message.character, true, false);
+					break;
+				case 'action':
+					generatePost(logmsg, message.username, message.post, message.character, false, false);
+					break;
+			}
+		} else {//quick edit
+			var type = target.className.split(" ")[1];
+			if(target.nextElementSibling.nextElementSibling && target.nextElementSibling.nextElementSibling.textContent.startsWith('[Edited')){
+				logmsg = target.nextElementSibling.nextElementSibling.cloneNode(true);
+				type = target.nextElementSibling.nextElementSibling.className.split(" ")[1];
+			} else {
+				logmsg = target.cloneNode(true);
+			}
+			logmsg.children[0].textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+			if(type == 'say'){
+				logmsg.children[logmsg.children.length-1].innerHTML = '"'+message.post+'"';
+			} else {
+				logmsg.children[logmsg.children.length-1].innerHTML = message.post;
+			}
 		}
-		//insert after
-		htm.body.insertBefore(edit, target.nextElementSibling);
+		htm.body.insertBefore(logmsg, target.nextElementSibling);
 		var br = htm.createElement('br');
 		br.className = 'IC';
 		htm.body.insertBefore(br, target.nextElementSibling);
@@ -281,7 +306,6 @@ var editLog = function(message){
 			if(error){console.log(error);}
 		});
 	}
-
 };
 
 var generateOOCmessage = function (message, username, post, color){
@@ -702,6 +726,21 @@ var Setconnections = function(socket){//username will definitely be present or s
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
 			message = processHTML(message);
 			var msg = {id: postid, post: message+'*'};
+			io.emit('ICedit', msg);
+			editLog(msg);
+		}
+	});
+	socket.on('Cedit', function(message, character, type, postid){
+		var username = sessions[socket.request.connection.remoteAddress];
+		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
+			message = processHTML(message);
+			className = 'message';
+			if(type.endsWith('Say')){
+				className = 'say ' + className;
+			} else if(type.endsWith('Action')){
+				className = 'action ' + className;
+			}
+			var msg = {id: postid, post: message+'*', character: character, className: 'IC '+className};
 			io.emit('ICedit', msg);
 			editLog(msg);
 		}

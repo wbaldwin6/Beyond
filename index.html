@@ -580,12 +580,19 @@
 							case 'IC say message':
 								//fallthrough
 							case 'IC action message':
+								//check username in data, add edit if needed
+								options = ['Notify for Character'];
+								var charid = target.getAttribute('data').split('-');
+								charid.pop(); charid = charid.join('-');//catches names with - in them
+								if(charid == this.state.username){
+									options.push('Edit', 'Full Edit');
+								}
 								//fallthrough
 							case 'IC narration message':
-								//check username in data, add edit if needed
-								if(target.getAttribute('data') == this.state.username){
+								if(target.getAttribute('data') == this.state.username){//just name in this case
 									options = ['Edit'];
 								}
+								//fallthrough
 							case 'ICbox':
 								//add 'Narrate'
 								options.unshift('Narrate');
@@ -614,6 +621,12 @@
 					}
 				}
 				switch(name){
+					case 'Notify for Character':
+						var settings = this.state.settings;
+						if(!settings.notify){settings.notify = {};}
+						settings.notify[this.state.context.target.getAttribute('data')] = {IC: true, OOC: false};
+						this.handleSettings(settings, this.state.characters);
+						break;
 					case 'Delete'://just delete it outright.
 						var settings = this.state.settings;
 						settings.dice.splice(+id[0].substring(4), 1);
@@ -674,6 +687,18 @@
 					case 'Join Room':
 						newmodal.type = 'action';
 						break;
+					case 'Full Edit':
+						newmodal.charid = this.state.context.target.getAttribute('data');
+						var children = this.state.context.target.children;
+						newmodal.post = children[children.length-1].innerHTML;
+						if(newmodal.post.charAt(0) === '"'){//This is really a bad check.
+							newmodal.post = newmodal.post.slice(1, -1);
+						}
+						if(newmodal.post.endsWith("*")){
+							newmodal.post = newmodal.post.slice(0, -1);
+						}
+						newmodal.post = sanitize(newmodal.post);
+						//fallthrough
 					case 'Set Active Character':
 						newmodal.type = 'active';//two part charid already in place
 						break;
@@ -1332,7 +1357,6 @@
 				var h = def-this.refs['text'].getBoundingClientRect().height;//initial size of non-textarea content
 				this.refs['text'].style.height = 'calc(100% - '+h+'px)';
 				h += this.refs['text'].scrollHeight+2;
-				var sh = this.refs['text'].scrollHeight;
 				//if scrollheight is over 50% of the client height, make it increase width too.
 				if(h > document.body.clientHeight/2){
 					w = this.state.width*2;
@@ -1488,7 +1512,12 @@
 					}
 					if(trueid){
 						var deriv = this.props.characters[trueid[0]][trueid[1]][did];
-						this.props.socket.emit('characterPost', post, deriv, name, room);
+						if(modata.name == 'Full Edit'){
+							this.props.socket.emit('Cedit', post, deriv, name, modata.id);
+							this.props.closeModal(this.props.id);
+						} else {
+							this.props.socket.emit('characterPost', post, deriv, name, room);
+						}
 					}//if it's undefined the character doesn't exist.
 					this.refs['text'].value = ''; //just empty it.
 				}
@@ -1506,7 +1535,9 @@
 			toggle: function(e){
 				switch(e.target.textContent){
 					case 'IC':
-						e.target.textContent = 'Omit';
+						if(this.props.modal.name != "Full Edit"){
+							e.target.textContent = 'Omit';
+						}
 						break;
 					case 'Omit':
 						e.target.textContent = 'Test';
@@ -1527,9 +1558,15 @@
 				if(ReactDOM.findDOMNode(this).getBoundingClientRect().bottom > document.body.clientHeight){
 					this.mode();
 				}
-				var h = this.refs['this'].getBoundingClientRect().height;
-				var unc = h - this.refs['img'].getBoundingClientRect().height - 34;
-				this.setState({height: h, unc: unc, minheight: unc+100+34});
+				var w = 217;
+				var def = this.refs['this'].getBoundingClientRect().height;
+				var h = def-this.refs['text'].getBoundingClientRect().height+this.refs['text'].scrollHeight+2;
+				if(h > document.body.clientHeight*0.75){//cannot fit without moving it upward.
+					h = document.body.clientHeight*0.6;
+					w = document.body.clientWidth*0.6;
+				}
+				var unc = def - this.refs['img'].getBoundingClientRect().height - 34;
+				this.setState({width: w, height: h, unc: unc, minheight: unc+100+34});
 			},
 
 			mode: function(){
@@ -1571,6 +1608,7 @@
 				}
 				var modal = this.props.modal;
 				var name = 'Active Character';
+				if(modal.name == 'Full Edit'){name = modal.name;}
 				var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
 				if(modal.charid){
 					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
@@ -1993,14 +2031,14 @@
 						return (<div className={message.className}>{"| "+message.username+" "+message.post+" |"}{'\r'}</div>);
 					case 'system'://just the post itself.
 						return (<div className={message.className}><span ref="post"></span>{'\r'}</div>);
-					case 'say':
+					case 'say'://fallthrough
 					case 'action':
 						var charid = character.id.split('-');
 						var d = charid.pop();
 						charid = charid.join('-');//catches names with - in them
 						var profileopen = function(e){window.open('/characters/'+charid+'/'+d+'.html');}
 						var edit = [];
-						if(message.id){edit.push(charid);}//worst case message.id is undefined
+						if(message.id){edit.push(character.id);}//worst case message.id is undefined
 						//if(!message.className.startsWith('O') && !message.className.startsWith('T')){edit.push('Narrate');}//IC post
 						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
 				}
@@ -2038,7 +2076,7 @@
 								document.title = "Post from "+message.username+"!";
 								document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
 							}
-						} else if(message.character && that.props.notify[message.character.name] && that.props.notify[message.character.name].IC){
+						} else if(message.character && (that.props.notify[message.character.name] && that.props.notify[message.character.name].IC) || (that.props.notify[message.character.id] && that.props.notify[message.character.id].IC)){
 							highlight = true;
 							if(document.visibilityState != 'visible'){//don't do this if they're in window
 								document.title = "Post from "+message.character.name+"!";
@@ -2057,6 +2095,12 @@
 					if(target){//if it isn't in here obviously we aren't doing it.
 						var msg = target.props.message;
 						msg.post = message.post;
+						if(message.character){
+							msg.character = message.character;
+						}
+						if(message.className){
+							msg.className = message.className;
+						}
 						messages[ids[message.id]] = React.cloneElement(target, msg);
 						
 						that.setState({messages: messages, height: that.refs.box.scrollHeight});
