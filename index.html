@@ -2076,7 +2076,7 @@
 								document.title = "Post from "+message.username+"!";
 								document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
 							}
-						} else if(message.character && (that.props.notify[message.character.name] && that.props.notify[message.character.name].IC) || (that.props.notify[message.character.id] && that.props.notify[message.character.id].IC)){
+						} else if(message.character && ((that.props.notify[message.character.name] && that.props.notify[message.character.name].IC) || (that.props.notify[message.character.id] && that.props.notify[message.character.id].IC))){
 							highlight = true;
 							if(document.visibilityState != 'visible'){//don't do this if they're in window
 								document.title = "Post from "+message.character.name+"!";
