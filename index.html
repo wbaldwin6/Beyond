@@ -585,12 +585,12 @@
 								var charid = target.getAttribute('data').split('-');
 								charid.pop(); charid = charid.join('-');//catches names with - in them
 								if(charid == this.state.username){
-									options.push('Edit', 'Full Edit');
+									options.push('Edit', 'Full Edit', 'Delete Post');
 								}
 								//fallthrough
 							case 'IC narration message':
 								if(target.getAttribute('data') == this.state.username){//just name in this case
-									options = ['Edit'];
+									options = ['Edit', 'Delete Post'];
 								}
 								//fallthrough
 							case 'ICbox':
@@ -636,7 +636,8 @@
 						newmodal.groupname = this.state.characters[id[0]][0];
 						//fallthrough
 					case 'Delete Character'://fallthrough
-					case 'Delete Derivative':
+					case 'Delete Derivative'://fallthrough
+					case 'Delete Post':
 						newmodal.type = 'delete';
 						break;
 					case 'Private Roll':
@@ -1329,17 +1330,25 @@
 				this.props.closeModal(this.props.id);
 			},
 
+			postDelete: function(e){
+				this.props.socket.emit('Delete Post', this.props.modal.id);
+				this.props.closeModal(this.props.id);
+			},
+
 			render: function(){
 				var modal = this.props.modal;
 				var name = modal.name;
+				var fun = this.charDelete;
 				if(modal.groupname){name += ' - '+modal.groupname;
 				} else if(modal.charid){
 					var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
 					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+				} else if(modal.name == "Delete Post"){
+					fun = this.postDelete;
 				}
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
-					Are you sure?<br/><button type="submit" onClick={this.charDelete}>Yes</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>No</button></div>
+					Are you sure?<br/><button type="submit" onClick={fun}>Yes</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>No</button></div>
 				);
 			}
 		});
@@ -2105,6 +2114,18 @@
 						
 						that.setState({messages: messages, height: that.refs.box.scrollHeight});
 						that.forceUpdate();//this is the cheap solution.
+					}
+				});
+
+				this.props.socket.on('ICdel', function(id){
+					var messages = that.state.messages.slice();
+					var ids = that.state.ids;
+					var target = messages[ids[id]];
+					if(target){
+						delete messages[ids[id]];
+						delete ids[id];
+						that.setState({messages: messages, ids: ids, height: that.refs.box.scrollHeight});
+						that.forceUpdate();
 					}
 				});
 			},

@@ -185,7 +185,7 @@ var openLog = function (logfile){//takes in a Date object
 	} catch(e){//today's logs don't exist, make them!
 		//this won't change, so just making it a static string (albeit a long one) is more effiicient.
 		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action, div.log, div.narration{font-weight: bold;} div.narration{text-align: center;} div.narration span.timestamp{position: absolute; left: 0;} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} .IC{} .OOC{}</style>';
-		var script = '<script>function OOC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "none"; x[7].style.display = "initial";} function IC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[7].style.display = "none"; x[6].style.display = "initial";}function Both(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "initial"; x[7].style.display = "initial";}</script>'
+		var script = '<script>function toggleedit(id){var e=document.getElementById(id); var edit=e.nextElementSibling; if(e.style.display=="none"){e.style.display=null; edit.style.display = "none";} else {edit.style.display=null; e.style.display="none";}} function OOC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "none"; x[7].style.display = "initial";} function IC(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[7].style.display = "none"; x[6].style.display = "initial";}function Both(){var x = document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display = "initial"; x[7].style.display = "initial";}</script>'
 		var body = '<body><div class="buttons" style="width: auto; position:fixed; bottom: 0; right: 0;"><button onclick="OOC()">OOC Only</button><button onclick="IC()">IC Only</button><button onclick="Both()">Both</button></div>'+script+'</body>';
 		var initialhtml = '<html><head><title>Logs for '+new Date().toLocaleString('en-us', {month: "long", day:"2-digit"})+
 		'</title>'+style+'<link rel="icon" href="/faceicons/favicon.png"></head>'+body+'</html>';
@@ -258,10 +258,50 @@ var toLog = function (message){
 	});
 };
 
+/*var editLogNew = function(message){
+	var today = new Date();
+	var target = htm.getElementById(message.id);
+	if(target && !target.children[0].textContent.startsWith('[Deleted')){
+		var logmsg;
+		if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//probably the best way to check for edits.
+			logmsg = target.nextElementSibling.cloneNode(true);
+		} else {
+			logmsg = target.cloneNode(true);
+		}
+		var type = message.className ? message.className.split(" ")[1] : logmsg.className.split(" ")[1];
+		logmsg.children[0].textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+		if(type != 'narration'){
+			//if message.character we change icon (logmsg.children[1].style['background-image'] and logmsg.children[1].style['background-position'])
+			//as well as name (logmsg.children[2], may need to have .style['font-weight'] set bold if say and whether it has : depends.)
+			var charname;
+			if(message.character){
+				logmsg.children[1].style.backgroundImage = 'url(/faceicons/'+message.character.icon+'.png)';
+				logmsg.children[1].style.backgroundPosition = '-'+message.character.icpos.left+'px -'+message.character.icpos.top+'px';
+				charname = message.character.
+			}
+		} //after dealing with those the post part is pretty standard.
+		logmsg.children[logmsg.children.length-1].innerHTML = message.post;
+		var e = target.nextElementSibling;
+		logmsg.setAttribute("onclick", "toggleedit("+message.id+")");
+		logmsg.style.cursor = "pointer";
+		if(e.id && e.id == target.id){//this is the edit and should be replaced.
+			htm.body.replaceChild(logmsg, e);
+		} else {//no preexisting edits
+			target.setAttribute("onclick", "toggleedit("+message.id+")");
+			target.style.cursor = "pointer";//only requires a change when it hasn't already had it set.
+			target.style.display = "none";
+			htm.body.insertBefore(logmsg, e);
+		}
+		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
+			if(error){console.log(error);}
+		});
+	}
+};*/
+
 var editLog = function(message){
 	var today = new Date();
 	var target = htm.getElementById(message.id);
-	if(target){
+	if(target && !target.children[0].textContent.startsWith('[Deleted')){
 		var logmsg;
 		if(message.className){
 			logmsg = htm.createElement('div');
@@ -285,9 +325,9 @@ var editLog = function(message){
 			}
 		} else {//quick edit
 			var type = target.className.split(" ")[1];
-			if(target.nextElementSibling.nextElementSibling && target.nextElementSibling.nextElementSibling.textContent.startsWith('[Edited')){
-				logmsg = target.nextElementSibling.nextElementSibling.cloneNode(true);
-				type = target.nextElementSibling.nextElementSibling.className.split(" ")[1];
+			if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//probably the best way to check for edits.
+				logmsg = target.nextElementSibling.cloneNode(true);
+				type = target.nextElementSibling.className.split(" ")[1];
 			} else {
 				logmsg = target.cloneNode(true);
 			}
@@ -298,10 +338,31 @@ var editLog = function(message){
 				logmsg.children[logmsg.children.length-1].innerHTML = message.post;
 			}
 		}
-		htm.body.insertBefore(logmsg, target.nextElementSibling);
-		var br = htm.createElement('br');
-		br.className = 'IC';
-		htm.body.insertBefore(br, target.nextElementSibling);
+		var e = target.nextElementSibling;
+		logmsg.setAttribute("onclick", "toggleedit("+message.id+")");
+		logmsg.style.cursor = "pointer";
+		if(e.id && e.id == target.id){//this is the edit and should be replaced.
+			htm.body.replaceChild(logmsg, e);
+		} else {//no preexisting edits
+			target.setAttribute("onclick", "toggleedit("+message.id+")");
+			target.style.cursor = "pointer";//only requires a change when it hasn't already had it set.
+			target.style.display = "none";
+			htm.body.insertBefore(logmsg, e);
+		}
+		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
+			if(error){console.log(error);}
+		});
+	}
+};
+
+var deleteLog = function(id){
+	var today = new Date();
+	var target = htm.getElementById(id);
+	if(target){
+		target.children[0].textContent = '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+		if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//has an edit!
+			target.nextElementSibling.children[0].textContent = '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+		}
 		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
 			if(error){console.log(error);}
 		});
@@ -743,6 +804,13 @@ var Setconnections = function(socket){//username will definitely be present or s
 			var msg = {id: postid, post: message+'*', character: character, className: 'IC '+className};
 			io.emit('ICedit', msg);
 			editLog(msg);
+		}
+	});
+	socket.on('Delete Post', function(id){
+		var username = sessions[socket.request.connection.remoteAddress];
+		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
+			deleteLog(id);
+			io.emit('ICdel', id);
 		}
 	});
 	socket.on('Update Character', function(character){
