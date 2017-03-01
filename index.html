@@ -690,6 +690,8 @@
 						break;
 					case 'Full Edit':
 						newmodal.charid = this.state.context.target.getAttribute('data');
+						var t = this.state.context.target.className.split(' ')[1];
+						newmodal.pt = t.charAt(0).toUpperCase() + t.slice(1);
 						var children = this.state.context.target.children;
 						newmodal.post = children[children.length-1].innerHTML;
 						if(newmodal.post.charAt(0) === '"'){//This is really a bad check.
@@ -1504,7 +1506,7 @@
 				var post = this.refs['text'].value;
 				var name = this.refs['type'].textContent;
 				var win = this.refs['win'].textContent;
-				//something to determine the specific derivative here. Probably just alter the charid we pass to verifyID to be 3 long instead of 2. We also need to use whatever our check for type is instead of modata.name.
+				var deriv = null;
 				if(post && this.state.id){//find the right id
 					var did = this.state.id.id;
 					var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
@@ -1520,15 +1522,14 @@
 						name = win+' '+name;
 					}
 					if(trueid){
-						var deriv = this.props.characters[trueid[0]][trueid[1]][did];
-						if(modata.name == 'Full Edit'){
-							this.props.socket.emit('Cedit', post, deriv, name, modata.id);
-							this.props.closeModal(this.props.id);
-						} else {
-							this.props.socket.emit('characterPost', post, deriv, name, room);
-						}
+						deriv = this.props.characters[trueid[0]][trueid[1]][did];
+						if(modata.name != 'Full Edit'){this.props.socket.emit('characterPost', post, deriv, name, room);}
 					}//if it's undefined the character doesn't exist.
 					this.refs['text'].value = ''; //just empty it.
+				}
+				if(post && modata.name == 'Full Edit'){//if there IS a trueid we have it by this point, else it should default to previous.
+					this.props.socket.emit('Cedit', post, deriv, name, modata.id);
+					this.props.closeModal(this.props.id);
 				}
 				e.preventDefault();
 			},
@@ -1615,9 +1616,10 @@
 				if(this.refs['img']){
 					hei = 'calc(100% - '+(this.refs['img'].getBoundingClientRect().height+this.state.unc)+'px)';
 				}
+				var def = 'Action';
 				var modal = this.props.modal;
 				var name = 'Active Character';
-				if(modal.name == 'Full Edit'){name = modal.name;}
+				if(modal.name == 'Full Edit'){name = modal.name; def = modal.pt;}
 				var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
 				if(modal.charid){
 					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
@@ -1628,7 +1630,7 @@
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{images}</div><br/>
-					<div style={{width: '100%', whiteSpace: 'nowrap', background:'none'}}><span ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><span ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>IC</span><span ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>Action</span></div><br/>
+					<div style={{width: '100%', whiteSpace: 'nowrap', background:'none'}}><span ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><span ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>IC</span><span ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>{def}</span></div><br/>
 					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:hei, minHeight:32}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
 					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Close</button><button ref='scrollb' type="submit" onClick={this.mode}>Scroll</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/></div>
 				);

@@ -127,7 +127,7 @@ app.get('/characters', function(req, res){
 						if(!file.endsWith('.json')){
 							var f = fs.readdirSync(__dirname+'/characters/'+file);
 							if(f.length !== 0){
-								ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+file+'\')">'+file+' ('+f.length+')</h2>';
+								ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+file.replace(/'/g, "\\'")+'\')">'+file+' ('+f.length+')</h2>';
 								ret += '<div id="'+file+'" style="display: none;">';
 								f.forEach(function(chr){
 									var id=file+'-'+chr.slice(0, -5);
@@ -258,81 +258,40 @@ var toLog = function (message){
 	});
 };
 
-/*var editLogNew = function(message){
-	var today = new Date();
-	var target = htm.getElementById(message.id);
-	if(target && !target.children[0].textContent.startsWith('[Deleted')){
-		var logmsg;
-		if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//probably the best way to check for edits.
-			logmsg = target.nextElementSibling.cloneNode(true);
-		} else {
-			logmsg = target.cloneNode(true);
-		}
-		var type = message.className ? message.className.split(" ")[1] : logmsg.className.split(" ")[1];
-		logmsg.children[0].textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
-		if(type != 'narration'){
-			//if message.character we change icon (logmsg.children[1].style['background-image'] and logmsg.children[1].style['background-position'])
-			//as well as name (logmsg.children[2], may need to have .style['font-weight'] set bold if say and whether it has : depends.)
-			var charname;
-			if(message.character){
-				logmsg.children[1].style.backgroundImage = 'url(/faceicons/'+message.character.icon+'.png)';
-				logmsg.children[1].style.backgroundPosition = '-'+message.character.icpos.left+'px -'+message.character.icpos.top+'px';
-				charname = message.character.
-			}
-		} //after dealing with those the post part is pretty standard.
-		logmsg.children[logmsg.children.length-1].innerHTML = message.post;
-		var e = target.nextElementSibling;
-		logmsg.setAttribute("onclick", "toggleedit("+message.id+")");
-		logmsg.style.cursor = "pointer";
-		if(e.id && e.id == target.id){//this is the edit and should be replaced.
-			htm.body.replaceChild(logmsg, e);
-		} else {//no preexisting edits
-			target.setAttribute("onclick", "toggleedit("+message.id+")");
-			target.style.cursor = "pointer";//only requires a change when it hasn't already had it set.
-			target.style.display = "none";
-			htm.body.insertBefore(logmsg, e);
-		}
-		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
-			if(error){console.log(error);}
-		});
-	}
-};*/
-
 var editLog = function(message){
 	var today = new Date();
 	var target = htm.getElementById(message.id);
 	if(target && !target.children[0].textContent.startsWith('[Deleted')){
 		var logmsg;
-		if(message.className){
+		if(message.character){//different character requires new post.
 			logmsg = htm.createElement('div');
-			logmsg.className = message.className;
-			if(message.id){//no need to do a complicated 'is this an IC post' check if I can do this.
-				logmsg.id = message.id;
-			}
+			logmsg.className = message.className;//if there's a character it'll always have this.
+			logmsg.id = message.id;
 			//the time stamp is added in all cases.
 			var ts=htm.createElement('span');
 			ts.setAttribute("class", "timestamp");
 			ts.textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 			logmsg.appendChild(ts);
-			var classparam = message.className.split(" ")[1];
-			switch(classparam){
-				case 'say':
-					generatePost(logmsg, message.username, message.post, message.character, true, false);
-					break;
-				case 'action':
-					generatePost(logmsg, message.username, message.post, message.character, false, false);
-					break;
-			}
+			var classparam = logmsg.className.split(" ")[1];
+			generatePost(logmsg, message.username, message.post, message.character, (classparam == 'say'), false);
 		} else {//quick edit
-			var type = target.className.split(" ")[1];
 			if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//probably the best way to check for edits.
 				logmsg = target.nextElementSibling.cloneNode(true);
-				type = target.nextElementSibling.className.split(" ")[1];
 			} else {
 				logmsg = target.cloneNode(true);
 			}
+			if(message.className && message.className != logmsg.className){//we can ignore class besides this and the post thing
+				if(message.className == 'IC say message'){//was previously action
+					logmsg.children[2].style.fontWeight = 'bold';
+					logmsg.children[2].innerHTML = logmsg.children[2].innerHTML.slice(0, -1) + ': ';
+				} else {//was previously say
+					logmsg.children[2].style.fontWeight = null;
+					logmsg.children[2].innerHTML = logmsg.children[2].innerHTML.slice(0, -2) + ' ';
+				}
+				logmsg.className = message.className;
+			}
 			logmsg.children[0].textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
-			if(type == 'say'){
+			if(logmsg.className.split(' ')[1] == 'say'){
 				logmsg.children[logmsg.children.length-1].innerHTML = '"'+message.post+'"';
 			} else {
 				logmsg.children[logmsg.children.length-1].innerHTML = message.post;
@@ -557,6 +516,8 @@ var commands = {//console command list, formatted this way for convenience.
 					bans.ips.push(ip); banlist.ips.push(ip);
 					bans.users[name] = ip; banlist.users[name] = ip;
 					users[name].disconnect();
+				} else if(name.startsWith(':')){
+					bans.ips.push(name); banlist.ips.push(name);
 				} else {
 					bans.users[name] = true; banlist.users[name] = true;
 				}
@@ -574,12 +535,13 @@ var commands = {//console command list, formatted this way for convenience.
 				if(err){console.log(err);} else {
 					bans = JSON.parse(bans);
 					if(name.startsWith(':')){
-						bans.ips.splice(bans.ips.indexOf(ip), 1);
+						bans.ips.splice(bans.ips.indexOf(name), 1);
+						banlist.ips.splice(banlist.ips.indexOf(name), 1);
 					} else {
 						var ip = bans.users[name];
 						delete bans.users[name];
 						delete banlist.users[name];
-						if(typeof ip === 'string'){
+						if(typeof ip === 'string' && bans.ips.indexOf(ip) > -1){
 							bans.ips.splice(bans.ips.indexOf(ip), 1);
 							banlist.ips.splice(banlist.ips.indexOf(ip), 1);
 						}
