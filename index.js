@@ -349,7 +349,9 @@ var generateOOClog = function (message, username, post){
 };
 
 var generateNarration = function (message, username, post, color){
-	var cur = htm.createElement('span');
+	var cur = htm.createElement('br');
+	message.appendChild(cur);
+	cur = htm.createElement('span');
 	cur.style.color = color;
 	cur.innerHTML = post;
 	message.appendChild(cur);
@@ -958,7 +960,7 @@ io.on('connection', function(socket){
 		socket.disconnect();
 		return;
 	}
-	socket.on('login', function(username, password, callback){
+	socket.on('login', function(username, password, relog, callback){
 		if(username.endsWith(' ')){
 			callback("Please do not end your username with a space.");
 			return;
@@ -993,6 +995,14 @@ io.on('connection', function(socket){
 									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
 									io.emit('OOCmessage', msg);
 									io.emit('PlayerList', playerlist);
+									if(!relog){
+										if(serversettings.rules){
+											socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
+										}
+										if(serversettings.motd){
+											socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
+										}
+									}
 									toLog(msg);
 								}
 							});
@@ -1011,15 +1021,7 @@ io.on('connection', function(socket){
 		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
 	} else {
 		console.log('a user connected');
-		if(serversettings.rules){
-			var msg = {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'};
-			socket.emit('OOCmessage', msg);
-		}
-		if(serversettings.motd){
-			var msg = {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'};
-			socket.emit('OOCmessage', msg);
-		}
-		socket.on('register', function(username, password, callback){
+		socket.on('register', function(username, password, du, callback){
 			if(username.endsWith(' ')){
 				callback("Please do not end your username with a space.");
 				return;
@@ -1049,6 +1051,12 @@ io.on('connection', function(socket){
 												var msg = {className: 'OOC log message', username: username, post: "has logged on"};
 												io.emit('OOCmessage', msg);
 												io.emit('PlayerList', playerlist);
+												if(serversettings.rules){
+													socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
+												}
+												if(serversettings.motd){
+													socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
+												}
 												toLog(msg);
 											} else {callback(err);}
 										});

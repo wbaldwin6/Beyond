@@ -468,7 +468,7 @@
 				var recfun = function(){
 					if(!reconnected){
 						console.log('Connected, logging in...');
-						that.props.socket.emit('login', that.state.username, that.state.pass, function(res){
+						that.props.socket.emit('login', that.state.username, that.state.pass, true, function(res){
 							if(res.settings){
 								console.log('Logged in successfully (as far as I can tell).');
 								//that.handleSettings(res.settings, res.characters);this SHOULDN'T change.
@@ -947,7 +947,7 @@
 				var password = this.refs.password.value;
 				if(username.length >= 6 && password.length >= 6){
 					var ind = e.target.parentNode.getAttribute('id');
-					this.props.socket.emit(type, username, md5(password), function (response){
+					this.props.socket.emit(type, username, md5(password), false, function (response){
 						if(response.settings){
 							that.props.handleSettings(response.settings, response.characters);
 							that.props.setUser(username, md5(password));
@@ -1966,18 +1966,7 @@
 				var classparam = message.className.split(" ")[1];
 				var post = message.post;
 				if(this.refs.post){
-					switch(classparam){
-						case 'say':
-							post = '"'+post+'"';
-							if(message.className.startsWith('O')){//omit
-								post += ' <b>(Omit)</b>';
-							}
-							break;
-						case 'action':
-							if(message.className.startsWith('O')){//omit
-								post += ' (Omit)';
-							}
-					}
+					if(classparam == 'say'){post = '"'+post+'"';}
 					this.refs.post.innerHTML = post;
 				}
 				if(this.refs.name){
@@ -2035,7 +2024,7 @@
 							return (<div className={message.className}>( <b>{'You whispered to '+message.target+': '}</b><span ref="post"></span> ){'\r'}</div>);
 						}
 					case 'narration'://ic narration message
-						return (<div id={message.id} data={message.username} className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
+						return (<div id={message.id} data={message.username} className={message.className}><br/><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
 					case 'dice'://ooc dice message
 						return (<div className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
 					case 'log':
