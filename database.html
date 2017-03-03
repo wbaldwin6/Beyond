@@ -85,7 +85,7 @@
 		//Properties: socket
 		var OuterArea = React.createClass({
 			getInitialState: function() {
-				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "Sk8torchic", contents: {}}, page: '', openness: {}};
+				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "Sk8torchic", contents: {}}, page: '', openness: {}, showNames: false};
 			},
 		
 			componentDidMount: function() {
@@ -111,7 +111,13 @@
 				this.props.socket.on('InitializeDatabase', function(username, permissions, dir) {
 					that.setState({username: username, permissions: permissions, directory: dir});
 				});
-				
+				this.props.socket.on('disconnect', function() {
+					alert('You have disconnected!');
+				});
+				this.props.socket.on('reconnect', function() {
+					that.props.socket.emit('ReLogin', that.state.username, that.state.permissions);
+					alert('You have reconnected!');
+				});
 			},
 			
 			GetDirectoryFromPath: function(path) {
@@ -164,7 +170,7 @@
 				var path = this.state.context.path;
 				var pathname = '/database';
 				for(var i = 0; i < path.length; i++)
-					pathname += '/' + path[i];
+					pathname += '/' + encodeURIComponent(path[i]);
 				window.open(pathname + '.html');
 				this.setState({context: null});
 			},
@@ -188,6 +194,10 @@
 			OpenSearchModal: function(e) {
 				var modal = <SearchDirectoryModal socket={this.props.socket} outerarea={this} />;
 				this.setState({context: null, modal: modal});
+			},
+			
+			ToggleNames: function(e) {
+				this.setState({showNames: !this.state.showNames});
 			},
 			
 			render: function() {
@@ -221,9 +231,10 @@
 					context = <div className="contextMenu" style={{left: this.state.context.x + "px", top: this.state.context.y + "px"}}>{contextOptions}</div>;
 				}
 				var searchButton = <button key="SearchButton" onClick={this.OpenSearchModal} disabled={this.state.modal ? true : false} style={{zIndex: "500", position: "fixed", left: "0px", bottom: "0px"}}>Search</button>;
+				var toggleNamesButton = <button key="ToggleNames" onClick={this.ToggleNames} style={{zIndex: "500", position: "fixed", left: "54px", bottom: "0px"}}>Toggle Names</button>
 				var dir = (<div key="Directory" id="Directory" style={{height: "100%", overflowY: "auto"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} parents={[]} /></div>);
 				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
-				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}</div>);
+				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}{toggleNamesButton}</div>);
 			}
 		});
 		
@@ -272,7 +283,7 @@
 			
 			render: function() {
 				if(this.state.open) {
-					var name = <b><i><u><div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [&#8209;]</span></div></u></i></b>
+					var name = <b><div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [&#8209;]</span></div></b>
 					var children = [];
 					var parents = this.props.parents.concat([this.props.name]);
 					for(var entry_name in this.props.contents) {
@@ -285,7 +296,7 @@
 					}
 					return(<div>{name}<br />{children}</div>);
 				} else {
-					return(<b><i><u><div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [+]</span><br /></div></u></i></b>);
+					return(<b><div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [+]</span><br /></div></b>);
 				}
 			}
 		});
@@ -319,7 +330,7 @@
 			},
 			
 			render: function() {
-				return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name} (By {this.props.creator})</span></div>);
+			return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name}{this.props.outerarea.state.showNames ? " (By " + this.props.creator + ")" : ""}</span></div>);
 			}
 		});
 		

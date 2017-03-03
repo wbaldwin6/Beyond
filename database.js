@@ -342,5 +342,9 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			socket.emit('UpdateError', 'You cannot change the locked status of that directory.');
 		}
 	});
+	socket.on('ReLogin', function(username, permissions) {
+		databaseSockets.push(user);
+		socket.emit('InitializeDatabase', username, permissions, toplevel);
+	});
 }
 };
