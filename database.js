@@ -132,7 +132,7 @@ UpdateMovedEntries: function(dir, oldpathname, newpathname) {
 	}
 	if("contents" in dir) {
 		for(var name in dir.contents) {
-			this.UpdateMovedEntries(dir.contents[name], oldpathname + "/" + dir.name, newpathname + "/" + dir.name);
+			this.UpdateMovedEntries(dir.contents[name], oldpathname + "/" + encodeURIComponent(dir.name), newpathname + "/" + encodeURIComponent(dir.name));
 		}
 	}
 },
@@ -148,7 +148,7 @@ RenameDirectory: function(path, newname, togglelock) {
 	var parentPathname = this.GetPathnameFromPath(parentPath);
 	if("contents" in dir.contents[oldname]) {
 		for(var name in dir.contents[oldname].contents) {
-			this.UpdateMovedEntries(dir.contents[oldname].contents[name], parentPathname + "/" + oldname, parentPathname + "/" + newname);
+			this.UpdateMovedEntries(dir.contents[oldname].contents[name], parentPathname + "/" + encodeURIComponent(oldname), parentPathname + "/" + encodeURIComponent(newname));
 		}
 	}
 	dir.contents[newname] = dir.contents[oldname];
@@ -229,6 +229,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
+			socket.emit('CloseModal');
 		} else {
 			socket.emit('UpdateError', 'That directory could not be created.');
 		}
@@ -244,6 +245,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
+			socket.emit('CloseModal');
 		} else {
 			socket.emit('UpdateError', 'That file could not be created.');
 		}
@@ -295,6 +297,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
+			socket.emit('CloseModal');
 		}
 	});
 	socket.on('RequestEntry', function(pathname, callback) {
@@ -314,6 +317,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
+			socket.emit('CloseModal');
 		} else {
 			socket.emit('UpdateError', 'That could not be moved into the selected directory.');
 		}
@@ -328,6 +332,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
+			socket.emit('CloseModal');
 		} else {
 			socket.emit('UpdateError', 'The directory could not be renamed to the given name.');
 		}
@@ -338,6 +343,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
+			socket.emit('CloseModal');
 		} else {
 			socket.emit('UpdateError', 'You cannot change the locked status of that directory.');
 		}

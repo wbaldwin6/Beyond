@@ -95,6 +95,9 @@
 				document.getElementById('Content').style.width = "calc(80% - 5px)";
 				
 				//Initialize socket event listeners
+				this.props.socket.on('CloseModal', function() {
+					that.setState({modal: null});
+				});
 				this.props.socket.on('UpdateDatabase', function (directory) {
 					that.setState({directory: directory});
 					document.getElementById('iFrame').contentWindow.location.reload(true);
@@ -375,7 +378,6 @@
 							socket.emit('EditEntry', this.props.path, name, content);
 						break;
 				}
-				this.props.outerarea.setState({modal: undefined});
 			},
 			
 			CancelButton: function(e) {
@@ -508,7 +510,6 @@
 				if(newname) {
 					this.props.socket.emit('AddDirectory', this.props.path, newname, this.props.outerarea.state.username, this.refs.checkLocked.checked);
 				}
-				this.props.outerarea.setState({modal: null});
 			},
 			
 			CancelButton: function(e) {
@@ -582,7 +583,7 @@
 					var oldpath = this.props.path;
 					this.props.socket.emit('MoveEntry', oldpath, newpath);
 				}
-				this.props.outerarea.setState({modal: null, movemodal: null});
+				this.props.outerarea.setState({movemodal: null});
 			},
 			
 			CancelButton: function(e) {
@@ -653,7 +654,6 @@
 				} else if(this.refs.checkLocked.checked) {
 					this.props.socket.emit('LockDirectory', path);
 				}
-				this.props.outerarea.setState({modal: null});
 			},
 			
 			CancelButton: function(e) {
