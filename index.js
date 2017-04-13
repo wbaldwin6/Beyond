@@ -1076,7 +1076,8 @@ if(process.argv[2]){
 	  console.log('listening on *:'+process.argv[2]);
 	});
 } else {
-	http.listen(0, function(){
+	var prt = process.env.PORT || 0;
+	http.listen(prt, function(){
 	  console.log('listening on *:'+http.address().port);
 	});
 }
