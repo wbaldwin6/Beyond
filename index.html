@@ -669,7 +669,7 @@
 					case 'Edit':
 						var children = this.state.context.target.children;
 						newmodal.post = children[children.length-1].innerHTML;
-						if(newmodal.post.charAt(0) === '"'){//This is really a bad check.
+						if(this.state.context.target.className.split(' ')[1] === 'say'){
 							newmodal.post = newmodal.post.slice(1, -1);
 						}
 						if(newmodal.post.endsWith("*")){
@@ -703,7 +703,7 @@
 						newmodal.pt = t.charAt(0).toUpperCase() + t.slice(1);
 						var children = this.state.context.target.children;
 						newmodal.post = children[children.length-1].innerHTML;
-						if(newmodal.post.charAt(0) === '"'){//This is really a bad check.
+						if(this.state.context.target.className.split(' ')[1] === 'say'){
 							newmodal.post = newmodal.post.slice(1, -1);
 						}
 						if(newmodal.post.endsWith("*")){
