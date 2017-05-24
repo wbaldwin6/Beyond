@@ -554,10 +554,11 @@
 						switch(className){
 							case 'character':
 								//add a check for 'if we're in doubleclick mode' to put open/close here
-								options = ['Modify Derivatives', 'Delete Character', 'Set Active Character', 'Set Profile'];
+								options = ['Modify Derivatives', 'Set Active Character', 'Set Profile'];
 								if(['Player', 'Admin'].indexOf(this.state.permissions) > -1){
 									options.push('Join Room', 'Leave Room');
 								}
+								options.push('Delete Character');
 								break;
 							case 'derivative':
 								options = ['Edit Derivative', 'Delete Derivative', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']
@@ -955,8 +956,8 @@
 				var password = this.refs.password.value;
 				if(username.length >= 6 && password.length >= 6){
 					if(this.refs.Remember.checked){
-						document.cookie = "username="+username;
-						document.cookie = "password="+password;
+						document.cookie = "username="+encodeURIComponent(username);
+						document.cookie = "password="+encodeURIComponent(password);
 					}
 					var ind = e.target.parentNode.getAttribute('id');
 					this.props.socket.emit(type, username, md5(password), false, function (response){
@@ -975,8 +976,8 @@
 			componentDidMount: function(){
 				if(document.cookie && document.cookie.match(/[; ^]?username=([^\s;]*)/)){
 					var c = document.cookie;
-					this.refs.username.value = c.match(/[; ^]?username=([^\s;]*)/)[1];
-					this.refs.password.value = c.match(/[; ^]?password=([^\s;]*)/)[1];
+					this.refs.username.value = decodeURIComponent(c.match(/[; ^]?username=([^\s;]*)/)[1]);
+					this.refs.password.value = decodeURIComponent(c.match(/[; ^]?password=([^\s;]*)/)[1]);
 					this.refs.password.focus();
 				} else {
 					this.refs.username.focus();

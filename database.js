@@ -171,7 +171,6 @@ LoadDatabase: function() {
 			this.SaveDatabase();
 		}
 	} catch(err) {
-		console.log(err.stack);
 		toplevel = new Directory('database', '');
 		entries = {};
 		fs.mkdirSync('./database', function(er) {
