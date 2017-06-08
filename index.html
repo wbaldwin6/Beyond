@@ -604,6 +604,7 @@
 								//fallthrough
 							case 'ICbox':
 								//add 'Narrate'
+								options.unshift('Persistent Narrate');
 								options.unshift('Narrate');
 								break;
 							case 'Dice Command':
@@ -693,6 +694,8 @@
 					case 'Test Action':
 						//fallthrough
 					case 'Narrate':
+						//fallthrough
+					case 'Persistent Narrate':
 						//fallthrough
 					case 'Join Room':
 						newmodal.type = 'action';
@@ -1437,6 +1440,11 @@
 						this.props.socket.emit('Whisper', post, modata.id);
 					} else if(modata.name == 'Narrate'){
 						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
+					} else if(modata.name == 'Persistent Narrate'){
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
+						this.refs['text'].value = '';
+						e.preventDefault();
+						return;
 					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
 					} else if(['Ban', 'Mute', 'Unban', 'Unmute'].indexOf(modata.name) > -1){
