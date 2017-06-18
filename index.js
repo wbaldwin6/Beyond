@@ -969,7 +969,7 @@ io.on('connection', function(socket){
 			if(err){callback(err);} else {
 				logins = JSON.parse(logins);
 				if(logins[username]){//valid username
-					if(users[username]){//already on the list?
+					if(users[username] || sessions[socket.request.connection.remoteAddress]){//already on the list?
 						callback("User already logged in!");
 					} else if(logins[username].password == password){//valid login
 						addPlayer(username, socket, logins[username].permissions, logins[username].muted);

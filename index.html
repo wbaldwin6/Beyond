@@ -575,16 +575,31 @@
 							case 'chargroup ungrouped':
 								options = ['New Character', 'New Group'];
 								break;
-							case 'OOC message':
-								//fallthrough
-							case 'OOC whisper':
-								//fallthrough
 							case 'PLentry':
 								//add Whisper, check if admin for other commands
 								options = ['Whisper'];
 								if(this.state.permissions == 'Admin'){
 									options.push('Make Player', 'Make Admin', 'Make Guest', 'Mute', 'Unmute', 'Boot', 'Ban');
 								}
+								break;
+							case 'OOC message':
+								//fallthrough
+							case 'OOC whisper':
+								options = ['Whisper'];
+								if(this.state.permissions == 'Admin'){
+									options.push('Make Player', 'Make Admin', 'Make Guest', 'Mute', 'Unmute', 'Boot', 'Ban');
+								}
+								//fallthrough
+							case 'OOC system message':
+								//fallthrough
+							case 'OOC log message':
+								//fallthrough
+							case 'OOC say message':
+								//fallthrough
+							case 'OOC action message':
+								//fallthrough
+							case 'OOCbox':
+								options.push('Clear OOC');
 								break;
 							case 'IC say message':
 								//fallthrough
@@ -606,6 +621,7 @@
 								//add 'Narrate'
 								options.unshift('Persistent Narrate');
 								options.unshift('Narrate');
+								options.push('Clear IC');
 								break;
 							case 'Dice Command':
 								//Delete
@@ -621,9 +637,10 @@
 
 			handleContext: function(e){
 				var name = e.target.textContent;
-				var id = this.state.context.target.getAttribute('id').split(',');
+				var id = this.state.context.target.getAttribute('id');
+				if(id){id = this.state.context.target.getAttribute('id').split(',');}
 				var newmodal = {id: id, name: name};
-				if(id.length >= 2 && name != 'Whisper'){
+				if(id && id.length >= 2 && name != 'Whisper'){
 					newmodal.charid = this.state.characters[id[0]][id[1]][0].id;
 					if(id.length === 3){
 						var deriv = this.state.characters[id[0]][id[1]][id[2]];
@@ -647,6 +664,14 @@
 						//fallthrough
 					case 'Delete Character'://fallthrough
 					case 'Delete Derivative'://fallthrough
+					case 'Clear OOC':
+						newmodal.cb = this.refs.OOCbox.boxClear;
+						newmodal.type = 'delete';
+						break;
+					case 'Clear IC':
+						newmodal.cb = this.refs.ICbox.boxClear;
+						newmodal.type = 'delete';
+						break;
 					case 'Delete Post':
 						newmodal.type = 'delete';
 						break;
@@ -766,7 +791,7 @@
 			},
 
 			modalpush: function(data){//helper for putting new modals in. Also good for letting other components do it.
-				if(data && data.id && data.type && data.name){
+				if(data && data.type && data.name){
 					var mod = this.state.modal;
 					var i=0;
 					while(mod[i]){//until we find one that's undefined
@@ -805,7 +830,7 @@
 						</div>
 						<div id="OI">
 							<div id="IC">
-								<IChandler socket={this.props.socket} notify={this.state.settings.notify}/>
+								<IChandler ref="ICbox" socket={this.props.socket} notify={this.state.settings.notify}/>
 							</div>
 							<div id="OOC">
 								<OOChandler ref="OOCbox" socket={this.props.socket} notify={this.state.settings.notify}/>
@@ -1361,6 +1386,11 @@
 				this.props.closeModal(this.props.id);
 			},
 
+			clearBox: function(e){
+				this.props.modal.cb(e);
+				this.props.closeModal(this.props.id);
+			},
+
 			render: function(){
 				var modal = this.props.modal;
 				var name = modal.name;
@@ -1371,6 +1401,8 @@
 					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
 				} else if(modal.name == "Delete Post"){
 					fun = this.postDelete;
+				} else if (modal.name.startsWith("Clear")){
+					fun = this.clearBox;
 				}
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
@@ -2087,6 +2119,13 @@
 				return {messages: [], ids: {}, height: 0};
 			},
 
+			boxClear: function(e){
+				var messages = this.state.messages.slice();
+				var ids = this.state.ids;
+				this.setState({messages: [], ids: {}, height: this.refs.box.scrollHeight});
+				this.forceUpdate();
+			},
+
 			shouldComponentUpdate: function(nextProps, nextState){
 				return(nextState.messages.length !== this.state.messages.length);
 			},
@@ -2169,6 +2208,11 @@
 		var OOChandler = React.createClass({
 			getInitialState: function(){
 				return {messages: [], height: 0};
+			},
+
+			boxClear: function(e){
+				this.setState({messages: [], height: this.refs.box.scrollHeight});
+				this.forceUpdate();
 			},
 
 			systemmessage: function(message){
