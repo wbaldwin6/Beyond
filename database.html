@@ -85,7 +85,7 @@
 		//Properties: socket
 		var OuterArea = React.createClass({
 			getInitialState: function() {
-				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "Sk8torchic", contents: {}}, page: '', openness: {}, showNames: false};
+				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "Sk8torchic", contents: {}, order: []}, page: '', openness: {}, showNames: false};
 			},
 		
 			componentDidMount: function() {
@@ -203,6 +203,43 @@
 				this.setState({showNames: !this.state.showNames});
 			},
 			
+			entryDragStart: function(e) {
+				if(this.state.permissions === 'Admin' && e.target.id != JSON.stringify([this.state.directory.name])) {
+					e.stopPropagation();
+					e.dataTransfer.setData("text", 'n');
+					var handler = document.getElementById("Directory");
+					handler.addEventListener("dragover", this.entryDragOver, false);
+					handler.addEventListener("dragend", this.entryDragEnd, false);
+					handler.addEventListener("drop", this.entryDrop, false);
+					this.setState({draggedElem: e.target});
+				}
+			},
+
+			entryDragEnd: function(e) {
+				e.preventDefault();
+				var handler = document.getElementById("Directory");
+				handler.removeEventListener("dragover", this.entryDragOver, false);
+				handler.removeEventListener("dragend", this.entryDragEnd, false);
+				handler.removeEventListener("drop", this.entryDrop, false);
+				this.setState({draggedElem: null});
+			},
+
+			entryDragOver: function(e) {
+				if(e.target.className === "databaseEntry" && this.state.draggedElem.id != e.target.id) {
+					e.preventDefault();
+				}
+			},
+
+			entryDrop: function(e) {
+				console.log("Fired Drop event.");
+				e.preventDefault();
+				var rect = e.target.getBoundingClientRect();
+				var where = (e.clientY - rect.top) * 2 > (rect.bottom - rect.top); //If true, it's below, else it's above.
+				var fromPath = JSON.parse(this.state.draggedElem.id);
+				var toPath = JSON.parse(e.target.id);
+				this.props.socket.emit('DragEntry', fromPath, toPath, where);
+			},
+			
 			render: function() {
 				var context = null;
 				if(this.state.context) { //context should have keys x, y, path, functions; functions include AddDirectory, AddEntry, Delete, Edit
@@ -235,7 +272,7 @@
 				}
 				var searchButton = <button key="SearchButton" onClick={this.OpenSearchModal} disabled={this.state.modal ? true : false} style={{zIndex: "500", position: "fixed", left: "0px", bottom: "0px"}}>Search</button>;
 				var toggleNamesButton = <button key="ToggleNames" onClick={this.ToggleNames} style={{zIndex: "500", position: "fixed", left: "54px", bottom: "0px"}}>Toggle Names</button>
-				var dir = (<div key="Directory" id="Directory" style={{height: "100%", overflowY: "auto"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} parents={[]} /></div>);
+				var dir = (<div key="Directory" id="Directory" style={{height: "100%", overflowY: "auto"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} order={this.state.directory.order} parents={[]} /></div>);
 				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
 				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}{toggleNamesButton}</div>);
 			}
@@ -286,20 +323,21 @@
 			
 			render: function() {
 				if(this.state.open) {
-					var name = <b><div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [&#8209;]</span></div></b>
+					var name = <b><div draggable id={JSON.stringify(this.props.parents.concat([this.props.name]).slice(1))} className="databaseEntry" onDragStart={this.props.outerarea.entryDragStart} onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{"\xA0".repeat(this.props.parents.length*4)}{this.props.name} [&#8209;]</div></b>
 					var children = [];
 					var parents = this.props.parents.concat([this.props.name]);
-					for(var entry_name in this.props.contents) {
+					for(var i = 0; i < this.props.order.length; i++) {
+						var entry_name = this.props.order[i];
 						var entry = this.props.contents[entry_name];
 						if("contents" in entry) {
-							children.push(<DirectoryList key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} contents={entry.contents} locked={entry.locked} parents={parents} />)
+							children.push(<DirectoryList key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} contents={entry.contents} locked={entry.locked} order={entry.order} parents={parents} />)
 						} else {
 							children.push(<Entry key={entry_name} outerarea={this.props.outerarea} socket={this.props.socket} name={entry.name} creator={entry.creator} parents={parents} />)
 						}
 					}
 					return(<div>{name}<br />{children}</div>);
 				} else {
-					return(<b><div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{this.props.name} [+]</span><br /></div></b>);
+					return(<b><div draggable id={JSON.stringify(this.props.parents.concat([this.props.name]).slice(1))} className="databaseEntry" onDragStart={this.props.outerarea.entryDragStart} onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{"\xA0".repeat(this.props.parents.length*4)}{this.props.name} [+]<br /></div></b>);
 				}
 			}
 		});
@@ -333,7 +371,7 @@
 			},
 			
 			render: function() {
-			return(<div>{"\xA0".repeat(this.props.parents.length*4)}<span onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{this.props.name}{this.props.outerarea.state.showNames ? " (By " + this.props.creator + ")" : ""}</span></div>);
+			return(<div draggable id={JSON.stringify(this.props.parents.concat([this.props.name]).slice(1))} className="databaseEntry" onDragStart={this.props.outerarea.entryDragStart} onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{"\xA0".repeat(this.props.parents.length*4)}{this.props.name}{this.props.outerarea.state.showNames ? " (By " + this.props.creator + ")" : ""}</div>);
 			}
 		});
 		
@@ -933,7 +971,8 @@
 				if(!c.match(/[0-9A-Za-z]/)) {
 					if(cur.end_state) {
 						cur.end_state = false;
-						count++;
+						if(++count == numwords)
+							break;
 					}
 					if(cur.children.hasOwnProperty(c)) {
 						cur = cur.children[c];

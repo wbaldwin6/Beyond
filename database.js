@@ -5,11 +5,22 @@ function Directory(name, creator, locked) {
 	this.creator = creator;
 	this.contents = {};
 	this.locked = locked;
+	this.order = [];
 }
 
 function Entry(name, creator) {
 	this.name = name;
 	this.creator = creator;
+}
+
+function BuildOrder(dir) {
+	if(("contents" in dir) && !("order" in dir)) {
+		dir.order = [];
+		for(var entry_name in dir.contents) {
+			dir.order.push(entry_name);
+			BuildOrder(dir.contents[entry_name]);
+		}
+	}
 }
 
 var toplevel;
@@ -22,6 +33,7 @@ AddDirectory: function(path, name, creator, locked) {
 	if(!("contents" in dir) || name in dir.contents)
 		return undefined;
 	dir.contents[name] = new Directory(name, creator, locked);
+	dir.order.push[name];
 	return dir.contents[name];
 },
 
@@ -31,6 +43,7 @@ AddEntry: function(path, name, creator, content) {
 		return undefined;
 	var pathname = this.GetPathnameFromPath(path) + "/" + encodeURIComponent(name) + ".html";
 	dir.contents[name] = new Entry(name, creator);
+	dir.order.push(name);
 	entries[pathname] = content;
 	return dir.contents[name];
 },
@@ -47,6 +60,7 @@ DeleteEntry: function(path) {
 		delete entries[pathname];
 	}
 	delete dir.contents[path[path.length-1]];
+	dir.order.splice(dir.order.indexOf(path[path.length-1]), 1);
 	return true;
 },
 
@@ -98,6 +112,7 @@ RenameEntry: function(path, newname) {
 	dir.contents[newname] = dir.contents[oldname];
 	delete dir.contents[oldname];
 	dir.contents[newname].name = newname;
+	dir.order[dir.order.indexOf(oldname)] = newname;
 	return true;
 },
 
@@ -119,7 +134,50 @@ MoveEntry: function(oldpath, newpath) {
 	}
 	this.UpdateMovedEntries(olddir.contents[dirname], this.GetPathnameFromPath(oldpath.slice(0, -1)), this.GetPathnameFromPath(newpath));
 	newdir.contents[dirname] = olddir.contents[dirname];
+	olddir.order.splice(olddir.order.indexOf(dirname), 1);
+	newdir.order.push(dirname);
 	delete olddir.contents[dirname];
+	return true;
+},
+
+DragEntry: function(oldpath, newpath, after) {
+	console.log("DragEntry:\noldpath: " + oldpath + "\nnewpath: " + newpath + "\nafter: " + after);
+	if(oldpath.length === 0) {
+		return false;
+	}
+	var dirname = oldpath[oldpath.length-1];
+	var targetname = newpath[newpath.length-1];
+	var olddir = this.GetDirectoryFromPath(oldpath.slice(0, -1));
+	if(!("contents" in olddir) || !(dirname in olddir.contents)) {
+		return false;
+	}
+	if(newpath.length === 0) { //Dragging into the toplevel
+		if(olddir === toplevel) {
+			olddir.order.splice(olddir.order.indexOf(dirname), 1);
+			toplevel.order.splice(0, 0, dirname);
+		} else {
+			this.UpdateMovedEntries(olddir.contents[dirname], this.GetPathnameFromPath(oldpath.slice(0, -1)), this.GetPathnameFromPath(newpath.slice(0, -1)));
+			toplevel.contents[dirname] = olddir.contents[dirname];
+			olddir.order.splice(olddir.order.indexOf(dirname), 1);
+			toplevel.order.splice(0, 0, dirname);
+			delete olddir.contents[dirname];
+		}
+		return true;
+	}
+	var newdir = this.GetDirectoryFromPath(newpath.slice(0, -1));
+	if(!("contents" in newdir) || (newdir !== olddir && (dirname in newdir.contents))) {
+		return false;
+	}
+	if(newdir !== olddir) {
+		this.UpdateMovedEntries(olddir.contents[dirname], this.GetPathnameFromPath(oldpath.slice(0, -1)), this.GetPathnameFromPath(newpath.slice(0, -1)));
+		newdir.contents[dirname] = olddir.contents[dirname];
+		olddir.order.splice(olddir.order.indexOf(dirname), 1);
+		newdir.order.splice((after ? newdir.order.indexOf(targetname) + 1 : newdir.order.indexOf(targetname)), 0, dirname);
+		delete olddir.contents[dirname];
+	} else {
+		olddir.order.splice(olddir.order.indexOf(dirname), 1);
+		newdir.order.splice((after ? newdir.order.indexOf(targetname) + 1 : newdir.order.indexOf(targetname)), 0, dirname);
+	}
 	return true;
 },
 
@@ -154,6 +212,7 @@ RenameDirectory: function(path, newname, togglelock) {
 	dir.contents[newname] = dir.contents[oldname];
 	dir.contents[newname].name = newname;
 	delete dir.contents[oldname];
+	dir.order[dir.order.indexOf(oldname)]
 	this.ToggleDirectoryLock(dir.contents[newname]);
 	return true;
 },
@@ -161,20 +220,24 @@ RenameDirectory: function(path, newname, togglelock) {
 LoadDatabase: function() {
 	try {
 		toplevel = JSON.parse(fs.readFileSync('./database/database.json', 'utf8'));
+		BuildOrder(toplevel);
 		entries = JSON.parse(fs.readFileSync('./database/entries.json', 'utf8'));
 		if(typeof toplevel !== 'object') {
 			toplevel = new Directory('database', '');
 			entries = {};
 			fs.mkdirSync('./database', function(err) {
-				if(err && err.code != 'EEXIST') throw err;
+				if(err && err.code !== 'EEXIST') {throw err;}
 			});
 			this.SaveDatabase();
 		}
+		
 	} catch(err) {
+		console.log("An error has occured.");
+		console.log(err);
 		toplevel = new Directory('database', '');
 		entries = {};
 		fs.mkdirSync('./database', function(er) {
-			if(er && er.code != 'EEXIST') throw er;
+			if(er && er.code !== 'EEXIST') {throw er;}
 		});
 		this.SaveDatabase();
 	}
@@ -317,6 +380,20 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
 			socket.emit('CloseModal');
+		} else {
+			socket.emit('UpdateError', 'That could not be moved into the selected directory.');
+		}
+	});
+	socket.on('DragEntry', function(oldpath, newpath, after) {
+		if(user[2] !== 'Admin') {
+			socket.emit('UpdateError', 'You do not have permission to move that.');
+			return;
+		}
+		if(that.DragEntry(oldpath, newpath, after)) {
+			that.SaveDatabase();
+			for(var i = 0; i < databaseSockets.length; i++) {
+				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
+			}
 		} else {
 			socket.emit('UpdateError', 'That could not be moved into the selected directory.');
 		}
