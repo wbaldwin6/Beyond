@@ -212,7 +212,7 @@ RenameDirectory: function(path, newname, togglelock) {
 	dir.contents[newname] = dir.contents[oldname];
 	dir.contents[newname].name = newname;
 	delete dir.contents[oldname];
-	dir.order[dir.order.indexOf(oldname)]
+	dir.order[dir.order.indexOf(oldname)] = newname;
 	this.ToggleDirectoryLock(dir.contents[newname]);
 	return true;
 },
