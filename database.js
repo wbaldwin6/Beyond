@@ -33,7 +33,7 @@ AddDirectory: function(path, name, creator, locked) {
 	if(!("contents" in dir) || name in dir.contents)
 		return undefined;
 	dir.contents[name] = new Directory(name, creator, locked);
-	dir.order.push[name];
+	dir.order.push(name);
 	return dir.contents[name];
 },
 
@@ -250,6 +250,20 @@ ToggleDirectoryLock: function(dir) {
 	return true;
 },
 
+PathIsLocked: function(path) {
+	var curdir = toplevel;
+	var i = 0;
+	while(i < path.length) {
+		if(curdir.locked)
+			return true;
+		if(!("contents" in curdir))
+			return false;
+		curdir = curdir.contents[path[i]];
+		i++;
+	}
+	return false;
+},
+
 SaveDatabase: function() {
 	savedToplevel = true;
 	that = this;
@@ -297,7 +311,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 	});
 	socket.on('AddEntry', function(path, name, creator, content) {
-		if(user[2] !== 'Admin' && that.GetDirectoryFromPath(path).locked) {
+		if(user[2] !== 'Admin' && that.PathIsLocked(path)) {
 			socket.emit('UpdateError', 'You do not have permission to create entries in that directory.');
 			return;
 		}
