@@ -232,8 +232,6 @@ LoadDatabase: function() {
 		}
 		
 	} catch(err) {
-		console.log("An error has occured.");
-		console.log(err);
 		toplevel = new Directory('database', '');
 		entries = {};
 		fs.mkdirSync('./database', function(er) {
