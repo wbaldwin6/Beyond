@@ -1098,6 +1098,7 @@
 					var fontStyle = this.refs['font'].value;
 					var nameColor = this.refs['nameColor'].value;
 					var customHTML = this.refs['html'].value;
+					var textHTML = this.refs['texthtml'].value;
 					var color = this.refs['color'].value;
 					var canvas;
 					var convertedicons = [];
@@ -1138,16 +1139,16 @@
 						}
 						if(modata.id[2]){//only in the single edit case (we have a deriv) do we NOT add.
 							var deriv = character[trueid[2]];
-							character[trueid[2]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[0] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML};
+							character[trueid[2]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[0] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML, textHTML: textHTML};
 						} else if(modata.id.length === 2 && toedit.length){
 							for(i=0; i<toedit.length; i++){
 								var deriv = character[toedit[i]];
-								character[toedit[i]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[i] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML};
+								character[toedit[i]] = {id: deriv.id, name: name || deriv.name, icon: picid || deriv.icon, icpos: convertedicons[i] || deriv.icpos, nameColor: nameColor, color: color, fontStyle: fontStyle || deriv.fontStyle, customHTML: customHTML, textHTML: textHTML};
 							}
 						} else {//but in the add derivatives case we use the 0-ID.
 							var charid = character[0] ? character[0].id : un+'-'+settings.characterIDs++;
 							for(i=0; i<convertedicons.length; i++){
-								character.push({id: charid, name: name || character[0].name, icon: picid, icpos: convertedicons[i], nameColor: nameColor, color: color, fontStyle: fontStyle, customHTML: customHTML});
+								character.push({id: charid, name: name || character[0].name, icon: picid, icpos: convertedicons[i], nameColor: nameColor, color: color, fontStyle: fontStyle, customHTML: customHTML, textHTML: textHTML});
 							}
 						}//now we've added all the new derivatives or just modified the one.
 						characters[trueid[0]][trueid[1]] = character;//adds new if new, otherwise overwrites
@@ -1198,7 +1199,7 @@
 				var derivatives;
 				var sel;
 				var FIs = (<input type='file' ref={'FIs'} style={{width:'100%',marginBottom:'1px'}} multiple onChange={this.handleFIs}/>);//by default it allows multiple
-				var nameColor; var color; var fontStyle; var customHTML;
+				var nameColor; var color; var fontStyle; var customHTML; var textHTML;
 				var character;
 				var trueid;
 				var name;
@@ -1207,6 +1208,7 @@
 					color = '#ffffff';
 					fontStyle = 'Times New Roman';
 					customHTML = '';
+					textHTML = '';
 					var grouption = this.props.characters.map(function(group, ind){
 						if(!ind){
 							return (<option key={ind} value={ind}>None</option>);
@@ -1224,6 +1226,7 @@
 						color = character[0].color;
 						fontStyle = character[0].fontStyle;
 						customHTML = character[0].customHTML;
+						textHTML = character[0].textHTML;
 						name = modal.name+' - '+character[0].name;
 					} else {
 						this.props.closeModal(this.props.id);
@@ -1240,6 +1243,7 @@
 					nameColor = character[trueid[2]].nameColor || nameColor;
 					fontStyle = character[trueid[2]].fontStyle || fontStyle;
 					customHTML = character[trueid[2]].customHTML || customHTML;
+					textHTML = character[trueid[2]].textHTML || textHTML;
 					name = modal.name+' - '+character[trueid[2]].name;
 				}
 				var previews = null;
@@ -1259,7 +1263,8 @@
 					Name Color: <input type="color" className="char" ref={'nameColor'} defaultValue={nameColor}/><br/>
 					Text Color: <input type="color" className="char" ref={'color'} defaultValue={color}/><br/>
 					Font: <input type="text" className="char" ref={'font'} placeholder="Font Style" defaultValue={fontStyle} style={{fontFamily: fontStyle}} onChange={this.testFont} onKeyDown={this.fontTest}/><br/>
-					Custom HTML: <input type="text" className="char" ref={'html'} placeholder="Custom HTML" defaultValue={customHTML} style={{marginBottom:'1px'}}/><br/>
+					Name HTML: <input type="text" className="char" ref={'html'} placeholder="Name HTML" defaultValue={customHTML} style={{marginBottom:'1px'}}/><br/>
+					Text HTML: <input type="text" className="char" ref={'texthtml'} placeholder="Test HTML" defaultValue={textHTML} style={{marginBottom:'1px'}}/><br/>
 					{groupdropdown ? 'Select a group: ' : ''}{groupdropdown}<br/>
 					<button type="submit" id="save" onClick={this.charEdit}>Save</button>
 						<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/></div>

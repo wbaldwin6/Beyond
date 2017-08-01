@@ -424,6 +424,11 @@ var processHTML = function(message){
 };
 
 var addPlayer = function(username, socket, permissions, muted){
+	var oldname = sessions[socket.request.connection.remoteAddress];
+	if(oldname){//in case a second login with the same IP somehow occurs, we should make sure the old name doesn't hang around.
+		delete users[oldname];
+		delete playerlist[oldname];
+	}
 	sessions[socket.request.connection.remoteAddress] = username;
 	users[username] = socket;
 	playerlist[username] = {permissions: permissions, muted: muted};
@@ -711,7 +716,10 @@ var Setconnections = function(socket){//username will definitely be present or s
 					}});
 			}//always do a serverside check!
 			var className = 'message'; var call;
-			message = processHTML(message);
+			if(character.textHTML){
+				message = character.textHTML+message;
+			}
+			message = processHTML(message); //one nice thing processHTML does for us is automatically close the tags.
 			if(type.startsWith('Unnamed')){
 				character.customHTML = ' ';
 				type = type.substr(type.indexOf(' ')+1); //remove the 'Unnamed' from the start, it has done its job.
