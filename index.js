@@ -712,6 +712,10 @@ var Setconnections = function(socket){//username will definitely be present or s
 			}//always do a serverside check!
 			var className = 'message'; var call;
 			message = processHTML(message);
+			if(type.startsWith('Unnamed')){
+				character.customHTML = ' ';
+				type = type.substr(type.indexOf(' ')+1); //remove the 'Unnamed' from the start, it has done its job.
+			}
 			var msg = {character: character, post: message, username: username};
 			if(type.endsWith('Say')){
 				className = 'say ' + className;

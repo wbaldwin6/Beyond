@@ -561,9 +561,9 @@
 								options.push('Delete Character');
 								break;
 							case 'derivative':
-								options = ['Edit Derivative', 'Delete Derivative', 'Omit Say', 'Omit Action', 'Test Say', 'Test Action']
+								options = ['Edit Derivative', 'Delete Derivative', 'Omit Say', 'Omit Action', 'Unnamed Omit Action', 'Test Say', 'Test Action', 'Unnamed Test Action']
 								if(['Player', 'Admin'].indexOf(this.state.permissions) > -1){
-									options.splice(2, 0, 'Say', 'Action');
+									options.splice(2, 0, 'Say', 'Action', 'Unnamed Action');
 								}
 								break;
 							case 'chargroup':
@@ -710,9 +710,13 @@
 						//fallthrough
 					case 'Action':
 						//fallthrough
+					case 'Unnamed Action':
+						//fallthrough
 					case 'Omit Say':
 						//fallthrough
 					case 'Omit Action':
+						//fallthrough
+					case 'Unnamed Omit Action':
 						//fallthrough
 					case 'Test Say':
 						//fallthrough
@@ -1512,7 +1516,7 @@
 					} else {//find the right id
 						var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
 						var room = null;
-						if(modata.name == 'Say' || modata.name == 'Action'){//only for IC posts.
+						if(modata.name == 'Say' || modata.name == 'Action' || modata.name == 'Unnamed Action'){//only for IC posts.
 							var rooms = Object.keys(this.props.settings.rooms);
 							for(var i=0; i < rooms.length && !room; i++){
 								if(this.props.settings.rooms[rooms[i]].indexOf(modata.charid) > -1){//it's in this room
@@ -1571,6 +1575,11 @@
 				var name = this.refs['type'].textContent;
 				var win = this.refs['win'].textContent;
 				var deriv = null;
+				var un = false;
+				if(name == 'Unnamed'){
+					name = 'Action';
+					un = true;
+				}
 				if(post && this.state.id){//find the right id
 					var did = this.state.id.id;
 					var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
@@ -1582,8 +1591,11 @@
 								room = rooms[i];
 							}
 						}
-					} else {//omits
+					} else {//omits and tests
 						name = win+' '+name;
+					}
+					if(un){
+						name = 'Unnamed ' + name;
 					}
 					if(trueid){
 						deriv = this.props.characters[trueid[0]][trueid[1]][did];
@@ -1623,6 +1635,9 @@
 						e.target.textContent = 'Say';
 						break;
 					case 'Say':
+						e.target.textContent = 'Unnamed';
+						break;
+					case 'Unnamed':
 						e.target.textContent = 'Action';
 						break;
 				}
