@@ -690,7 +690,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('Dice', function(dice, result, color, priv){
 		var username = sessions[socket.request.connection.remoteAddress];
-		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
+		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && result){
 			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
 			if(result.length > 1){
 				var total = result.reduce(function(a,b){return a+b;});
@@ -707,7 +707,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('characterPost', function(message, character, type, room){
 		var username = sessions[socket.request.connection.remoteAddress];
-		if(username && !playerlist[username].muted){
+		if(username && !playerlist[username].muted && character){
 			if(character.customHTML){
 				character.customHTML = sanitizeHtml(character.customHTML, {allowedTags: ['b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
 					allowedAttributes: {
