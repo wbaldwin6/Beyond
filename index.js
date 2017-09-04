@@ -654,7 +654,8 @@ var Setconnections = function(socket){//username will definitely be present or s
 			socket.emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">You are currently muted.</font>'});
 		}
 	});
-	socket.on('Narrate', function(message, color, room){
+	socket.on('Narrate', function(message, color, room, callback){
+		if(callback){callback();}
 		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
 			message = processHTML(message);
@@ -705,9 +706,10 @@ var Setconnections = function(socket){//username will definitely be present or s
 			}
 		}
 	});
-	socket.on('characterPost', function(message, character, type, room){
+	socket.on('characterPost', function(message, character, type, room, callback){
+		if(callback){callback();}
 		var username = sessions[socket.request.connection.remoteAddress];
-		if(username && !playerlist[username].muted && character){
+		if(username && !playerlist[username].muted){
 			if(character.customHTML){
 				character.customHTML = sanitizeHtml(character.customHTML, {allowedTags: ['b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
 					allowedAttributes: {

@@ -1423,7 +1423,7 @@
 		var ActionModal = React.createClass({
 			getInitialState: function(){
 				var width = 300;
-				return {x: '25%', y: '25%', width: width, minwidth: 140, height: 'auto'};
+				return {x: '25%', y: '25%', width: width, minwidth: 140, height: 'auto', wait: false};
 			},
 
 			componentDidMount: function(){
@@ -1457,6 +1457,7 @@
 			},
 
 			post: function(e){
+				e.preventDefault();
 				var modal = e.target.parentNode;
 				var modata = this.props.modal;
 				var post = this.refs['text'].value;
@@ -1469,7 +1470,7 @@
 							this.props.socket.emit('Join Room', post);
 						}
 						this.props.handleSettings(this.props.settings, this.props.characters);
-				} else if(post){
+				} else if(post && !this.state.wait){
 					if(modata.name.startsWith('Show')){
 						return;
 					}
@@ -1480,11 +1481,20 @@
 					} else if(modata.name == 'Whisper'){
 						this.props.socket.emit('Whisper', post, modata.id);
 					} else if(modata.name == 'Narrate'){
-						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
+						var that = this;
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room, function(){
+							that.props.closeModal(that.props.id);
+						});
+						this.state.wait = true;
+						setTimeout(this.unWait, 1000);
+						return;
 					} else if(modata.name == 'Persistent Narrate'){
-						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room);
-						this.refs['text'].value = '';
-						e.preventDefault();
+						var that = this;
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room, function(){
+							that.refs['text'].value = '';
+						});
+						this.state.wait = true;
+						setTimeout(this.unWait, 1000);
 						return;
 					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
@@ -1492,6 +1502,9 @@
 						this.props.socket.emit('AdminCommand', modata.name, post);
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
+						this.state.wait = true;
+						setTimeout(this.unWait, 1000);
+						return;
 					} else if(modata.name == 'Join Room'){
 						var settings = this.props.settings;
 						if(!settings.rooms[post]){//not in this room yet
@@ -1531,12 +1544,23 @@
 						}
 						if(trueid){
 							var deriv = this.props.characters[trueid[0]][trueid[1]][trueid[2]];
-							this.props.socket.emit('characterPost', post, deriv, modata.name, room);
-						}//if it's undefined the character doesn't exist.
+							var that = this;
+							this.props.socket.emit('characterPost', post, deriv, modata.name, room, function(){
+								that.props.closeModal(that.props.id);
+							});
+							this.state.wait = true;
+							setTimeout(this.unWait, 1000);
+							return;
+						}
 					}
 				}
+				if(!this.state.wait){//if it's in a wait loop, preserve the modal.
+					this.props.closeModal(this.props.id);
+				}
+			},
 
-				this.props.closeModal(this.props.id);
+			unWait: function(){
+				this.state.wait = false;
 			},
 
 			render: function(){
@@ -1558,7 +1582,7 @@
 
 		var ActiveModal = React.createClass({
 			getInitialState: function(){
-				return {x: '25%', y: '25%', width: 217, minwidth: 167, height: 'auto'};
+				return {x: '25%', y: '25%', width: 217, minwidth: 167, height: 'auto', wait: false};
 			},
 
 			startDrag: startDrag,
@@ -1574,6 +1598,7 @@
 			},
 
 			post: function(e){
+				e.preventDefault();
 				var modal = e.target.parentNode;
 				var modata = this.props.modal;
 				var post = this.refs['text'].value;
@@ -1585,7 +1610,7 @@
 					name = 'Action';
 					un = true;
 				}
-				if(post && this.state.id){//find the right id
+				if(post && this.state.id && !this.state.wait){//find the right id
 					var did = this.state.id.id;
 					var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
 					var room = null;
@@ -1604,15 +1629,24 @@
 					}
 					if(trueid){
 						deriv = this.props.characters[trueid[0]][trueid[1]][did];
-						if(modata.name != 'Full Edit'){this.props.socket.emit('characterPost', post, deriv, name, room);}
+						if(modata.name != 'Full Edit'){
+							var that = this;
+							this.props.socket.emit('characterPost', post, deriv, name, room, function(){
+								that.refs['text'].value = ''; //just empty it.
+							});
+							this.state.wait = true;
+							setTimeout(this.unWait, 1000);
+						}
 					}//if it's undefined the character doesn't exist.
-					this.refs['text'].value = ''; //just empty it.
 				}
 				if(post && modata.name == 'Full Edit'){//if there IS a trueid we have it by this point, else it should default to previous.
 					this.props.socket.emit('Cedit', post, deriv, name, modata.id);
 					this.props.closeModal(this.props.id);
 				}
-				e.preventDefault();
+			},
+
+			unWait: function(){
+				this.state.wait = false;
 			},
 
 			select: function(e){
