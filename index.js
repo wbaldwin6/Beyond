@@ -709,7 +709,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 	socket.on('characterPost', function(message, character, type, room, callback){
 		if(callback){callback();}
 		var username = sessions[socket.request.connection.remoteAddress];
-		if(username && !playerlist[username].muted){
+		if(username && !playerlist[username].muted && character){
 			if(character.customHTML){
 				character.customHTML = sanitizeHtml(character.customHTML, {allowedTags: ['b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
 					allowedAttributes: {
