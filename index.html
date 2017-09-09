@@ -1482,18 +1482,19 @@
 						this.props.socket.emit('Whisper', post, modata.id);
 					} else if(modata.name == 'Narrate'){
 						var that = this;
+						var to = setTimeout(this.unWait, 1000);
 						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room, function(){
+							clearTimeout(to);
 							that.props.closeModal(that.props.id);
 						});
-						this.state.wait = true;
-						setTimeout(this.unWait, 1000);
+						this.setState({wait: true});
 						return;
 					} else if(modata.name == 'Persistent Narrate'){
 						var that = this;
 						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room, function(){
 							that.refs['text'].value = '';
 						});
-						this.state.wait = true;
+						this.setState({wait: true});
 						setTimeout(this.unWait, 1000);
 						return;
 					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info'].indexOf(modata.name) > -1){
@@ -1502,8 +1503,6 @@
 						this.props.socket.emit('AdminCommand', modata.name, post);
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
-						this.state.wait = true;
-						setTimeout(this.unWait, 1000);
 						return;
 					} else if(modata.name == 'Join Room'){
 						var settings = this.props.settings;
@@ -1545,22 +1544,23 @@
 						if(trueid){
 							var deriv = this.props.characters[trueid[0]][trueid[1]][trueid[2]];
 							var that = this;
+							var to = setTimeout(this.unWait, 1000);
 							this.props.socket.emit('characterPost', post, deriv, modata.name, room, function(){
+								clearTimeout(to);
 								that.props.closeModal(that.props.id);
 							});
-							this.state.wait = true;
-							setTimeout(this.unWait, 1000);
+							this.setState({wait: true});
 							return;
 						}
 					}
 				}
-				if(!this.state.wait){//if it's in a wait loop, preserve the modal.
+				if(!this.state.wait && !(modata.name == 'Persistent Narrate')){//if it's in a wait loop or is persistent, preserve the modal.
 					this.props.closeModal(this.props.id);
 				}
 			},
 
 			unWait: function(){
-				this.state.wait = false;
+				this.setState({wait: false});
 			},
 
 			render: function(){
@@ -1582,7 +1582,7 @@
 
 		var ActiveModal = React.createClass({
 			getInitialState: function(){
-				return {x: '25%', y: '25%', width: 217, minwidth: 167, height: 'auto', wait: false};
+				return {x: '25%', y: '25%', width: 217, minwidth: 167, height: 'auto', wait: false, min: false};
 			},
 
 			startDrag: startDrag,
@@ -1634,7 +1634,7 @@
 							this.props.socket.emit('characterPost', post, deriv, name, room, function(){
 								that.refs['text'].value = ''; //just empty it.
 							});
-							this.state.wait = true;
+							this.setState({wait: true});
 							setTimeout(this.unWait, 1000);
 						}
 					}//if it's undefined the character doesn't exist.
@@ -1646,7 +1646,7 @@
 			},
 
 			unWait: function(){
-				this.state.wait = false;
+				this.setState({wait: false});
 			},
 
 			select: function(e){
@@ -1709,28 +1709,38 @@
 				}
 			},
 
-			componentDidUpdate: function(){
-				if(this.state.id){
-					var trueid = this.props.verifyID(this.props.modal.charid, this.props.modal.id, null);
-					var deriv = this.props.characters[trueid[0]][trueid[1]][this.state.id.id];
-					if(deriv){
-						this.refs['prev'].style.fontFamily = deriv.fontStyle;
-						this.refs['prev'].style.color = deriv.nameColor;
-						if(deriv.customHTML){
-							this.refs['prev'].innerHTML = deriv.customHTML;
-						} else {
-							this.refs['prev'].textContent = deriv.name;
+			componentDidUpdate: function(prevProps, prevState){
+				if(!this.state.min){
+					if(this.state.id){
+						var trueid = this.props.verifyID(this.props.modal.charid, this.props.modal.id, null);
+						var deriv = this.props.characters[trueid[0]][trueid[1]][this.state.id.id];
+						if(deriv){
+							this.refs['prev'].style.fontFamily = deriv.fontStyle;
+							this.refs['prev'].style.color = deriv.nameColor;
+							if(deriv.customHTML){
+								this.refs['prev'].innerHTML = deriv.customHTML;
+							} else {
+								this.refs['prev'].textContent = deriv.name;
+							}
 						}
+					}//img must always exist by this point or we're in an invalid state.
+					var h = this.state.unc + this.refs['img'].getBoundingClientRect().height + 34;
+					if(this.state.height < h){//prevents height from going below a certain point.
+						this.setState({height: h});
 					}
-				}
-				var h = this.state.unc + this.refs['img'].getBoundingClientRect().height + 34;
-				if(this.state.height < h){
-					this.setState({height: h});
+					if(prevState.min){//was minimized last update.
+						this.forceUpdate();
+						this.refs.text.focus();
+					}
 				}
 			},
 
 			focus: function(){
 				this.refs.text.focus();
+			},
+
+			minimize: function(){
+				this.setState({min: !this.state.min});
 			},
 
 			render: function(){
@@ -1749,13 +1759,19 @@
 				var images = this.props.characters[trueid[0]][trueid[1]].map(function(deriv, i3){
 					return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);
 				});//grab the derivatives in here
+				if(this.state.min){
 				return(
-					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag} onClick={this.focus}><span className="mtitle">{name}</span><br/>
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><span onClick={this.minimize} style={{position: 'absolute', right:0, top: 0, cursor: "default"}}>[+]</span></div>
+				);
+				} else {
+				return(
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag} onClick={this.focus}><span className="mtitle">{name}</span><span onClick={this.minimize} style={{position: 'absolute', right:0, top: 0, cursor: "default"}}>[-]</span><br/>
 					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{images}</div><br/>
 					<div style={{width: '100%', whiteSpace: 'nowrap', background:'none'}}><span ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><span ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>IC</span><span ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>{def}</span></div><br/>
 					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:hei, minHeight:32}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
 					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Close</button><button ref='scrollb' type="submit" onClick={this.mode}>Scroll</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/></div>
 				);
+				}
 			}
 		});
 
