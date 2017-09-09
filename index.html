@@ -2186,13 +2186,13 @@
 		var IChandler = React.createClass({
 			getInitialState: function(){
 				//normally messages would be empty but I want to test this out.
-				return {messages: [], ids: {}, height: 0};
+				return {messages: [], ids: {}};
 			},
 
 			boxClear: function(e){
 				var messages = this.state.messages.slice();
 				var ids = this.state.ids;
-				this.setState({messages: [], ids: {}, height: this.refs.box.scrollHeight});
+				this.setState({messages: [], ids: {}});
 				this.forceUpdate();
 			},
 
@@ -2200,10 +2200,13 @@
 				return(nextState.messages.length !== this.state.messages.length);
 			},
 
+			componentWillUpdate: function(){
+				this.scroll = this.refs.box.scrollTop + this.refs.box.offsetHeight === this.refs.box.scrollHeight;//already at the bottom.
+			},
+
 			componentDidUpdate: function(){
-				//I need it to only autoscroll if they were previously at the bottom.
-				if(this.refs.box.scrollTop + this.refs.box.clientHeight >= this.state.height){
-					this.refs.box.scrollTop = this.state.height;
+				if(this.scroll){
+					this.refs.box.scrollTop = this.refs.box.scrollHeight - this.refs.box.offsetHeight;
 				}
 			},
 
@@ -2230,7 +2233,7 @@
 						}
 					}
 					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
-					that.setState({messages: newm, ids: ids, height: that.refs.box.scrollHeight});
+					that.setState({messages: newm, ids: ids});
 				});
 
 				this.props.socket.on('ICedit', function(message){
@@ -2248,7 +2251,7 @@
 						}
 						messages[ids[message.id]] = React.cloneElement(target, msg);
 						
-						that.setState({messages: messages, height: that.refs.box.scrollHeight});
+						that.setState({messages: messages});
 						that.forceUpdate();//this is the cheap solution.
 					}
 				});
@@ -2260,7 +2263,7 @@
 					if(target){
 						delete messages[ids[id]];
 						delete ids[id];
-						that.setState({messages: messages, ids: ids, height: that.refs.box.scrollHeight});
+						that.setState({messages: messages, ids: ids});
 						that.forceUpdate();
 					}
 				});
@@ -2277,27 +2280,31 @@
 
 		var OOChandler = React.createClass({
 			getInitialState: function(){
-				return {messages: [], height: 0};
+				return {messages: []};
 			},
 
 			boxClear: function(e){
-				this.setState({messages: [], height: this.refs.box.scrollHeight});
+				this.setState({messages: []});
 				this.forceUpdate();
 			},
 
 			systemmessage: function(message){
 				var newm = this.state.messages.slice();
 				newm.push(<Message key={newm.length} message={{post: message, className: 'OOC system message'}}/>)
-				this.setState({messages: newm, height: this.refs.box.scrollHeight});
+				this.setState({messages: newm});
 			},
 
 			shouldComponentUpdate: function(nextProps, nextState){
 				return(nextState.messages.length !== this.state.messages.length);
 			},
 
+			componentWillUpdate: function(){
+				this.scroll = this.refs.box.scrollTop + this.refs.box.offsetHeight === this.refs.box.scrollHeight;//already at the bottom.
+			},
+
 			componentDidUpdate: function(){
-				if(this.refs.box.scrollTop + this.refs.box.clientHeight >= this.state.height){
-					this.refs.box.scrollTop = this.state.height;
+				if(this.scroll){
+					this.refs.box.scrollTop = this.refs.box.scrollHeight - this.refs.box.offsetHeight;
 				}
 			},
 
@@ -2314,12 +2321,12 @@
 						}
 					}
 					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
-					that.setState({messages: newm, height: that.refs.box.scrollHeight});
+					that.setState({messages: newm});
 				});
 				this.props.socket.on('disconnect', function(){
 					var newm = that.state.messages.slice();
 					newm.push(<Message key={newm.length} message={{username: 'You', post: 'have disconnected.', className: 'OOC log message'}}/>);
-					that.setState({messages: newm, height: that.refs.box.scrollHeight});
+					that.setState({messages: newm});
 				});
 			},
 
