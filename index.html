@@ -2201,12 +2201,12 @@
 			},
 
 			componentWillUpdate: function(){
-				this.scroll = this.refs.box.scrollTop + this.refs.box.offsetHeight === this.refs.box.scrollHeight;//already at the bottom.
+				this.scroll = Math.ceil(this.refs.box.scrollTop) + this.refs.box.offsetHeight >= this.refs.box.scrollHeight;//already at the bottom.
 			},
 
 			componentDidUpdate: function(){
 				if(this.scroll){
-					this.refs.box.scrollTop = this.refs.box.scrollHeight - this.refs.box.offsetHeight;
+					this.refs.box.scrollTop = this.refs.box.scrollHeight;
 				}
 			},
 
@@ -2299,12 +2299,12 @@
 			},
 
 			componentWillUpdate: function(){
-				this.scroll = this.refs.box.scrollTop + this.refs.box.offsetHeight === this.refs.box.scrollHeight;//already at the bottom.
+				this.scroll = Math.ceil(this.refs.box.scrollTop) + this.refs.box.offsetHeight >= this.refs.box.scrollHeight;//already at the bottom.
 			},
 
 			componentDidUpdate: function(){
 				if(this.scroll){
-					this.refs.box.scrollTop = this.refs.box.scrollHeight - this.refs.box.offsetHeight;
+					this.refs.box.scrollTop = this.refs.box.scrollHeight;
 				}
 			},
 
