@@ -230,7 +230,7 @@ var toLog = function (message){
 	//the time stamp is added in all cases.
 	var ts=htm.createElement('span');
 	ts.setAttribute("class", "timestamp");
-	ts.textContent = '['+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+	ts.textContent = '['+message.username+' '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 	logmsg.appendChild(ts);
 	var classparam = message.className.split(" ")[1];
 	switch(classparam){
@@ -270,7 +270,7 @@ var editLog = function(message){
 			//the time stamp is added in all cases.
 			var ts=htm.createElement('span');
 			ts.setAttribute("class", "timestamp");
-			ts.textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+			ts.textContent = '['+message.username+' '+'Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 			logmsg.appendChild(ts);
 			var classparam = logmsg.className.split(" ")[1];
 			generatePost(logmsg, message.username, message.post, message.character, (classparam == 'say'), false);
@@ -290,7 +290,7 @@ var editLog = function(message){
 				}
 				logmsg.className = message.className;
 			}
-			logmsg.children[0].textContent = '[Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+			logmsg.children[0].textContent = '['+message.username+' '+'Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 			if(logmsg.className.split(' ')[1] == 'say'){
 				logmsg.children[logmsg.children.length-1].innerHTML = '"'+message.post+'"';
 			} else {
@@ -314,13 +314,25 @@ var editLog = function(message){
 	}
 };
 
+var getUser = function(id){
+	var target = htm.getElementById(id);
+	var ret = target.children[0].textContent.split(' ');
+	if(target && !target.children[0].textContent.startsWith('[Deleted')){
+		ret.splice(-2, 2);
+		ret = ret.join(' ');
+		return ret.substring(1);
+	} else {
+		return '';
+	}
+};
+
 var deleteLog = function(id){
 	var today = new Date();
 	var target = htm.getElementById(id);
-	if(target){
-		target.children[0].textContent = '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+	if(target && !target.children[0].textContent.startsWith('[Deleted')){
+		target.children[0].textContent += '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 		if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//has an edit!
-			target.nextElementSibling.children[0].textContent = '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
+			target.nextElementSibling.children[0].textContent += '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 		}
 		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
 			if(error){console.log(error);}
@@ -762,15 +774,24 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('ICedit', function(message, postid){
 		var username = sessions[socket.request.connection.remoteAddress];
+		if(getUser(postid) != username){
+			console.log(username + ' tried to edit a post by '+getUser(postid));
+			return;
+		}
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
 			message = processHTML(message);
 			var msg = {id: postid, post: message+'*'};
 			io.emit('ICedit', msg);
+			msg.username = username;
 			editLog(msg);
 		}
 	});
 	socket.on('Cedit', function(message, character, type, postid){
 		var username = sessions[socket.request.connection.remoteAddress];
+		if(getUser(postid) != username){
+			console.log(username + ' tried to edit a post by '+getUser(postid));
+			return;
+		}
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
 			message = processHTML(message);
 			className = 'message';
@@ -786,6 +807,10 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('Delete Post', function(id){
 		var username = sessions[socket.request.connection.remoteAddress];
+		if(getUser(id) != username){
+			console.log(username + ' tried to delete a post by '+getUser(id));
+			return;
+		}
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
 			deleteLog(id);
 			io.emit('ICdel', id);
