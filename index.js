@@ -241,10 +241,10 @@ var toLog = function (message){
 			generateOOClog(logmsg, message.username, message.post);
 			break;
 		case 'say':
-			generatePost(logmsg, message.username, message.post, message.character, true, message.className.startsWith('O'));
+			generatePost(logmsg, message.username, message.post, message.character, true, message.className.startsWith('O'), message.unnamed);
 			break;
 		case 'action':
-			generatePost(logmsg, message.username, message.post, message.character, false, message.className.startsWith('O'));
+			generatePost(logmsg, message.username, message.post, message.character, false, message.className.startsWith('O'), message.unnamed);
 			break;
 		case 'narration':
 			generateNarration(logmsg, message.username, message.post, message.color);
@@ -273,7 +273,7 @@ var editLog = function(message){
 			ts.textContent = '['+message.username+' '+'Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 			logmsg.appendChild(ts);
 			var classparam = logmsg.className.split(" ")[1];
-			generatePost(logmsg, message.username, message.post, message.character, (classparam == 'say'), false);
+			generatePost(logmsg, message.username, message.post, message.character, (classparam == 'say'), false, message.unnamed);
 		} else {//quick edit
 			if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//probably the best way to check for edits.
 				logmsg = target.nextElementSibling.cloneNode(true);
@@ -290,6 +290,7 @@ var editLog = function(message){
 				}
 				logmsg.className = message.className;
 			}
+			logmsg.children[2].style.display = message.unnamed ? 'none' : 'initial';
 			logmsg.children[0].textContent = '['+message.username+' '+'Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 			if(logmsg.className.split(' ')[1] == 'say'){
 				logmsg.children[logmsg.children.length-1].innerHTML = '"'+message.post+'"';
@@ -369,8 +370,9 @@ var generateNarration = function (message, username, post, color){
 	message.appendChild(cur);
 }
 
-var generatePost = function (message, username, post, character, say, omit){
+var generatePost = function (message, username, post, character, say, omit, unnamed){
 	message.style.fontFamily = character.fontStyle;
+	//image section
 	var cur = htm.createElement('img');
 	cur.src = '/faceicons/img_trans.gif';
 	cur.height=50; cur.width=50;
@@ -380,7 +382,7 @@ var generatePost = function (message, username, post, character, say, omit){
 
 	//add the space after the image
 	message.appendChild(htm.createTextNode(" "));
-
+	//name section
 	cur = htm.createElement('span');
 	cur.style.color = character.nameColor;
 	if(!character.customHTML){
@@ -398,8 +400,9 @@ var generatePost = function (message, username, post, character, say, omit){
 			cur.innerHTML = character.customHTML+' ';
 		}
 	}
+	cur.style.display = unnamed ? 'none' : 'initial';
 	message.appendChild(cur);
-
+	//post section
 	cur = htm.createElement('span');
 	cur.style.color = character.color;
 	if(say){
@@ -734,11 +737,11 @@ var Setconnections = function(socket){//username will definitely be present or s
 				message = character.textHTML+message;
 			}
 			message = processHTML(message); //one nice thing processHTML does for us is automatically close the tags.
+			var msg = {character: character, post: message, username: username};
 			if(type.startsWith('Unnamed')){
-				character.customHTML = ' ';
+				msg.unnamed = true;
 				type = type.substr(type.indexOf(' ')+1); //remove the 'Unnamed' from the start, it has done its job.
 			}
-			var msg = {character: character, post: message, username: username};
 			if(type.endsWith('Say')){
 				className = 'say ' + className;
 			} else if(type.endsWith('Action')){
@@ -801,7 +804,12 @@ var Setconnections = function(socket){//username will definitely be present or s
 				className = 'action ' + className;
 			}
 			var msg = {id: postid, post: message+'*', character: character, className: 'IC '+className};
+			if(type.startsWith('Unnamed')){
+				msg.unnamed = true;
+				type = type.substr(type.indexOf(' ')+1); //remove the 'Unnamed' from the start, it has done its job.
+			}
 			io.emit('ICedit', msg);
+			msg.username = username;
 			editLog(msg);
 		}
 	});

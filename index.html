@@ -1606,9 +1606,14 @@
 				var win = this.refs['win'].textContent;
 				var deriv = null;
 				var un = false;
-				if(name == 'Unnamed'){
-					name = 'Action';
-					un = true;
+				if(win != 'IC'){
+					if(name == 'Unnamed'){
+						name = 'Unnamed '+win+' Action';//omit or test
+					} else {
+						name = win+' '+name;
+					}
+				} else if(name == 'Unnamed') {
+					name = 'Unnamed Action';//IC action.
 				}
 				if(post && this.state.id && !this.state.wait){//find the right id
 					var did = this.state.id.id;
@@ -1621,11 +1626,6 @@
 								room = rooms[i];
 							}
 						}
-					} else {//omits and tests
-						name = win+' '+name;
-					}
-					if(un){
-						name = 'Unnamed ' + name;
 					}
 					if(trueid){
 						deriv = this.props.characters[trueid[0]][trueid[1]][did];
@@ -2120,6 +2120,7 @@
 					} else {
 						this.refs.name.textContent = name;
 					}
+					this.refs.name.style.display = message.unnamed ? 'none' : 'initial';
 				}
 			},
 
@@ -2243,6 +2244,7 @@
 					if(target){//if it isn't in here obviously we aren't doing it.
 						var msg = target.props.message;
 						msg.post = message.post;
+						msg.unnamed = message.unnamed;
 						if(message.character){
 							msg.character = message.character;
 						}
