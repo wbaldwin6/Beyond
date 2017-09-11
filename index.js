@@ -317,8 +317,8 @@ var editLog = function(message){
 
 var getUser = function(id){
 	var target = htm.getElementById(id);
-	var ret = target.children[0].textContent.split(' ');
 	if(target && !target.children[0].textContent.startsWith('[Deleted')){
+		var ret = target.children[0].textContent.split(' ');
 		ret.splice(-2, 2);
 		ret = ret.join(' ');
 		return ret.substring(1);
