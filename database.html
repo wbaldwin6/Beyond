@@ -1,6 +1,6 @@
 <html>
 	<head>
-		<title>Database</title>
+		<title>Database (Beyond)</title>
 		<link rel="icon" href="/faceicons/favicon.png">
 		<style>
 			body {
@@ -81,6 +81,13 @@
 		
 		<script type='text/babel'>
 		var socket = io();
+
+		var title = 'Database (Beyond)';
+
+		socket.on('Title', function(message){
+			document.title = 'Database ('+message+')';
+			title = 'Database ('+message+')';
+		});
 		
 		//Properties: socket
 		var OuterArea = React.createClass({

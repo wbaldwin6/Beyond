@@ -28,7 +28,7 @@ try{
 	serversettings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
 } catch(e) {
 	var profile = '<style>body{background-color:black}</style><font style="font-size:16px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i><br><br><b>Age:</b> <i>In years, typically.</i><br><br><b>Gender:</b> <i>____</i><br><br><b>Species:</b> <i> </i><br><br><b>Height:</b> <i> </i><br><br><b>History:</b> <i>Any other relevant information can be have fields added.</i>';
-	serversettings = {motd: '', rules: 'Rule 0: Be respectful.', profile: profile};
+	serversettings = {motd: '', rules: 'Rule 0: Be respectful.', profile: profile, title: 'Beyond'};
 	fs.writeFileSync('settings.json', JSON.stringify(serversettings));
 }
 
@@ -121,7 +121,7 @@ app.get('/characters', function(req, res){
 			fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, charindex){
 				if(!err){
 					charindex = JSON.parse(charindex);
-					var ret = '<head><title>Character Database</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
+					var ret = '<head><title>Character Database ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
 					files = files.sort(function (a, b){return a.toLowerCase().localeCompare(b.toLowerCase());});
 					files.forEach(function(file, index){
 						if(!file.endsWith('.json')){
@@ -152,7 +152,7 @@ var monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
 app.get('/logs', function(req, res){
 	fs.readdir(__dirname+'/logs', function(err, files){
 		if(!err){
-			var ret = '<head><title>Logs</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
+			var ret = '<head><title>Logs ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
 			var months = {};
 			files.forEach(function(file, index){
 				if(file.endsWith('.html')){//make a separate header for each month, THEN worry about collapsibility
@@ -290,7 +290,9 @@ var editLog = function(message){
 				}
 				logmsg.className = message.className;
 			}
-			logmsg.children[2].style.display = message.unnamed ? 'none' : 'initial';
+			if(typeof message.unnamed === "boolean"){//keep as-is if it's undeclared.
+				logmsg.children[2].style.display = message.unnamed ? 'none' : 'initial';
+			}
 			logmsg.children[0].textContent = '['+message.username+' '+'Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 			if(logmsg.className.split(' ')[1] == 'say'){
 				logmsg.children[logmsg.children.length-1].innerHTML = '"'+message.post+'"';
@@ -807,6 +809,8 @@ var Setconnections = function(socket){//username will definitely be present or s
 			if(type.startsWith('Unnamed')){
 				msg.unnamed = true;
 				type = type.substr(type.indexOf(' ')+1); //remove the 'Unnamed' from the start, it has done its job.
+			} else {
+				msg.unnamed = false; //explicitly set this to false, this is important.
 			}
 			io.emit('ICedit', msg);
 			msg.username = username;
@@ -968,6 +972,17 @@ var Setconnections = function(socket){//username will definitely be present or s
 			console.log(username+' attempted to use an admin command.');
 		}
 	});
+	socket.on('Edit Title', function(message){
+		var username = sessions[socket.request.connection.remoteAddress];
+		if(username && playerlist[username].permissions == 'Admin'){
+			serversettings.title = sanitizeHtml(message, {allowedTags: [], allowedAttributes: []}); //allow no html here.
+			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
+				if(err){console.log(err);} else {io.emit('Title', serversettings.title); console.log(username+' edited the title to '+serversettings.title);}
+			});
+		} else {
+			console.log(username+' attempted to use an admin command.');
+		}
+	});
 	socket.on('AdminCommand', function(command, target){
 		//before we even consider it: ARE they an admin?
 		var username = sessions[socket.request.connection.remoteAddress];
@@ -1006,6 +1021,9 @@ io.on('connection', function(socket){
 	if(banlist.ips.indexOf(socket.request.connection.remoteAddress) > -1){//banned IP
 		socket.disconnect();
 		return;
+	}
+	if(serversettings.title){
+		socket.emit('Title', serversettings.title);
 	}
 	socket.on('login', function(username, password, relog, callback){
 		if(username.endsWith(' ')){
