@@ -1589,7 +1589,7 @@
 
 		var ActiveModal = React.createClass({
 			getInitialState: function(){
-				return {x: '25%', y: '25%', width: 217, minwidth: 167, height: 'auto', wait: false, min: false};
+				return {x: '25%', y: '25%', width: 217, minwidth: 167, height: 'auto', wait: false, min: false, post: this.props.modal.post, pt: this.props.modal.pt || 'Action', win: 'IC'};
 			},
 
 			startDrag: startDrag,
@@ -1747,7 +1747,11 @@
 			},
 
 			minimize: function(){
-				this.setState({min: !this.state.min});
+				if(!this.state.min){
+					this.setState({min: !this.state.min, post: this.refs['text'].value, pt: this.refs['type'].textContent, win: this.refs['win'].textContent});
+				} else {
+					this.setState({min: false});
+				}
 			},
 
 			render: function(){
@@ -1755,27 +1759,30 @@
 				if(this.refs['img']){
 					hei = 'calc(100% - '+(this.refs['img'].getBoundingClientRect().height+this.state.unc)+'px)';
 				}
-				var def = 'Action';
 				var modal = this.props.modal;
 				var name = 'Active Character';
-				if(modal.name == 'Full Edit'){name = modal.name; def = modal.pt;}
 				var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
 				if(modal.charid){
 					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
 				}
-				var images = this.props.characters[trueid[0]][trueid[1]].map(function(deriv, i3){
-					return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);
-				});//grab the derivatives in here
 				if(this.state.min){
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><span onClick={this.minimize} style={{position: 'absolute', right:0, top: 0, cursor: "default"}}>[+]</span></div>
 				);
 				} else {
+				var that = this;
+				var images = this.props.characters[trueid[0]][trueid[1]].map(function(deriv, i3){
+					if(that.state.id && i3 == that.state.id.id){
+						return(<img key={i3} id={i3} src='/faceicons/box.png' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);
+					} else {
+						return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);
+					}
+				});//grab the derivatives in here
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag} onClick={this.focus}><span className="mtitle">{name}</span><span onClick={this.minimize} style={{position: 'absolute', right:0, top: 0, cursor: "default"}}>[-]</span><br/>
 					<div ref="img" onClick={this.select} style={{maxWidth:'100%', background: 'none'}}>{images}</div><br/>
-					<div style={{width: '100%', whiteSpace: 'nowrap', background:'none'}}><span ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><span ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>IC</span><span ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>{def}</span></div><br/>
-					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:hei, minHeight:32}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
+					<div style={{width: '100%', whiteSpace: 'nowrap', background:'none'}}><span ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><span ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>{this.state.win}</span><span ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>{this.state.pt}</span></div><br/>
+					<textarea defaultValue={this.state.post || ''} autoFocus style={{resize: 'none', width:'100%', height:hei, minHeight:32}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
 					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Close</button><button ref='scrollb' type="submit" onClick={this.mode}>Scroll</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/></div>
 				);
 				}
