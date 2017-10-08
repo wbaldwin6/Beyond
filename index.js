@@ -69,6 +69,7 @@ try{
 var sessions = {};//maps session.id to username
 var users = {};//maps username to sockets. YES, we need both!
 var playerlist = {};//Having three feels superfluous, but I think O(1) is more important than a bit of extra memory.
+var idlist = {};
 
 app.get('/', function(req, res){
 	res.sendFile(__dirname + '/index.html');
@@ -261,7 +262,7 @@ var toLog = function (message){
 var editLog = function(message){
 	var today = new Date();
 	var target = htm.getElementById(message.id);
-	if(target && !target.children[0].textContent.startsWith('[Deleted')){
+	if(target && target.children[0].textContent.indexOf('[Deleted at') == -1){
 		var logmsg;
 		if(message.character){//different character requires new post.
 			logmsg = htm.createElement('div');
@@ -317,22 +318,17 @@ var editLog = function(message){
 	}
 };
 
-var getUser = function(id){
-	var target = htm.getElementById(id);
-	if(target && !target.children[0].textContent.startsWith('[Deleted')){
-		var ret = target.children[0].textContent.split(' ');
-		ret.splice(-2, 2);
-		ret = ret.join(' ');
-		return ret.substring(1);
-	} else {
-		return '';
+var addid = function(id, username){
+	idlist[id] = username;
+	if(id > 100 && idlist[id-100]){
+		delete idlist[id-100];
 	}
 };
 
 var deleteLog = function(id){
 	var today = new Date();
 	var target = htm.getElementById(id);
-	if(target && !target.children[0].textContent.startsWith('[Deleted')){
+	if(target && target.children[0].textContent.indexOf('[Deleted at') == -1){
 		target.children[0].textContent += '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 		if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//has an edit!
 			target.nextElementSibling.children[0].textContent += '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
@@ -678,6 +674,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 			message = processHTML(message);
 			var msg = {className: 'IC narration message', username: username, post: message, color: color};
 			msg.id = postnum++;
+			addid(msg.id, username);
 			fs.writeFile(__dirname+'/logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
 			if(room){
 				msg.post = '<span style="color:white;">['+room+']</span> '+msg.post;
@@ -754,6 +751,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 				call = 'OOCmessage';
 			} else if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1) {//IC say or action
 				msg.id = postnum++;
+				addid(msg.id, username);
 				className = 'IC ' + className;
 				call = 'ICmessage';
 				fs.writeFile(__dirname+'/logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
@@ -779,8 +777,8 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('ICedit', function(message, postid){
 		var username = sessions[socket.request.connection.remoteAddress];
-		if(getUser(postid) != username){
-			console.log(username + ' tried to edit a post by '+getUser(postid));
+		if(idlist[postid] != username){
+			console.log(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
 		}
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
@@ -793,8 +791,8 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('Cedit', function(message, character, type, postid){
 		var username = sessions[socket.request.connection.remoteAddress];
-		if(getUser(postid) != username){
-			console.log(username + ' tried to edit a post by '+getUser(postid));
+		if(idlist[postid] != username){
+			console.log(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
 		}
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
@@ -819,8 +817,8 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('Delete Post', function(id){
 		var username = sessions[socket.request.connection.remoteAddress];
-		if(getUser(id) != username){
-			console.log(username + ' tried to delete a post by '+getUser(id));
+		if(idlist[id] != username){
+			console.log(username + ' tried to delete a post by '+(idlist[id] || ''));
 			return;
 		}
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
