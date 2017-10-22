@@ -1080,7 +1080,7 @@ io.on('connection', function(socket){
 		});
 	});
 	var username = sessions[socket.request.connection.remoteAddress]
-	if(username){//logged in, probably a database access
+	if(username && playerlist[username]){//logged in, probably a database access
 		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
 	} else {
 		console.log('a user connected');
