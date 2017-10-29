@@ -577,7 +577,13 @@ var commands = {//console command list, formatted this way for convenience.
 		console.log(banlist);
 	},
 	"Boot": function(name){//Just logs them out.
-		if(users[name]){users[name].disconnect();} else {
+		if(users[name]){
+			users[name].disconnect();
+			setTimeout(function() {cleanup(name);}, 500);
+		} else {
+			if(playerlist[name]){//not in users, but on the playerlist.
+				delete playerlist[name];
+			}//this is the best we can do without any socket info, but it gets them off the playerlist.
 			console.log(name+' is not logged in.');
 		}
 	},
@@ -625,6 +631,14 @@ var commands = {//console command list, formatted this way for convenience.
 		process.exit();
 	},
 };
+
+var cleanup = function(username){
+	if(users[username]){//is it still there after trying to disconnect?
+		try{delete sessions[users[username].request.connection.remoteAddress];} catch(e){console.log(e);}
+		delete users[username];
+	}
+	if(playerlist[username]){delete playerlist[username];}
+}
 
 var saveFile = function(filename, data, socket, username){
 	fs.writeFile(filename, data, function(err){
@@ -1079,9 +1093,9 @@ io.on('connection', function(socket){
 			}
 		});
 	});
-	var username = sessions[socket.request.connection.remoteAddress]
+	var username = sessions[socket.request.connection.remoteAddress];
 	if(username && playerlist[username]){//logged in, probably a database access
-		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);})
+		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);});
 	} else {
 		console.log('a user connected');
 		socket.on('register', function(username, password, du, callback){
