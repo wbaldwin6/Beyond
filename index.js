@@ -66,7 +66,6 @@ try{
 	if(e.code != 'EEXIST'){throw e;}
 }
 
-var sessions = {};//maps session.id to username
 var users = {};//maps username to sockets. YES, we need both!
 var playerlist = {};//Having three feels superfluous, but I think O(1) is more important than a bit of extra memory.
 var idlist = {};
@@ -437,19 +436,11 @@ var processHTML = function(message){
 };
 
 var addPlayer = function(username, socket, permissions, muted){
-	var oldname = sessions[socket.request.connection.remoteAddress];
-	if(oldname){//in case a second login with the same IP somehow occurs, we should make sure the old name doesn't hang around.
-		delete users[oldname];
-		delete playerlist[oldname];
-	}
-	sessions[socket.request.connection.remoteAddress] = username;
 	users[username] = socket;
 	playerlist[username] = {permissions: permissions, muted: muted};
 };
 
-var removePlayer = function(id){
-	var username = sessions[id];
-	delete sessions[id];
+var removePlayer = function(username){
 	delete users[username];
 	delete playerlist[username];
 };
@@ -634,7 +625,6 @@ var commands = {//console command list, formatted this way for convenience.
 
 var cleanup = function(username){
 	if(users[username]){//is it still there after trying to disconnect?
-		try{delete sessions[users[username].request.connection.remoteAddress];} catch(e){console.log(e);}
 		delete users[username];
 	}
 	if(playerlist[username]){delete playerlist[username];}
@@ -654,23 +644,22 @@ var saveFile = function(filename, data, socket, username){
 	});
 };
 
-var Setconnections = function(socket){//username will definitely be present or something is wrong enough to warrant throwing.
+var Setconnections = function(socket, user){//username will definitely be present or something is wrong enough to warrant throwing.
+	var username = user;
+
 	socket.on('Join Room', function(room){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			socket.join(room);
 			io.to(room).emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">'+username+' has entered Room '+room+'</font>'});
 		}
 	});
 	socket.on('Leave Room', function(room){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
 			io.to(room).emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">'+username+' has left Room '+room+'</font>'});
 			socket.leave(room);
 		}
 	});
 	socket.on('OOCmessage', function(message, color){
-		var username = sessions[socket.request.connection.remoteAddress];
 		message = processHTML(message);
 		var msg = {className: 'OOC message', username: username, post: message, color: color};
 		if(username && msg.post && !playerlist[username].muted){
@@ -683,7 +672,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('Narrate', function(message, color, room, callback){
 		if(callback){callback();}
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
 			message = processHTML(message);
 			var msg = {className: 'IC narration message', username: username, post: message, color: color};
@@ -703,7 +691,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Whisper', function(message, target){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && users[target]){//if they logged out midwhisper or they send an invalid one somehow we need to stop that.
 			message = processHTML(message);
 			socket.emit('OOCmessage', {className: 'OOC whisper', target: target, post:message});
@@ -711,14 +698,12 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}//no logging, OBVIOUSLY. What's an admin window?
 	});
 	socket.on('AFK', function(on){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(playerlist[username] && on != playerlist[username].afk){
 			playerlist[username].afk = on;
 			io.emit('PlayerList', playerlist);
 		}
 	});
 	socket.on('Dice', function(dice, result, color, priv){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && result){
 			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
 			if(result.length > 1){
@@ -736,7 +721,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('characterPost', function(message, character, type, room, callback){
 		if(callback){callback();}
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && !playerlist[username].muted && character){
 			if(character.customHTML){
 				character.customHTML = sanitizeHtml(character.customHTML, {allowedTags: ['b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
@@ -790,7 +774,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('ICedit', function(message, postid){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(idlist[postid] != username){
 			console.log(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
@@ -804,7 +787,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Cedit', function(message, character, type, postid){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(idlist[postid] != username){
 			console.log(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
@@ -830,7 +812,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Delete Post', function(id){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(idlist[id] != username){
 			console.log(username + ' tried to delete a post by '+(idlist[id] || ''));
 			return;
@@ -848,7 +829,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		});
 	});
 	socket.on('sendimage', function(icons, callback){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username){
 			var data = icons.replace(/^data:image\/png;base64,/, "");
 			if(icons == 'data:,'){//no image
@@ -907,7 +887,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		socket.emit('OOCmessage', msg);
 	});
 	socket.on('Set Profile', function(profile, id){
-		var username = sessions[socket.request.connection.remoteAddress];
 		var n = id.split('-');
 		var d = n.pop();
 		n = n.join('-');
@@ -920,7 +899,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Delete Profile', function(id){
-		var username = sessions[socket.request.connection.remoteAddress];
 		var n = id.split('-');
 		var d = n.pop();
 		n = n.join('-');
@@ -938,7 +916,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Edit Rules', function(message){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.rules = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the rules.</font>'};
@@ -950,7 +927,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Edit MOTD', function(message){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.motd = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the MOTD.</font>'};
@@ -962,7 +938,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Edit Default Profile', function(message){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.profile = message.replace(/\r\n?|\n/g, "<br />");//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
@@ -974,7 +949,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Edit World Info', function(message){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
 			fs.writeFile('worldinfo.html', message.replace(/\r\n?|\n/g, "<br />"), function(err){
@@ -985,7 +959,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('Edit Title', function(message){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.title = sanitizeHtml(message, {allowedTags: [], allowedAttributes: []}); //allow no html here.
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
@@ -997,7 +970,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 	});
 	socket.on('AdminCommand', function(command, target){
 		//before we even consider it: ARE they an admin?
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username && playerlist[username].permissions == 'Admin'){
 			if(commands[command]){
 				commands[command](target);
@@ -1009,8 +981,7 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 	socket.on('disconnect', function(){
-		var username = sessions[socket.request.connection.remoteAddress];
-		removePlayer(socket.request.connection.remoteAddress);
+		removePlayer(username);
 		var msg = {className: 'OOC log message', username: username, post: "has logged off"}
 		io.emit('OOCmessage', msg);
 		toLog(msg);
@@ -1018,7 +989,6 @@ var Setconnections = function(socket){//username will definitely be present or s
 		console.log(username + ' ('+socket.request.connection.remoteAddress+') has disconnected.');
 	});
 	socket.on('save', function(settings, ret){
-		var username = sessions[socket.request.connection.remoteAddress];
 		if(username){
 			if(ret){
 				saveFile(__dirname+'/saves/'+username+'.json', settings, socket, username);
@@ -1028,6 +998,10 @@ var Setconnections = function(socket){//username will definitely be present or s
 		}
 	});
 };
+
+io.of('/database').on('connection', function(socket) {
+    database.InitializeDatabaseSocket(socket);
+});
 
 io.on('connection', function(socket){
 	if(banlist.ips.indexOf(socket.request.connection.remoteAddress) > -1){//banned IP
@@ -1046,7 +1020,7 @@ io.on('connection', function(socket){
 			if(err){callback(err);} else {
 				logins = JSON.parse(logins);
 				if(logins[username]){//valid username
-					if(users[username] || sessions[socket.request.connection.remoteAddress]){//already on the list?
+					if(users[username]){//already on the list?
 						callback("User already logged in!");
 					} else if(logins[username].password == password){//valid login
 						addPlayer(username, socket, logins[username].permissions, logins[username].muted);
@@ -1057,7 +1031,7 @@ io.on('connection', function(socket){
 							//pull up user info
 							fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
 								if(err){callback(err);} else {
-									setImmediate(function() {Setconnections(socket);});
+									setImmediate(function() {Setconnections(socket, username);});
 									info = JSON.parse(info);
 									callback(info);
 									if(info.settings.room){
@@ -1093,59 +1067,54 @@ io.on('connection', function(socket){
 			}
 		});
 	});
-	var username = sessions[socket.request.connection.remoteAddress];
-	if(username && playerlist[username]){//logged in, probably a database access
-		setImmediate(function() {database.InitializeDatabaseSocket(socket, username, playerlist[username].permissions);});
-	} else {
-		console.log('a user connected');
-		socket.on('register', function(username, password, du, callback){
-			if(username.endsWith(' ')){
-				callback("Please do not end your username with a space.");
-				return;
-			}
-			fs.readFile('logins.json', 'utf8', function(err, logins){
-				if(err){callback(err);} else {
-					logins = JSON.parse(logins);
-					var loginstest = {};
-					Object.keys(logins).forEach(function(key){
-						loginstest[key.toLowerCase()] = true;
-					});//fill it with lowercased
-					if(loginstest[username.toLowerCase()]){//username in use
-						callback("Username already in use.");
-					} else {//new username
-						logins[username] = {password: password, permissions: 'Guest', muted: false};
-						fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
-							if(!err){
-								fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-									if(!err){
-										fs.mkdir(__dirname+'/characters/'+username, function(err){
-											if(!err || err.code == 'EEXIST'){
-												setImmediate(function() {Setconnections(socket);});
-												addPlayer(username, socket, 'Guest', false);
-												//create new user info
-												callback(userdefaults);
-												console.log(socket.id+" has logged in as "+username);
-												var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-												io.emit('OOCmessage', msg);
-												io.emit('PlayerList', playerlist);
-												if(serversettings.rules){
-													socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
-												}
-												if(serversettings.motd){
-													socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
-												}
-												toLog(msg);
-											} else {callback(err);}
-										});
-									} else {callback(err);}
-								});
-							} else {callback(err);}
-						});
-					}
+	console.log('a user connected');
+	socket.on('register', function(username, password, du, callback){
+		if(username.endsWith(' ')){
+			callback("Please do not end your username with a space.");
+			return;
+		}
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){callback(err);} else {
+				logins = JSON.parse(logins);
+				var loginstest = {};
+				Object.keys(logins).forEach(function(key){
+					loginstest[key.toLowerCase()] = true;
+				});//fill it with lowercased
+				if(loginstest[username.toLowerCase()]){//username in use
+					callback("Username already in use.");
+				} else {//new username
+					logins[username] = {password: password, permissions: 'Guest', muted: false};
+					fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
+						if(!err){
+							fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+								if(!err){
+									fs.mkdir(__dirname+'/characters/'+username, function(err){
+										if(!err || err.code == 'EEXIST'){
+											setImmediate(function() {Setconnections(socket, username);});
+											addPlayer(username, socket, 'Guest', false);
+											//create new user info
+											callback(userdefaults);
+											console.log(socket.id+" has logged in as "+username);
+											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+											io.emit('OOCmessage', msg);
+											io.emit('PlayerList', playerlist);
+											if(serversettings.rules){
+												socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
+											}
+											if(serversettings.motd){
+												socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
+											}
+											toLog(msg);
+										} else {callback(err);}
+									});
+								} else {callback(err);}
+							});
+						} else {callback(err);}
+					});
 				}
-			});
+			}
 		});
-	}
+	});
 });
 
 if(process.argv[2]){
