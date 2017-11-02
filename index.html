@@ -451,7 +451,11 @@
 
 		var Outercontainer = React.createClass({
 			getInitialState: function(){
-				return {settings: {}, characters: [], modal: [{type: 'login'}], permissions: 'Guest', username: '', pass: '', players: {}};
+				var modals = [{type: 'login'}];
+				if(navigator.appName == 'Microsoft Internet Explorer' || /edge|mobi/i.test(navigator.userAgent) || ((!window.chrome) && (typeof InstallTrigger == 'undefined'))){
+					modals.push({type: 'warning'});
+				}
+				return {settings: {}, characters: [], modal: modals, permissions: 'Guest', username: '', pass: '', players: {}};
 			},
 
 			focusf: function(e){
@@ -926,6 +930,8 @@
 								return(<ActiveModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} closeModal={that.props.closeModal}/>);
 							case 'notifications':
 								return(<NotificationModal key={index} id={index} modal={modal} characters={that.props.characters} settings={that.props.settings} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+							case 'warning':
+								return(<WarningModal key={index} id={index} closeModal={that.props.closeModal}/>);
 						}
 					} else {
 						return(<div key={index} className="modal" style={{display:'none'}}></div>);
@@ -1042,6 +1048,18 @@
 						<button type="submit" id="register" onClick={this.submission}>Register</button><br/>
 						<b>{this.state.loginmessage}</b><br/>
 						<iframe src='/worldinfo' style={{width:'95%', height:'85%'}}/>
+					</div>);
+			}
+		});
+
+		var WarningModal = React.createClass({
+			render: function(){
+				return(<div id={this.props.id} className="modal" style={{left: '10%', top: '30%', textAlign:'center', height:'auto', width:'80%', backgroundColor: "rgb(50,50,50)"}}>
+						<h1 style={{color: "red", fontSize: "300%"}}><b>WARNING</b></h1><br/>
+						Beyond has detected that you are trying to connect from an unsupported browser. Due to shaky support for various HTML functionality and the nature of various 'modern' browsers, Beyond is only set up to support Firefox and Chrome. If you decide you wish to do this anyway, it is at your own risk.<br/>
+							<br/>
+						If this is a mobile browser in particular, I strongly advise you not to attempt to use Beyond this way, or at least not to report issues that occur when you do so. The only reason this works is because it is browser-based, and 'works' is being generous. This platform has little to no formal support for mobile, and doing so is next to impossible as most mobile browsers are wildly inconsistent about what they support.<br/><br/>
+						<button type="submit" id="continue" onClick={this.props.closeModal.bind(null, this.props.id)}>I understand and wish to continue</button><br/>
 					</div>);
 			}
 		});
