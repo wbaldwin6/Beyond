@@ -1119,7 +1119,7 @@
 				var modal = e.target.parentNode;//the modal containing the save button
 				var name = this.refs['name'].value;
 				var icons = this.refs['faceicons'].children;
-				if((name && icons.length) || (this.props.modal.id.length > 1 && (!this.state.ids.length || !icons.length || this.state.ids.length == icons.length))){//do nothing if they didn't put a name in if it's new
+				if((name && this.props.modal.id.length === 1) || (name && icons.length) || (this.props.modal.id.length > 1 && (!this.state.ids.length || !icons.length || this.state.ids.length == icons.length))){//do nothing if they didn't put a name in if it's new
 					var fontStyle = this.refs['font'].value;
 					var nameColor = this.refs['nameColor'].value;
 					var customHTML = this.refs['html'].value;
@@ -1174,6 +1174,9 @@
 							var charid = character[0] ? character[0].id : un+'-'+settings.characterIDs++;
 							for(i=0; i<convertedicons.length; i++){
 								character.push({id: charid, name: name || character[0].name, icon: picid, icpos: convertedicons[i], nameColor: nameColor, color: color, fontStyle: fontStyle, customHTML: customHTML, textHTML: textHTML});
+							}
+							if(!convertedicons.length && modata.id.length === 1){
+								character.push({id: charid, name: name || character[0].name, icon: 'img_trans', icpos: {left: 0, top: 0}, nameColor: nameColor, color: color, fontStyle: fontStyle, customHTML: customHTML, textHTML: textHTML});
 							}
 						}//now we've added all the new derivatives or just modified the one.
 						characters[trueid[0]][trueid[1]] = character;//adds new if new, otherwise overwrites
@@ -1749,6 +1752,9 @@
 							}
 						}
 					}//img must always exist by this point or we're in an invalid state.
+					if(this.refs['img'].childElementCount === 1 && !this.state.id){//exactly one derivative
+						this.setState({id: this.refs['img'].childNodes[0]});
+					}
 					var h = this.state.unc + this.refs['img'].getBoundingClientRect().height + 34;
 					if(this.state.height < h){//prevents height from going below a certain point.
 						this.setState({height: h});
