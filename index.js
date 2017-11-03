@@ -7,6 +7,73 @@ var jsdom = require('jsdom');
 var sanitizeHtml = require('sanitize-html');
 var database = require('./database');
 
+var DomParser = require('dom-parser'); //Used in log searching
+var parser = new DomParser(); //Also used in log searching
+var Promise = require('promise'); //Used to wait for asynchronous functions to complete
+
+//This function returns a "Promise", which will "resolve" when it is done
+//When the promise resolves, the searchLogs function will know to send its information to the client
+function searchLogsByFilename(stringToFind, filename) {
+    return new Promise(function (resolve, reject) {
+        if(!filename.endsWith('.html')) { //Not a log file
+            resolve('');
+        } else {
+            fs.readFile("./logs/" + filename, 'utf8', function(err, data) { //Open the specific log file here
+                if(err) { //If some error occurs, we have to break
+                    resolve(''); //Should actually be a 'reject', but that might cause all of the files to reject?
+                } else {
+                    var logfile = parser.parseFromString(data); //Convert the file into a DOM object
+                    var bodyOfFile = logfile.getElementsByTagName("body")[0]; //Grab the body of the DOM
+                    if(bodyOfFile.textContent.search(stringToFind) !== -1) { //If the string to find is in the body's textContent
+                        resolve(filename); //We say we found it
+                    } else {
+                        resolve(''); //The empty string works as a "Not Found" value
+                    }
+                }  
+            });
+        }
+    });
+}
+ 
+//This function takes a string and an HTTP Response object
+//Search all the log files, then send the list of good results back to the response
+function searchLogs(stringToFind, res) {
+	var errorReport = '<body style="background-color:black;color:white;"><b>An error occurred trying to search the logs. Please try again later.</b><br />';
+    fs.readdir("./logs", function(err, files) {
+        if(err) {
+            res.send(errorReport + err + '</body>'); //An error has occured, so tell the user.
+        }
+        var arrOfPromises = files.filter(function (file) { //Need to create an array of promises to run them all in parallel
+            return file.endsWith('.html'); //Ignore any non-HTML files, like postid.txt
+        }).map(function (file) {
+            return searchLogsByFilename(stringToFind, file); //Map the searchLogsByFilename function over the list of filenames to get the list of Promises
+        });
+        Promise.all(arrOfPromises).then(function (results) { //We read the files in parallel and run a function on the results array once they're all finished
+            var realResults = results.filter(result => result).sort(); //Remove the empty strings and sort the list
+			if(realResults.length) {
+				retVal = '<body style="background-color:black;color:white;">';
+				realResults.forEach(function(result, index) {
+					retVal += '<b>' + result.replace(/([0-9]+)_([0-9]+)_([0-9]+).html/, function(match, p1, p2, p3, offset, string) {
+						return monthenum[parseInt(p2)] + ' ' + p3 + ', ' + p1; //Convert "YYYY_MM_DD.html" into "Monthname DD, YYYY"
+					}) + '</b><br />'
+				});
+				res.send(retVal + '</body>');
+			} else {
+				res.send('<body style="background-color:black;color:white;"><b>No results found!</b></body>');
+			}
+            res.json(realResults); //Return the list of meaningful filenames back to the user
+        }).catch(function (err) {
+            res.send(errorReport + err + '</body>'); //An error has occured, so tell the user.
+        });
+    });
+}
+ 
+//Set up the search request for the logs
+app.get('/logs/search/:search', function(req, res) {
+    var stringToFind = req.params.search;
+    searchLogs(stringToFind, res);
+});
+
 //Make sure the database exists
 database.LoadDatabase(); //TODO: Move this somewhere more appropriate?
 
@@ -169,6 +236,9 @@ app.get('/logs', function(req, res){
 					ret += '<a href="/logs/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a><br><br>';
 				}
 			});
+			//Code for sending Search requests and receiving the results go here.
+			ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/search/\' + searchTerm);};</script>';
+			ret += '<form onsubmit=\'searchLogs()\'><span style="color:white;">Search Logs:</span><input type=\'text\' id=\'txtSearch\'></form><br /><button type=\'button\' onclick=\'searchLogs()\'>Search</button>';
 			ret += '</body>';
 			res.send(ret);
 		} else {
@@ -1001,7 +1071,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 };
 
 io.of('/database').on('connection', function(socket) {
-    database.InitializeDatabaseSocket(socket);
+	database.InitializeDatabaseSocket(socket);
 });
 
 io.on('connection', function(socket){

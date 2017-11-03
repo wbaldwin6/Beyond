@@ -13,6 +13,8 @@
     "express": "^4.14.0",
     "jsdom": "^9.5.0",
     "sanitize-html": "^1.13.0",
-    "socket.io": "^1.4.8"
+    "socket.io": "^1.4.8",
+	"dom-parser": "^0.1.5",
+	"promise": "^8.0.1"
   }
 }

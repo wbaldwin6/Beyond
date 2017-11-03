@@ -462,6 +462,7 @@ InitializeDatabaseSocket: function(socket) {
 					socket.emit('SetUsername', username);
 					socket.emit('SetPermissions', logins[username].permissions);
 					socket.emit('CloseModal');
+					socket.emit('UpdateError', 'You have successfully logged in as ' + username + '!');
 				} else {
 					socket.emit('UpdateError', "Your password was incorrect.");
 				}

@@ -285,9 +285,9 @@
 				var searchButton = <button key="SearchButton" onClick={this.OpenSearchModal} disabled={this.state.modal ? true : false} style={{zIndex: "500", position: "fixed", left: "0px", bottom: "0px"}}>Search</button>;
 				var toggleNamesButton = <button key="ToggleNames" onClick={this.ToggleNames} style={{zIndex: "500", position: "fixed", left: "54px", bottom: "0px"}}>Toggle Names</button>
 				var loginButton = <button key="LoginButton" onClick={this.AttemptLogin} style={{zIndex: "500", position: "fixed", left: "160px", bottom: "0px"}}>Login</button>
-				var dir = (<div key="Directory" id="Directory" style={{height: "100%-16px", overflowY: "auto"}} onClick={this.closeContext}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} order={this.state.directory.order} parents={[]} /></div>);
+				var dir = (<div key="Directory" id="Directory" style={{height: "100%-16px", overflowY: "auto"}}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} order={this.state.directory.order} parents={[]} /></div>);
 				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
-				return(<div>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}{toggleNamesButton}{loginButton}</div>);
+				return(<div onClick={this.closeContext}  onContextMenu={this.closeContext}>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}{toggleNamesButton}{loginButton}</div>);
 			}
 		});
 		
@@ -948,6 +948,10 @@
 			OKButton: function(e) {
 				var username = this.refs.inputName.value;
 				var password = this.refs.inputPass.value;
+				if(this.refs.Remember.checked){
+					document.cookie = "username="+encodeURIComponent(username);
+					document.cookie = "password="+encodeURIComponent(password);
+				}
 				this.props.socket.emit('DatabaseLogin', username, md5(password));
 			},
 
@@ -955,19 +959,42 @@
 				this.props.outerarea.setState({modal: undefined});
 			},
 
+			componentDidMount: function(){
+				if(document.cookie && document.cookie.match(/[; ^]?username=([^\s;]*)/)){
+					var c = document.cookie;
+					this.refs.inputName.value = decodeURIComponent(c.match(/[; ^]?username=([^\s;]*)/)[1]);
+					this.refs.inputPass.value = decodeURIComponent(c.match(/[; ^]?password=([^\s;]*)/)[1]);
+					this.refs.inputPass.focus();
+				} else {
+					this.refs.inputName.focus();
+				}
+			},
+			
+			enterCheck: function(e){
+				if(e.keyCode == 13){
+					if(e.target.name == 'password'){
+						this.submission(e);
+					} else if(e.target.value.length >= 6) {
+						this.refs.password.focus();
+					}
+				}
+			},
+
 			render: function() {
 				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>Enter your username and password.</div>;
 					var buttonOK = <button key='buttonOK' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.OKButton}>OK</button>;
 					var buttonCancel = <button key='buttonCancel' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.CancelButton}>Cancel</button>;
-					var labelName = <div key='labelName' style={{width: "40%", height: "24px", margin: "4px 0px"}}>Userame:</div>;
-					var inputName = <input key='inputName' type="text" ref="inputName" style={{width: "60%", height: "24px", margin: "4px 0px"}} defaultValue=""></input>;
-					var labelPass = <div key='labelPass' style={{width: "40%", height: "24px", margin: "4px 0px"}}>Password:</div>;
-					var inputPass = <input key='inputPass' type="text" ref="inputPass" style={{width: "60%", height: "24px", margin: "4px 0px"}} defaultValue=""></input>;
+					var labelName = <div key='labelName' style={{width: "50%", height: "24px", margin: "4px 0px"}}>Username:</div>;
+					var inputName = <input key='inputName' type="text" ref="inputName" style={{width: "50%", height: "24px", margin: "4px 0px"}} defaultValue="" placeholder="Username" onKeyDown={this.enterCheck}></input>;
+					var labelPass = <div key='labelPass' style={{width: "50%", height: "24px", margin: "4px 0px"}}>Password:</div>;
+					var inputPass = <input key='inputPass' type="text" ref="inputPass" style={{width: "50%", height: "24px", margin: "4px 0px"}} defaultValue="" placeholder="Password" onKeyDown={this.enterCheck}></input>;
+					var chkRemember = <input type="checkbox" name="Remember" ref="Remember" defaultChecked={false}/>
 					return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
 								{titlebar}<br />
 								{labelName}{inputName}<br />
 								{labelPass}{inputPass}<br />
-								{buttonOK}{buttonCancel}
+								{buttonOK}{buttonCancel}<br />
+								{chkRemember}<b>Remember me</b>
 							</div>);
 			},
 
