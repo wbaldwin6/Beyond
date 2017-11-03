@@ -53,9 +53,9 @@ function searchLogs(stringToFind, res) {
 			if(realResults.length) {
 				retVal = '<body style="background-color:black;color:white;">';
 				realResults.forEach(function(result, index) {
-					retVal += '<b>' + result.replace(/([0-9]+)_([0-9]+)_([0-9]+).html/, function(match, p1, p2, p3, offset, string) {
-						return monthenum[parseInt(p2)] + ' ' + p3 + ', ' + p1; //Convert "YYYY_MM_DD.html" into "Monthname DD, YYYY"
-					}) + '</b><br />'
+					retVal += '<b><a href="/logs/'+result+'" style="color:blue;">' + result.replace(/([0-9]+)_([0-9]+)_([0-9]+).html/, function(match, p1, p2, p3, offset, string) {
+						return monthenum[parseInt(p2)-1] + ' ' + p3 + ', ' + p1; //Convert "YYYY_MM_DD.html" into "Monthname DD, YYYY"
+					}) + '</a></b><br />'
 				});
 				res.send(retVal + '</body>');
 			} else {
