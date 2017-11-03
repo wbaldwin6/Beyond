@@ -284,16 +284,16 @@ SaveDatabase: function() {
 	}
 },
 
-InitializeDatabaseSocket: function(socket, username, permissions) {
+InitializeDatabaseSocket: function(socket) {
 	var that = this;
-	var user = [socket, username, permissions];
+	var user = [socket, '', 'Guest'];
 	databaseSockets.push(user);
-	socket.emit('InitializeDatabase', username, permissions, toplevel);
+	socket.emit('InitializeDatabase', '', 'Guest', toplevel);
 	socket.on('disconnect', function() {
 		databaseSockets.splice(databaseSockets.indexOf(user), 1);
 	});
 	socket.on('AddDirectory', function(path, name, creator, locked) {
-		if(user[2] !== 'Admin') {
+		if(!(user[1]) || !creator || user[2] !== 'Admin') {
 			socket.emit('UpdateError', 'You do not have permission to create directories!');
 			return;
 		}
@@ -309,7 +309,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 	});
 	socket.on('AddEntry', function(path, name, creator, content) {
-		if(user[2] !== 'Admin' && that.PathIsLocked(path)) {
+		if(!(user[1]) || !creator || (user[2] !== 'Admin' && that.PathIsLocked(path))) {
 			socket.emit('UpdateError', 'You do not have permission to create entries in that directory.');
 			return;
 		}
@@ -330,7 +330,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 			return;
 		}
 		var dir = that.GetDirectoryFromPath(path);
-		if(!(user[2] === 'Admin' || user[1] === dir.creator)) {
+		if(!(user[1]) || !(user[2] === 'Admin' || user[1] === dir.creator)) {
 			socket.emit('UpdateError', 'You do not have permission to delete that!');
 			return;
 		}
@@ -346,7 +346,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 	});
 	socket.on('EditEntry', function(path, name, content) {
 		var dir = that.GetDirectoryFromPath(path);
-		if(!(user[2] === 'Admin' || user[1] === dir.creator)) {
+		if(!(user[1]) || !(user[2] === 'Admin' || user[1] === dir.creator)) {
 			socket.emit('UpdateError', 'You do not have permission to edit that!');
 			return;
 		}
@@ -382,7 +382,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 	});
 	socket.on('MoveEntry', function(oldpath, newpath) {
-		if(user[2] !== 'Admin') {
+		if(!(user[1]) || user[2] !== 'Admin') {
 			socket.emit('UpdateError', 'You do not have permission to move that.');
 			return;
 		}
@@ -397,7 +397,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 	});
 	socket.on('DragEntry', function(oldpath, newpath, after) {
-		if(user[2] !== 'Admin') {
+		if(!(user[1]) || user[2] !== 'Admin') {
 			socket.emit('UpdateError', 'You do not have permission to move that.');
 			return;
 		}
@@ -411,7 +411,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 	});
 	socket.on('RenameDirectory', function(path, newname, togglelock) {
-		if(user[2] !== 'Admin') {
+		if(!(user[1]) || user[2] !== 'Admin') {
 			socket.emit('UpdateError', 'You do not have permission to rename directories.');
 			return;
 		}
@@ -426,7 +426,7 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 		}
 	});
 	socket.on('LockDirectory', function(path) {
-		if(user[2] === 'Admin' && that.ToggleDirectoryLock(that.GetDirectoryFromPath(path))) {
+		if(user[1] && user[2] === 'Admin' && that.ToggleDirectoryLock(that.GetDirectoryFromPath(path))) {
 			that.SaveDatabase();
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
@@ -439,6 +439,37 @@ InitializeDatabaseSocket: function(socket, username, permissions) {
 	socket.on('ReLogin', function(username, permissions) {
 		databaseSockets.push(user);
 		socket.emit('InitializeDatabase', username, permissions, toplevel);
+	});
+	socket.on('DatabaseLogin', function(username, password) {
+		fs.readFile('./logins.json', 'utf8', function(err, logins) {
+			if(err) {
+				socket.emit('UpdateError', err);
+				return;
+			}
+			logins = JSON.parse(logins);
+			if(logins[username]) {
+				if(logins[username].password == password) {
+					try {
+						banlist = JSON.parse(fs.readFileSync('./bans.json', 'utf8'));
+						if(user in banlist.users) { //Banned people can still read. They're harmless.
+							socket.emit('UpdateError', "You're banned from logging in, but you can still read things. I'm not a jerk.");
+							socket.emit('CloseModal');
+							return;
+						}
+					} catch(err) {} //Couldn't read bans.json, so just assume they're fine
+					user[1] = username;
+					user[2] = logins[username].permissions;
+					socket.emit('SetUsername', username);
+					socket.emit('SetPermissions', logins[username].permissions);
+					socket.emit('CloseModal');
+					socket.emit('UpdateError', 'You have successfully logged in as ' + username + '!');
+				} else {
+					socket.emit('UpdateError', "Your password was incorrect.");
+				}
+			} else {
+				socket.emit('UpdateError', "That username was not in our list. Register in the main server before trying to log in.");
+			}
+		});
 	});
 }
 };
