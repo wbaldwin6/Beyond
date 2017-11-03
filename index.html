@@ -1484,6 +1484,14 @@
 				}
 			},
 
+			preview: function(){
+				var frame = "<body style='margin: 0'><iframe width='100%' height='100%' src='data:text/html," + encodeURIComponent(this.refs['text'].value.replace(/\r\n?|\n/g, "<br />")).replace(/'/g,"%27") + "'></iframe></body>";
+				var myw = window.open();
+				myw.document.open();
+				myw.document.write(frame);
+				myw.document.close();
+			},
+
 			post: function(e){
 				e.preventDefault();
 				var modal = e.target.parentNode;
@@ -1600,11 +1608,19 @@
 				} else if(modal.name == 'Whisper') {
 					name+=' - '+modal.id;
 				}
+				if(this.props.modal.name == 'Set Profile'){
+				return(
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:'auto'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
+					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> <button type="submit" onClick={this.preview}>Preview</button></div>
+				);
+				} else {
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:'auto'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
 					<button type="submit" onClick={this.post}>OK</button><button type="submit" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> </div>
 				);
+				}
 			}
 		});
 
