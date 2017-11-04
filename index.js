@@ -53,9 +53,9 @@ function searchLogs(stringToFind, res) {
 			if(realResults.length) {
 				retVal = '<body style="background-color:black;color:white;">';
 				realResults.forEach(function(result, index) {
-					retVal += '<b><a href="/logs/'+result+'" style="color:blue;">' + result.replace(/([0-9]+)_([0-9]+)_([0-9]+).html/, function(match, p1, p2, p3, offset, string) {
-						return monthenum[parseInt(p2)-1] + ' ' + p3 + ', ' + p1; //Convert "YYYY_MM_DD.html" into "Monthname DD, YYYY"
-					}) + '</a></b><br />'
+					retVal += '<b>' + result.replace(/([0-9]+)_([0-9]+)_([0-9]+).html/, function(match, p1, p2, p3, offset, string) {
+						return monthenum[parseInt(p2)] + ' ' + p3 + ', ' + p1; //Convert "YYYY_MM_DD.html" into "Monthname DD, YYYY"
+					}) + '</b><br />'
 				});
 				res.send(retVal + '</body>');
 			} else {
@@ -69,10 +69,10 @@ function searchLogs(stringToFind, res) {
 }
  
 //Set up the search request for the logs
-app.get('/logs/search/:search', function(req, res) {
+/*app.get('/logs/search/:search', function(req, res) {
     var stringToFind = req.params.search;
     searchLogs(stringToFind, res);
-});
+});*/
 
 //Make sure the database exists
 database.LoadDatabase(); //TODO: Move this somewhere more appropriate?
@@ -237,8 +237,10 @@ app.get('/logs', function(req, res){
 				}
 			});
 			//Code for sending Search requests and receiving the results go here.
+			/*
 			ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/search/\' + searchTerm);};</script>';
 			ret += '<form onsubmit=\'searchLogs()\'><span style="color:white;">Search Logs:</span><input type=\'text\' id=\'txtSearch\'></form><br /><button type=\'button\' onclick=\'searchLogs()\'>Search</button>';
+			*/
 			ret += '</body>';
 			res.send(ret);
 		} else {
