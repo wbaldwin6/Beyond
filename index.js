@@ -48,6 +48,14 @@ try{
 	fs.writeFileSync('settings.json', JSON.stringify(serversettings));
 }
 
+var adminlogs;
+try{
+	adminlogs = fs.readFileSync('adminlogs.txt', 'utf8');
+} catch(e) {
+	adminlogs = '';
+	fs.writeFileSync('adminlogs.txt', '');
+}
+
 try{
 	fs.accessSync('worldinfo.html', fs.R_OK | fs.W_OK);
 } catch(e) {
@@ -664,6 +672,13 @@ var saveFile = function(filename, data, socket, username){
 	});
 };
 
+var adminLog = function(username, command, target){
+	var today = new Date();
+	adminlogs+='['+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+'] '+username+' used the '+command+' command';
+	if(target){adminlogs+=' on '+target+'.\r\n';} else {adminlogs+='.\r\n';}
+	fs.writeFile('adminlogs.txt', adminlogs, function(err){if(err){console.log(err);} else {}});
+};
+
 var Setconnections = function(socket, user){//username will definitely be present or something is wrong enough to warrant throwing.
 	var username = user;
 
@@ -902,6 +917,15 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			}
 		});
 	});
+	socket.on('Show Logs', function(callback){
+		fs.readFile('adminlogs.txt', 'utf8', function(err, info){
+			if(!err){
+				callback(info);
+			} else {
+				callback('');
+			}
+		});
+	});
 	socket.on('List Bans', function(callback){
 		var msg = {className: 'OOC system message', post: '<font style="color:red;">'+JSON.stringify(banlist)+'<br /></font>'};
 		socket.emit('OOCmessage', msg);
@@ -910,27 +934,33 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		var n = id.split('-');
 		var d = n.pop();
 		n = n.join('-');
-		if(username && username == n){
+		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync(__dirname+'/characters').indexOf(n) > -1))){
 			var dir = '/characters/'+n+'/'+d+'.html';
 			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dir+'" target="_blank">here.</a>'+'</font>'};
 			fs.writeFile(__dirname+dir, profile.replace(/\r\n?|\n/g, "<br />"), function(err){
 				if(err){console.log(err);} else {socket.emit('OOCmessage', msg);}
 			});
+			if(username != n && playerlist[username].permissions == 'Admin'){
+				adminLog(username, 'Set Profile', id);
+			}
 		}
 	});
 	socket.on('Delete Profile', function(id){
 		var n = id.split('-');
 		var d = n.pop();
 		n = n.join('-');
-		if(username && username == n){
+		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync(__dirname+'/characters').indexOf(n) > -1))){
 			var dir = '/characters/'+n+'/'+d+'.html';
 			fs.unlink(__dirname+dir, function(err){
 				if(err && err.code != 'ENOENT'){console.log(err);} else {
-					fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
+					if(username != n && playerlist[username].permissions == 'Admin'){
+						adminLog(username, 'Delete Profile', id);
+					}
+					/*fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
 						index = JSON.parse(index);
 						delete index[id];
 						fs.writeFileSync(__dirname+'/characters/charindex.json', JSON.stringify(index));
-					});
+					});*/
 				}
 			});
 		}
@@ -940,7 +970,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			serversettings.rules = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the rules.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
+				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Rules', null);}
 			});
 		} else {
 			console.log(username+' attempted to use an admin command.');
@@ -951,7 +981,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			serversettings.motd = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the MOTD.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
+				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit MOTD', null);}
 			});
 		} else {
 			console.log(username+' attempted to use an admin command.');
@@ -962,7 +992,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			serversettings.profile = message.replace(/\r\n?|\n/g, "<br />");//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
+				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Default Profile', null);}
 			});
 		} else {
 			console.log(username+' attempted to use an admin command.');
@@ -972,7 +1002,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		if(username && playerlist[username].permissions == 'Admin'){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
 			fs.writeFile('worldinfo.html', message.replace(/\r\n?|\n/g, "<br />"), function(err){
-				if(err){console.log(err);} else {io.emit('OOCmessage', msg);}
+				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit World Info', null);}
 			});
 		} else {
 			console.log(username+' attempted to use an admin command.');
@@ -982,7 +1012,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		if(username && playerlist[username].permissions == 'Admin'){
 			serversettings.title = sanitizeHtml(message, {allowedTags: [], allowedAttributes: []}); //allow no html here.
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-				if(err){console.log(err);} else {io.emit('Title', serversettings.title); console.log(username+' edited the title to '+serversettings.title);}
+				if(err){console.log(err);} else {io.emit('Title', serversettings.title); adminLog(username, 'Edit Title', null);}
 			});
 		} else {
 			console.log(username+' attempted to use an admin command.');
@@ -996,6 +1026,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			} else if(command.startsWith('Make')) {
 				commands['Set'](target, command.split(' ')[1]);
 			}
+			adminLog(username, command, target);
 		} else {
 			console.log(username+' attempted to use an admin command.');
 		}
@@ -1015,6 +1046,36 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			} else {
 				saveFile(__dirname+'/saves/'+username+'.json', settings);
 			}
+		}
+	});
+	socket.on('Get Character List', function(callback){
+		if(username && playerlist[username].permissions == 'Admin'){
+			fs.readdir(__dirname+'/characters', function(err, files){
+				if(!err){
+					fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, charindex){
+						if(!err){
+							var ret = [];
+							charindex = JSON.parse(charindex);
+							files = files.sort(function (a, b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+							files.forEach(function(file, index){
+								if(!file.endsWith('.json')){
+									var f = fs.readdirSync(__dirname+'/characters/'+file);
+									if(f.length !== 0){//player with characters
+										var player = [];
+										f.forEach(function(chr){
+											var id=file+'-'+chr.slice(0, -5);
+											var name = charindex[id].name;//get character names
+											player.push({id: id, name: name});
+										});
+										ret.push(player);
+									}
+								}
+							});
+							callback(ret);
+						} else callback(err);
+					});
+				} else callback(err);
+			});
 		}
 	});
 };

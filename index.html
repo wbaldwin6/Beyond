@@ -586,6 +586,9 @@
 							case 'chargroup ungrouped':
 								options = ['New Character', 'New Group'];
 								break;
+							case 'character admin':
+								options = ['Set Profile', 'Delete Profile'];
+								break;
 							case 'PLentry':
 								//add Whisper, check if admin for other commands
 								options = ['Whisper'];
@@ -651,7 +654,7 @@
 				var id = this.state.context.target.getAttribute('id');
 				if(id){id = this.state.context.target.getAttribute('id').split(',');}
 				var newmodal = {id: id, name: name};
-				if(id && id.length >= 2 && name != 'Whisper'){
+				if(id && id.length >= 2 && !(isNaN(id[0]) || isNaN(id[1])) && name != 'Whisper'){
 					newmodal.charid = this.state.characters[id[0]][id[1]][0].id;
 					if(id.length === 3){
 						var deriv = this.state.characters[id[0]][id[1]][id[2]];
@@ -758,12 +761,17 @@
 						newmodal.type = 'active';//two part charid already in place
 						break;
 					case 'Set Profile':
+						if(!newmodal.charid){newmodal.charid = newmodal.id.join(','); newmodal.charname = this.state.context.target.textContent;}
 						var that=this;
 						this.props.socket.emit('Show Profile', newmodal.charid, function(response){
 							newmodal.post = sanitize(response);
 							newmodal.type = 'action';
 							that.modalpush(newmodal);//async is just fine thanks to this function.
 						});
+						break;
+					case 'Delete Profile':
+						newmodal.charid = newmodal.id.join(','); newmodal.charname = this.state.context.target.textContent;
+						newmodal.type = 'delete';
 						break;
 					case 'Leave Room':
 						var settings = this.state.settings;
@@ -1428,18 +1436,30 @@
 				this.props.closeModal(this.props.id);
 			},
 
+			adminProfileDelete: function(e){
+				this.props.socket.emit('Delete Profile', this.props.modal.charid);
+				this.props.closeModal(this.props.id);
+			},
+
 			render: function(){
 				var modal = this.props.modal;
 				var name = modal.name;
 				var fun = this.charDelete;
 				if(modal.groupname){name += ' - '+modal.groupname;
 				} else if(modal.charid){
-					var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
-					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+					if(modal.charname){
+						name+=' - '+modal.charname;
+					} else {
+						var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
+						if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+					}
 				} else if(modal.name == "Delete Post"){
 					fun = this.postDelete;
 				} else if (modal.name.startsWith("Clear")){
 					fun = this.clearBox;
+				}
+				if (modal.name.startsWith("Delete Profile")){
+					fun = this.adminProfileDelete;
 				}
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
@@ -1603,8 +1623,12 @@
 				var modal = this.props.modal;
 				var name = modal.name;
 				if(modal.charid){
-					var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
-					if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+					if(modal.charname){
+						name+=' - '+modal.charname;
+					} else {
+						var trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
+						if(trueid){name+=' - '+this.props.characters[trueid[0]][trueid[1]][(trueid[2] || 0)].name;} else {this.props.closeModal(this.props.id);}
+					}
 				} else if(modal.name == 'Whisper') {
 					name+=' - '+modal.id;
 				}
@@ -1904,7 +1928,7 @@
 
 		var ChartabHandler = React.createClass({
 			getInitialState: function(){//open.characters[ID] will be true if we need to open derivs
-				return {tab: 'characters', open:{groups: {}, characters: {}}};
+				return {tab: 'characters', open:{groups: {}, characters: {}, players: {}}};
 			},
 
 			shiftTab: function(e){//It's both a relevant name and a terrible pun!
@@ -1925,6 +1949,14 @@
 				var op = this.state.open;
 				var name = this.props.characters[id[0]][id[1]][0].id;//characters[0][2][0] for instance.
 				op.characters[name] = !op.characters[name];
+				this.setState({open: op});
+			},
+
+			togglePlayer: function(e){
+				e.stopPropagation();
+				var id = e.target.getAttribute('id');
+				var op = this.state.open;
+				op.players[id] = !op.players[id];
 				this.setState({open: op});
 			},
 
@@ -1950,7 +1982,7 @@
 				var name = e.target.textContent;
 				var type = name.split(' '); type = type[type.length-1];
 				var that = this;
-				if(['Rules', 'MOTD', 'Profile', 'Info'].indexOf(type) > -1){
+				if(['Rules', 'MOTD', 'Profile', 'Info', 'Logs'].indexOf(type) > -1){
 					var res = function(response){
 						if(response){response = sanitize(response);}
 						that.props.modalpush({id: [], name: name, type: 'action', post: response});
@@ -2079,6 +2111,13 @@
 				this.props.handleSettings(this.props.settings, this.props.characters);
 			},
 
+			refresh: function(){
+				var that=this;
+				this.props.socket.emit('Get Character List', function(charindex){
+					that.setState({charindex: charindex});
+				});
+			},
+
 			save: function(e){this.props.handleSettings(this.props.settings, this.props.characters, true);},
 
 			render: function(){
@@ -2135,7 +2174,24 @@
 						});
 						break;
 					case 'admin'://case for the administrative commands tab
-						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.genmodal}>Mute</div>, <div key='6' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='7' className='Command' onClick={this.show}>List Bans</div>, <div key='8' className='Command' onClick={this.genmodal}>Ban</div>, <div key='9' className='Command' onClick={this.genmodal}>Unban</div>]
+						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.genmodal}>Mute</div>, <div key='6' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='7' className='Command' onClick={this.show}>List Bans</div>, <div key='8' className='Command' onClick={this.genmodal}>Ban</div>, <div key='9' className='Command' onClick={this.genmodal}>Unban</div>, <div key='10' className='Command' onClick={this.genmodal}>Show Admin Logs</div>, <div key='11' className='Command' onClick={this.refresh}>Open Lists</div>];
+						if(this.state.charindex){
+							var characters = this.state.charindex;
+							var charlist = characters.map(function(player, i){//players loop
+								var charid = characters[i][0].id.split('-');
+								charid.pop();
+								var playername = charid.join('-');//catches names with - in them
+								if(that.state.open.players[playername]){//open player
+									var chars = characters[i].map(function(chr, i2){//characters loop
+										return(<div key={i2} id={chr.id} className="character admin"><span style={{pointerEvents:'none'}}>{chr.name}</span></div>);
+									});
+									return(<div onClick={that.togglePlayer} key={i} id={playername} className="chargroup admin"><span style={{pointerEvents:'none'}} className='group'>{playername} [-]</span>{chars}</div>);
+								} else {//closed player
+									return(<div onClick={that.togglePlayer} key={i} id={playername} className="chargroup admin"><span className='group' style={{pointerEvents:'none'}}>{playername} [+]</span></div>);
+								}
+							});
+							currenttab.push(charlist);
+						}
 				}
 				var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 				return (
