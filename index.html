@@ -2083,29 +2083,35 @@
 				switch(this.state.dragEl.className){
 					case 'derivative':
 						el = this.props.characters[id1[0]][id1[1]].splice(id1[2], 1)[0];
-						if(+id1[2] < +id2[2]){id2[2]--;}//if splice shifted the array up, account for this
-						if(where){id2[2]++;}
-						this.props.characters[id1[0]][id1[1]].splice(id2[2], 0, el);
+						if(el){
+							if(+id1[2] < +id2[2]){id2[2]--;}//if splice shifted the array up, account for this
+							if(where){id2[2]++;}
+							this.props.characters[id1[0]][id1[1]].splice(id2[2], 0, el);
+						}
 						break;
 					case 'character':
 						el = this.props.characters[id1[0]].splice(id1[1], 1)[0];
-						if(id2[1]){//no need or ability to check this otherwise
-							if(id1[0] == id2[0] && +id1[1] < +id2[1]){id2[1]--;}//same group AND higher placement, or there's no shift up.
-							if(where){id2[1]++;}//this needs a check regardless.
-							this.props.characters[id2[0]].splice(id2[1], 0, el);
-						} else {
-							if(!where && id2[0] == '1'){//top group and at the top
-								this.props.characters[0].push(el);//add it to the end of ungrouped.
+						if(el){
+							if(id2[1]){//no need or ability to check this otherwise
+								if(id1[0] == id2[0] && +id1[1] < +id2[1]){id2[1]--;}//same group AND higher placement, or there's no shift up.
+								if(where){id2[1]++;}//this needs a check regardless.
+								this.props.characters[id2[0]].splice(id2[1], 0, el);
 							} else {
-								this.props.characters[id2[0]].splice(1, 0, el);//add to first non-name position
+								if(!where && id2[0] == '1'){//top group and at the top
+									this.props.characters[0].push(el);//add it to the end of ungrouped.
+								} else {
+									this.props.characters[id2[0]].splice(1, 0, el);//add to first non-name position
+								}
 							}
 						}
 						break;
 					case 'chargroup'://no case for ungrouped, it should never be moved or draggable at all.
 						el = this.props.characters.splice(id1[0], 1)[0];
-						if(+id1[0] < +id2[0]){id2[0]--;}
-						if(where){id2[0]++;}
-						this.props.characters.splice(id2[0], 0, el);
+						if(el){
+							if(+id1[0] < +id2[0]){id2[0]--;}
+							if(where){id2[0]++;}
+							this.props.characters.splice(id2[0], 0, el);
+						}
 						break;
 				}
 				this.props.handleSettings(this.props.settings, this.props.characters);
