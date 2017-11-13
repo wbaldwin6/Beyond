@@ -391,7 +391,7 @@
 		var title = 'Beyond';
 
 		socket.on('Title', function(message){
-			document.title = message;
+			if(document.title.startsWith('(AFK) ')){document.title = '(AFK) '+message;} else {document.title = message;}
 			title = message;
 		});
 
@@ -492,8 +492,7 @@
 								console.log('Logged in successfully (as far as I can tell).');
 								//that.handleSettings(res.settings, res.characters);this SHOULDN'T change.
 								reconnected = true;//we made it in, stop retrying.
-								if(idleInterval){idleInterval.terminate();}
-								timersetup();//restart the afk timer.
+								if(!idleInterval){that.props.socket.emit('AFK', true);}//if the idleInterval is null, leave them AFK until they return.
 							} else {
 								console.log(res);
 							}
