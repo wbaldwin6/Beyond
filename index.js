@@ -157,7 +157,7 @@ app.get('/characters', function(req, res){
 								f.forEach(function(chr){
 									var id=file+'-'+chr.slice(0, -5);
 									var name = charindex[id].name;
-									ret += '<a href="/characters/'+file+'/'+chr+'" style="color:blue;">'+
+									ret += '<a href="/characters/'+encodeURIComponent(file)+'/'+chr+'" style="color:blue;">'+
 									'<img src="/faceicons/img_trans.gif" height="50px" width="50px" style="background-image:url(/faceicons/'+charindex[id].icon+'.png);">'+name+'</a><br><br>';
 								});
 								ret += '</div>';
@@ -939,8 +939,9 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		var d = n.pop();
 		n = n.join('-');
 		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync(__dirname+'/characters').indexOf(n) > -1))){
+			var dirmessage = '/characters/'+encodeURIComponent(n)+'/'+d+'.html';
 			var dir = '/characters/'+n+'/'+d+'.html';
-			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dir+'" target="_blank">here.</a>'+'</font>'};
+			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dirmessage+'" target="_blank">here.</a>'+'</font>'};
 			fs.writeFile(__dirname+dir, profile.replace(/\r\n?|\n/g, "<br />"), function(err){
 				if(err){console.log(err);} else {socket.emit('OOCmessage', msg);}
 			});
