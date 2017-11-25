@@ -2290,11 +2290,10 @@
 						var charid = character.id.split('-');
 						var d = charid.pop();
 						charid = charid.join('-');//catches names with - in them
-						var profileopen = function(e){window.open('/characters/'+charid+'/'+d+'.html');}
 						var edit = [];
 						if(message.id){edit.push(character.id);}//worst case message.id is undefined
 						//if(!message.className.startsWith('O') && !message.className.startsWith('T')){edit.push('Narrate');}//IC post
-						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
+						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><a href={'/characters/'+charid+'/'+d+'.html'} target="_blank"><img src='/faceicons/img_trans.gif' onClick={profileopen} height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/></a> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
 				}
 			}
 		});
