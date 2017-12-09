@@ -1087,6 +1087,9 @@ var Setconnections = function(socket, user){//username will definitely be presen
 
 io.of('/database').on('connection', function(socket) {
 	database.InitializeDatabaseSocket(socket);
+	if(serversettings.title){
+		socket.emit('Title', serversettings.title);
+	}
 });
 
 io.on('connection', function(socket){
