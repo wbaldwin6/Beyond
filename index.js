@@ -683,17 +683,37 @@ var adminLog = function(username, command, target){
 	fs.writeFile('adminlogs.txt', adminlogs, function(err){if(err){console.log(err);} else {}});
 };
 
+var CheckUser = function(username, minimumPermission, muteusable, socket){
+	if(!username){return false;}
+	if(minimumPermission == 'Admin'){
+		if(playerlist[username].permissions == 'Admin'){
+			return true;
+		} else {
+			console.log(username+' attempted to use an admin command.');
+			return false;
+		}
+	}
+	if(!muteusable && playerlist[username].muted){
+		socket.emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">You are currently muted.</font>'});
+		return false;
+	}
+	if(minimumPermission == 'Player'){
+		return (['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1);
+	}
+	return true;//If we're here, username is present, muteusable is true (the command can be used even when muted), and it requires no permissions.
+};
+
 var Setconnections = function(socket, user){//username will definitely be present or something is wrong enough to warrant throwing.
 	var username = user;
 
 	socket.on('Join Room', function(room){
-		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
+		if(CheckUser(username, 'Player', true, socket)){
 			socket.join(room);
 			io.to(room).emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">'+username+' has entered Room '+room+'</font>'});
 		}
 	});
 	socket.on('Leave Room', function(room){
-		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1){
+		if(CheckUser(username, 'Player', true, socket)){
 			io.to(room).emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">'+username+' has left Room '+room+'</font>'});
 			socket.leave(room);
 		}
@@ -701,17 +721,14 @@ var Setconnections = function(socket, user){//username will definitely be presen
 	socket.on('OOCmessage', function(message, color){
 		message = processHTML(message);
 		var msg = {className: 'OOC message', username: username, post: message, color: color};
-		if(username && msg.post && !playerlist[username].muted){
+		if(msg.post && CheckUser(username, 'Guest', false, socket)){
 			io.emit('OOCmessage', msg);
 			toLog(msg);
-		}
-		if(username && playerlist[username].muted){
-			socket.emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">You are currently muted.</font>'});
 		}
 	});
 	socket.on('Narrate', function(message, color, room, callback){
 		if(callback){callback();}
-		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
+		if(CheckUser(username, 'Player', false, socket)){
 			message = processHTML(message);
 			var msg = {className: 'IC narration message', username: username, post: message, color: color};
 			msg.id = postnum++;
@@ -724,9 +741,6 @@ var Setconnections = function(socket, user){//username will definitely be presen
 				io.emit('ICmessage', msg);
 				toLog(msg);
 			}
-		}
-		if(username && playerlist[username].muted){
-			socket.emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">You are currently muted.</font>'});
 		}
 	});
 	socket.on('Whisper', function(message, target){
@@ -743,7 +757,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		}
 	});
 	socket.on('Dice', function(dice, result, color, priv){
-		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && result){
+		if(CheckUser(username, 'Player', true, socket) && result){//we automatically switch to private instead of just disallowing, so no mute check.
 			var post = username+' rolled '+dice+': '+(result.toString().replace(/,/g, ', '));
 			if(result.length > 1){
 				var total = result.reduce(function(a,b){return a+b;});
@@ -760,7 +774,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 	});
 	socket.on('characterPost', function(message, character, type, room, callback){
 		if(callback){callback();}
-		if(username && !playerlist[username].muted && character){
+		if(CheckUser(username, 'Guest', false, socket) && character){//We do not check for Player status here, only if it's IC.
 			if(character.customHTML){
 				character.customHTML = sanitizeHtml(character.customHTML, {allowedTags: ['b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
 					allowedAttributes: {
@@ -802,14 +816,14 @@ var Setconnections = function(socket, user){//username will definitely be presen
 				if(character.customHTML){
 					msg.character.customHTML = '<span style="color:white;">['+room+']</span> '+msg.character.customHTML;
 				} else {msg.character.customHTML = '<span style="color:white;">['+room+']</span> '+msg.character.name;}
+				if(msg.unnamed){
+					msg.post = '<span style="color:white;">['+room+']</span> '+msg.post;
+				}
 				io.to(room).emit(call, msg);
 			} else if(call) {//If it doesn't have a call(IE they didn't pass the player/admin test) drop the message
 				io.emit(call, msg);
 				toLog(msg);
 			}
-		}
-		if(username && playerlist[username].muted){
-			socket.emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">You are currently muted.</font>'});
 		}
 	});
 	socket.on('ICedit', function(message, postid){
@@ -817,7 +831,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			console.log(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
 		}
-		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
+		if(CheckUser(username, 'Player', false, socket)){
 			message = processHTML(message);
 			var msg = {id: postid, post: message+'*'};
 			io.emit('ICedit', msg);
@@ -830,7 +844,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			console.log(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
 		}
-		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
+		if(CheckUser(username, 'Player', false, socket)){
 			message = processHTML(message);
 			className = 'message';
 			if(type.endsWith('Say')){
@@ -855,7 +869,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			console.log(username + ' tried to delete a post by '+(idlist[id] || ''));
 			return;
 		}
-		if(username && ['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1 && !playerlist[username].muted){
+		if(CheckUser(username, 'Player', false, socket)){
 			deleteLog(id);
 			io.emit('ICdel', id);
 		}
@@ -938,6 +952,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		var n = id.split('-');
 		var d = n.pop();
 		n = n.join('-');
+		//this is a very unique case, so we don't use CheckUser.
 		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync(__dirname+'/characters').indexOf(n) > -1))){
 			var dirmessage = '/characters/'+encodeURIComponent(n)+'/'+d+'.html';
 			var dir = '/characters/'+n+'/'+d+'.html';
@@ -954,6 +969,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		var n = id.split('-');
 		var d = n.pop();
 		n = n.join('-');
+		//if I add any more 'admin or specific user' commands I may add it to CheckUser, but currently these are the only two.
 		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync(__dirname+'/characters').indexOf(n) > -1))){
 			var dir = '/characters/'+n+'/'+d+'.html';
 			fs.unlink(__dirname+dir, function(err){
@@ -961,79 +977,62 @@ var Setconnections = function(socket, user){//username will definitely be presen
 					if(username != n && playerlist[username].permissions == 'Admin'){
 						adminLog(username, 'Delete Profile', id);
 					}
-					/*fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
-						index = JSON.parse(index);
-						delete index[id];
-						fs.writeFileSync(__dirname+'/characters/charindex.json', JSON.stringify(index));
-					});*/
 				}
 			});
 		}
 	});
 	socket.on('Edit Rules', function(message){
-		if(username && playerlist[username].permissions == 'Admin'){
+		if(CheckUser(username, 'Admin', true, socket)){
 			serversettings.rules = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the rules.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Rules', null);}
 			});
-		} else {
-			console.log(username+' attempted to use an admin command.');
 		}
 	});
 	socket.on('Edit MOTD', function(message){
-		if(username && playerlist[username].permissions == 'Admin'){
+		if(CheckUser(username, 'Admin', true, socket)){
 			serversettings.motd = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the MOTD.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit MOTD', null);}
 			});
-		} else {
-			console.log(username+' attempted to use an admin command.');
 		}
 	});
 	socket.on('Edit Default Profile', function(message){
-		if(username && playerlist[username].permissions == 'Admin'){
+		if(CheckUser(username, 'Admin', true, socket)){
 			serversettings.profile = message.replace(/\r\n?|\n/g, "<br />");//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Default Profile', null);}
 			});
-		} else {
-			console.log(username+' attempted to use an admin command.');
 		}
 	});
 	socket.on('Edit World Info', function(message){
-		if(username && playerlist[username].permissions == 'Admin'){
+		if(CheckUser(username, 'Admin', true, socket)){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
 			fs.writeFile('worldinfo.html', message.replace(/\r\n?|\n/g, "<br />"), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit World Info', null);}
 			});
-		} else {
-			console.log(username+' attempted to use an admin command.');
 		}
 	});
 	socket.on('Edit Title', function(message){
-		if(username && playerlist[username].permissions == 'Admin'){
+		if(CheckUser(username, 'Admin', true, socket)){
 			serversettings.title = sanitizeHtml(message, {allowedTags: [], allowedAttributes: []}); //allow no html here.
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){console.log(err);} else {io.emit('Title', serversettings.title); adminLog(username, 'Edit Title', null);}
 			});
-		} else {
-			console.log(username+' attempted to use an admin command.');
 		}
 	});
 	socket.on('AdminCommand', function(command, target){
 		//before we even consider it: ARE they an admin?
-		if(username && playerlist[username].permissions == 'Admin'){
+		if(CheckUser(username, 'Admin', true, socket)){
 			if(commands[command]){
 				commands[command](target);
 			} else if(command.startsWith('Make')) {
 				commands['Set'](target, command.split(' ')[1]);
 			}
 			adminLog(username, command, target);
-		} else {
-			console.log(username+' attempted to use an admin command.');
 		}
 	});
 	socket.on('disconnect', function(){
@@ -1054,7 +1053,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		}
 	});
 	socket.on('Get Character List', function(callback){
-		if(username && playerlist[username].permissions == 'Admin'){
+		if(CheckUser(username, 'Admin', true, socket)){
 			fs.readdir(__dirname+'/characters', function(err, files){
 				if(!err){
 					fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, charindex){
