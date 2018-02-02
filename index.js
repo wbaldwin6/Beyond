@@ -11,7 +11,7 @@ var cp = require('child_process');
 //Set up the search request for the logs
 app.get('/logs/search/:search', function(req, res) {
     var stringToFind = req.params.search;
-    var child = cp.fork('logsearch.js');
+    var child = cp.fork(__dirname+'/logsearch.js');
     child.send(stringToFind);
 
     child.on('message', function(m){
@@ -64,29 +64,29 @@ try{
 }
 
 var postnum = 1;
-if(!fs.existsSync(__dirname+'/logs')){fs.mkdirSync(__dirname+'/logs');}
-if(!fs.existsSync(__dirname+'/logs/postid.txt')){fs.writeFile(__dirname+'/logs/postid.txt', 1);} else {fs.readFile(__dirname+'/logs/postid.txt','utf8',function(err,num){postnum=+num;});}
+if(!fs.existsSync('./logs')){fs.mkdirSync('./logs');}
+if(!fs.existsSync('./logs/postid.txt')){fs.writeFile('./logs/postid.txt', 1);} else {fs.readFile('./logs/postid.txt','utf8',function(err,num){postnum=+num;});}
 
 var iconnum = 0;
-if(!fs.existsSync(__dirname+'/faceicons')){fs.mkdirSync(__dirname+'/faceicons');}
+if(!fs.existsSync('./faceicons')){fs.mkdirSync('./faceicons');}
 
-if(!fs.existsSync(__dirname+'/faceicons/num.txt')){fs.writeFile(__dirname+'/faceicons/num.txt', 0);} else {fs.readFile(__dirname+'/faceicons/num.txt','utf8',function(err,num){iconnum=+num;});}
-if(!fs.existsSync(__dirname+'/faceicons/img_trans.gif')){fs.writeFile(__dirname+'/faceicons/img_trans.gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');}
-if(!fs.existsSync(__dirname+'/faceicons/img_trans.png')){fs.writeFile(__dirname+'/faceicons/img_trans.png', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');}
-if(!fs.existsSync(__dirname+'/faceicons/favicon.png')){fs.writeFile(__dirname+'/faceicons/favicon.png', 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAADXUAAA11AFeZeUIAAACKElEQVQ4jaWTO2hUURCGvzn33t272TW7S7QwGpVtTBSxsLAUUwYhiPjCQhQLBdFCNFiJoIWFCGonCmITNKCFUYlCiCIp1CJFJGgwaHEjJIImxn3dc8Yi7iY+EhEHBg5T/Od/zAhAc3Oz8g8VRZHU3j7A5MTH19fOdbY1pBtIJAM830OMAcBZh41jKuUK32aK+mjgjXZH0TugUAdIJQPWFZqk8/iDBX/tvrzdLc2lzMbW5cTWrerpG7kKHPUBUEdp6utv9ObXnmN39entA4Cyu2MDPX0jHQAGQICZz1/+ql2MwU8kyObSBgjrEhAozxSBhQ19eH2XqqoYYxh48QFgcA4AQYxw5eBq1LnaCM8PSC3JkGnKQxyLi632D45y6cazIrBjHgMhzKQR0Gq5LC62qFO1Gku1VKZaKuvE5JScOdvL85djAOkas1kPjJDOZ0llG0mmG/ASgRqvFqPFVmNpTPl0Hd7Cob2b8X3zqQbwIwVI53PsPN1fS+CnJG52bcJZS2FlXk4daWdtYVnu5Pn7w8B6A6DOEWZmWUVRJL/2/guvEM+ggDplW3ubFFryrXUJxhi8wF80wiAMESOoczhrpdCSn/MAI9g4XhQgkQoxxsNaS7Vc0bdjk1L3II4tpenZTfzTHjy+tU89EXHWYisV7vQO8X58aqhulu/J8MUTW9ckU2EQhEkTJALj+T4YAVW11qmNrZueLpr+wVFz78nIuCor6gD/c87fAZie5tVJv8TeAAAAAElFTkSuQmCC', 'base64');}
-if(!fs.existsSync(__dirname+'/faceicons/notice.png')){fs.writeFile(__dirname+'/faceicons/notice.png', 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAADXUAAA11AFeZeUIAAAB4ElEQVQ4jaWTP28TQRDFf7u+851ln+0EEzmKiE5BigAXSOgsCtoI0QEdJR+Amu9AzzegoaWJKKhoQPJJKMWVECkKAoTDv9g+27feobj4EkchCDHF7hYzb957M6sAoigS/iHiOFbztwKoQXJ4Y+0q9QAcF7wS+E6eMbYwnsBkAoOhvNj/Kff6oz1gA8ABWFYKBpnq6toZ/TRQodcuW2oVfVccnousPzhInwKPAFiHRKolOU9KFEUi97sitzsinbYBPszh82M4+7t4R0PFh3pFA34h4Zjqnw3tNUYCgUJrUscHeANHJoaQ7MI1cE+UzBlZaDiweQnay4KGi9vv0n5mq0VqCImACNoKrgieCJ7Nby3iYqWzKo832jZHPMVbuwpaPmgLZEAmC3kZitGUJ5cv8PbWJj4cFLYAYICwTTdszRdEcSJ6cQyTDIxRN1sB6Z3rTfVyJwE6DoAVgVYD+otbNo9uFEnv2/sjaywoUVuV8pVX6TSX4AD47um6xWgG+RiNhalRW3Xv2AO8Ekyz8wGWqlByYGZgPJbtL4eqaD42M/j8HfTKmXvQWzVCVlYYA4OU9MeA17BTmOVDki65Ic26y0qg8T2N7+XMslk+4aGxZFP9bO+rfvjx1ycLawXA/3zn3yXMuSxJ72rcAAAAAElFTkSuQmCC', 'base64');}
-if(!fs.existsSync(__dirname+'/faceicons/box.png')){fs.writeFile(__dirname+'/faceicons/box.png', 'iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAADXUAAA11AFeZeUIAAABA0lEQVRoge2asYoCMRRFz4i4EUR2FiwUG9n//5SttdVWS1enmy2SgThMkWIhF7kHwp3p7uGle2nuhJ43YJ7yF3iMjjIBWOY5iDyAG3BNeatSr5xP4CvLNhe5AhfgnFKZLbBL2TAxkTNwBE5V6pVzADqgJ16tdixyAU4rup86/cq4E56kSRCvVjerW+n/sIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImoMe/ZAfA6xBQ5pj63MN7AHNsAaWAwiS+LifUd8UdBUqVfOnleRMDWRPv0rs8nO5ESa7FuZ9ei8TKTNsqtSr5wFseuQH3+zPCfjk5ftQQAAAABJRU5ErkJggg==', 'base64');}
-if(!fs.existsSync(__dirname+'/faceicons/handle.png')){fs.writeFile(__dirname+'/faceicons/handle.png', 'iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAADXUAAA11AFeZeUIAAAAB3RJTUUH4QIUDyUsZQAKFgAAAMpJREFUOMvt1DtrAlEQxfE/+/28IgbiVNaCsIZAHoVv10JFSUifLgckWMwntBlhsVlfjeDpLgw/zp1i4JFHKuNS5lLn8M5uYO6An5uALu2AGjC4GnRpC9SBQTIrrgJd+geawCiZFS59XwwG1ghs6tIG6F4ExjePsRxYng0G1gTmgS0DWyWz97NAl/5KO+sH9hrYW3k2O3Fnz8Akmq0DWxywaF8NRrMGMEtm48B6wFcy+4iZX+CpEnRpAbQCG7qUl7CXEtYGPu/nWOwBIGxhMKJusmIAAAAASUVORK5CYII=', 'base64');}
+if(!fs.existsSync('./faceicons/num.txt')){fs.writeFile('./faceicons/num.txt', 0);} else {fs.readFile('./faceicons/num.txt','utf8',function(err,num){iconnum=+num;});}
+if(!fs.existsSync('./faceicons/img_trans.gif')){fs.writeFile('./faceicons/img_trans.gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');}
+if(!fs.existsSync('./faceicons/img_trans.png')){fs.writeFile('./faceicons/img_trans.png', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');}
+if(!fs.existsSync('./faceicons/favicon.png')){fs.writeFile('./faceicons/favicon.png', 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAADXUAAA11AFeZeUIAAACKElEQVQ4jaWTO2hUURCGvzn33t272TW7S7QwGpVtTBSxsLAUUwYhiPjCQhQLBdFCNFiJoIWFCGonCmITNKCFUYlCiCIp1CJFJGgwaHEjJIImxn3dc8Yi7iY+EhEHBg5T/Od/zAhAc3Oz8g8VRZHU3j7A5MTH19fOdbY1pBtIJAM830OMAcBZh41jKuUK32aK+mjgjXZH0TugUAdIJQPWFZqk8/iDBX/tvrzdLc2lzMbW5cTWrerpG7kKHPUBUEdp6utv9ObXnmN39entA4Cyu2MDPX0jHQAGQICZz1/+ql2MwU8kyObSBgjrEhAozxSBhQ19eH2XqqoYYxh48QFgcA4AQYxw5eBq1LnaCM8PSC3JkGnKQxyLi632D45y6cazIrBjHgMhzKQR0Gq5LC62qFO1Gku1VKZaKuvE5JScOdvL85djAOkas1kPjJDOZ0llG0mmG/ASgRqvFqPFVmNpTPl0Hd7Cob2b8X3zqQbwIwVI53PsPN1fS+CnJG52bcJZS2FlXk4daWdtYVnu5Pn7w8B6A6DOEWZmWUVRJL/2/guvEM+ggDplW3ubFFryrXUJxhi8wF80wiAMESOoczhrpdCSn/MAI9g4XhQgkQoxxsNaS7Vc0bdjk1L3II4tpenZTfzTHjy+tU89EXHWYisV7vQO8X58aqhulu/J8MUTW9ckU2EQhEkTJALj+T4YAVW11qmNrZueLpr+wVFz78nIuCor6gD/c87fAZie5tVJv8TeAAAAAElFTkSuQmCC', 'base64');}
+if(!fs.existsSync('./faceicons/notice.png')){fs.writeFile('./faceicons/notice.png', 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAADXUAAA11AFeZeUIAAAB4ElEQVQ4jaWTP28TQRDFf7u+851ln+0EEzmKiE5BigAXSOgsCtoI0QEdJR+Amu9AzzegoaWJKKhoQPJJKMWVECkKAoTDv9g+27feobj4EkchCDHF7hYzb957M6sAoigS/iHiOFbztwKoQXJ4Y+0q9QAcF7wS+E6eMbYwnsBkAoOhvNj/Kff6oz1gA8ABWFYKBpnq6toZ/TRQodcuW2oVfVccnousPzhInwKPAFiHRKolOU9KFEUi97sitzsinbYBPszh82M4+7t4R0PFh3pFA34h4Zjqnw3tNUYCgUJrUscHeANHJoaQ7MI1cE+UzBlZaDiweQnay4KGi9vv0n5mq0VqCImACNoKrgieCJ7Nby3iYqWzKo832jZHPMVbuwpaPmgLZEAmC3kZitGUJ5cv8PbWJj4cFLYAYICwTTdszRdEcSJ6cQyTDIxRN1sB6Z3rTfVyJwE6DoAVgVYD+otbNo9uFEnv2/sjaywoUVuV8pVX6TSX4AD47um6xWgG+RiNhalRW3Xv2AO8Ekyz8wGWqlByYGZgPJbtL4eqaD42M/j8HfTKmXvQWzVCVlYYA4OU9MeA17BTmOVDki65Ic26y0qg8T2N7+XMslk+4aGxZFP9bO+rfvjx1ycLawXA/3zn3yXMuSxJ72rcAAAAAElFTkSuQmCC', 'base64');}
+if(!fs.existsSync('./faceicons/box.png')){fs.writeFile('./faceicons/box.png', 'iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAADXUAAA11AFeZeUIAAABA0lEQVRoge2asYoCMRRFz4i4EUR2FiwUG9n//5SttdVWS1enmy2SgThMkWIhF7kHwp3p7uGle2nuhJ43YJ7yF3iMjjIBWOY5iDyAG3BNeatSr5xP4CvLNhe5AhfgnFKZLbBL2TAxkTNwBE5V6pVzADqgJ16tdixyAU4rup86/cq4E56kSRCvVjerW+n/sIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImoMe/ZAfA6xBQ5pj63MN7AHNsAaWAwiS+LifUd8UdBUqVfOnleRMDWRPv0rs8nO5ESa7FuZ9ei8TKTNsqtSr5wFseuQH3+zPCfjk5ftQQAAAABJRU5ErkJggg==', 'base64');}
+if(!fs.existsSync('./faceicons/handle.png')){fs.writeFile('./faceicons/handle.png', 'iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAADXUAAA11AFeZeUIAAAAB3RJTUUH4QIUDyUsZQAKFgAAAMpJREFUOMvt1DtrAlEQxfE/+/28IgbiVNaCsIZAHoVv10JFSUifLgckWMwntBlhsVlfjeDpLgw/zp1i4JFHKuNS5lLn8M5uYO6An5uALu2AGjC4GnRpC9SBQTIrrgJd+geawCiZFS59XwwG1ghs6tIG6F4ExjePsRxYng0G1gTmgS0DWyWz97NAl/5KO+sH9hrYW3k2O3Fnz8Akmq0DWxywaF8NRrMGMEtm48B6wFcy+4iZX+CpEnRpAbQCG7qUl7CXEtYGPu/nWOwBIGxhMKJusmIAAAAASUVORK5CYII=', 'base64');}
 
 try{//make the saves folder if it doesn't exist BEFORE proceeding.
-	fs.mkdirSync(__dirname+'/saves');
+	fs.mkdirSync('./saves');
 } catch(e){//do nothing if it already exists.
 	if(e.code != 'EEXIST'){throw e;}
 }
 
 try{
-	fs.mkdirSync(__dirname+'/characters');
-	fs.writeFile(__dirname+'/characters/charindex.json', JSON.stringify({}));
+	fs.mkdirSync('./characters');
+	fs.writeFile('./characters/charindex.json', JSON.stringify({}));
 } catch(e){
 	if(e.code != 'EEXIST'){throw e;}
 }
@@ -100,7 +100,7 @@ app.get('/', function(req, res){
 });
 
 app.get('/worldinfo', function(req, res){
-	res.sendFile(__dirname + '/worldinfo.html');
+	res.sendFile('worldinfo.html', {root: '.'});
 });
 
 app.get('/idle.js', function(req, res){
@@ -124,7 +124,7 @@ app.get('/database/*', function(req, res){
 app.get('/logs/:name', function(req, res){
 	var name = req.params.name;
 	if(name.endsWith('.html')){
-		res.sendFile(name, {root: __dirname+'/logs/'});
+		res.sendFile(name, {root: './logs/'});
 	}
 });
 
@@ -132,8 +132,8 @@ app.get('/characters/:user/:name', function(req, res){
 	var name = req.params.name;
 	if(name.endsWith('.html')){
 		try{//make sure the logins file exists BEFORE proceeding.
-			fs.accessSync(__dirname+'/characters/'+req.params.user+'/'+name, fs.R_OK | fs.W_OK);
-			res.sendFile(name, {root: __dirname+'/characters/'+req.params.user});
+			fs.accessSync('./characters/'+req.params.user+'/'+name, fs.R_OK | fs.W_OK);
+			res.sendFile(name, {root: './characters/'+req.params.user});
 		} catch(e) {
 			res.send("<style>body{background-color: black; color: white;}</style><body>Profile not found!</body>")
 		}
@@ -141,16 +141,16 @@ app.get('/characters/:user/:name', function(req, res){
 });
 
 app.get('/characters', function(req, res){
-	fs.readdir(__dirname+'/characters', function(err, files){
+	fs.readdir('./characters', function(err, files){
 		if(!err){
-			fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, charindex){
+			fs.readFile('./characters/charindex.json', 'utf8', function(err, charindex){
 				if(!err){
 					charindex = JSON.parse(charindex);
 					var ret = '<head><title>Character Database ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
 					files = files.sort(function (a, b){return a.toLowerCase().localeCompare(b.toLowerCase());});
 					files.forEach(function(file, index){
 						if(!file.endsWith('.json')){
-							var f = fs.readdirSync(__dirname+'/characters/'+file);
+							var f = fs.readdirSync('./characters/'+file);
 							if(f.length !== 0){
 								ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+file.replace(/'/g, "\\'")+'\')">'+file+' ('+f.length+')</h2>';
 								ret += '<div id="'+file+'" style="display: none;">';
@@ -175,7 +175,7 @@ app.get('/characters', function(req, res){
 var monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 app.get('/logs', function(req, res){
-	fs.readdir(__dirname+'/logs', function(err, files){
+	fs.readdir('./logs', function(err, files){
 		if(!err){
 			var ret = '<head><title>Logs ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
 			var months = {};
@@ -204,7 +204,7 @@ app.get('/logs', function(req, res){
 	});
 });
 
-app.use('/faceicons', express.static(__dirname+'/faceicons'));
+app.use('/faceicons', express.static('./faceicons'));
 
 var openLog = function (logfile){//takes in a Date object
 	try{
@@ -226,7 +226,7 @@ var openLog = function (logfile){//takes in a Date object
 };
 //initial opening when the server is activated
 var logday = function(today){
-	return __dirname+'/logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+("0"+today.getDate()).slice(-2)+'.html'
+	return './logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+("0"+today.getDate()).slice(-2)+'.html'
 };
 var today = new Date();
 var logfile = logday(today);
@@ -504,10 +504,10 @@ var commands = {//console command list, formatted this way for convenience.
 						if(users[name]){users[name].disconnect();}
 						delete logins[name];
 						out += name+' ';
-						fs.unlink(__dirname+'/saves/'+name+'.json', function(err){
+						fs.unlink('./saves/'+name+'.json', function(err){
 							if(err){console.log(err);}
 						});
-						fs.unlink(__dirname+'/characters/'+name, function(err){
+						fs.unlink('./characters/'+name, function(err){
 							if(err){console.log(err);}
 						});
 					}//'shouldn't' need to catch if they have a login.
@@ -733,7 +733,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			var msg = {className: 'IC narration message', username: username, post: message, color: color};
 			msg.id = postnum++;
 			addid(msg.id, username);
-			fs.writeFile(__dirname+'/logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
+			fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
 			if(room){
 				msg.post = '<span style="color:white;">['+room+']</span> '+msg.post;
 				io.to(room).emit('ICmessage', msg);
@@ -805,7 +805,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 				addid(msg.id, username);
 				className = 'IC ' + className;
 				call = 'ICmessage';
-				fs.writeFile(__dirname+'/logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
+				fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
 			}
 			msg.className = className;
 			if(type.startsWith('Test')){
@@ -875,10 +875,10 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		}
 	});
 	socket.on('Update Character', function(character){
-		fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, index){
+		fs.readFile('./characters/charindex.json', 'utf8', function(err, index){
 			index = JSON.parse(index);
 			index[character.id] = {name: character.name, icon: character.icon};
-			fs.writeFileSync(__dirname+'/characters/charindex.json', JSON.stringify(index));
+			fs.writeFileSync('./characters/charindex.json', JSON.stringify(index));
 		});
 	});
 	socket.on('sendimage', function(icons, callback){
@@ -887,9 +887,9 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			if(icons == 'data:,'){//no image
 				callback(null, username);
 			} else {//If this breaks something (makes icons load weird, etc), switch it back to sync.
-				fs.writeFile(__dirname+'/faceicons/'+iconnum+'.png', data, 'base64', function(err){if(err){console.log(err);}});
+				fs.writeFile('./faceicons/'+iconnum+'.png', data, 'base64', function(err){if(err){console.log(err);}});
 				var ids = iconnum++;
-				fs.writeFile(__dirname+'/faceicons/num.txt', iconnum, function(err){if(err){console.log(err);}});//update this
+				fs.writeFile('./faceicons/num.txt', iconnum, function(err){if(err){console.log(err);}});//update this
 				callback(ids, username);
 			}
 		}
@@ -915,7 +915,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			var n = id.split('-');
 			var d = n.pop();
 			n = n.join('-');
-			fs.readFile(__dirname+'/characters/'+n+'/'+d+'.html', 'utf8', function(err, profile){
+			fs.readFile('./characters/'+n+'/'+d+'.html', 'utf8', function(err, profile){
 				if(err){
 					callback(serversettings.profile);
 				} else {
@@ -953,11 +953,11 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		var d = n.pop();
 		n = n.join('-');
 		//this is a very unique case, so we don't use CheckUser.
-		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync(__dirname+'/characters').indexOf(n) > -1))){
+		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync('./characters').indexOf(n) > -1))){
 			var dirmessage = '/characters/'+encodeURIComponent(n)+'/'+d+'.html';
-			var dir = '/characters/'+n+'/'+d+'.html';
+			var dir = './characters/'+n+'/'+d+'.html';
 			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dirmessage+'" target="_blank">here.</a>'+'</font>'};
-			fs.writeFile(__dirname+dir, profile.replace(/\r\n?|\n/g, "<br />"), function(err){
+			fs.writeFile(dir, profile.replace(/\r\n?|\n/g, "<br />"), function(err){
 				if(err){console.log(err);} else {socket.emit('OOCmessage', msg);}
 			});
 			if(username != n && playerlist[username].permissions == 'Admin'){
@@ -970,9 +970,9 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		var d = n.pop();
 		n = n.join('-');
 		//if I add any more 'admin or specific user' commands I may add it to CheckUser, but currently these are the only two.
-		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync(__dirname+'/characters').indexOf(n) > -1))){
-			var dir = '/characters/'+n+'/'+d+'.html';
-			fs.unlink(__dirname+dir, function(err){
+		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync('./characters').indexOf(n) > -1))){
+			var dir = './characters/'+n+'/'+d+'.html';
+			fs.unlink(dir, function(err){
 				if(err && err.code != 'ENOENT'){console.log(err);} else {
 					if(username != n && playerlist[username].permissions == 'Admin'){
 						adminLog(username, 'Delete Profile', id);
@@ -1046,24 +1046,24 @@ var Setconnections = function(socket, user){//username will definitely be presen
 	socket.on('save', function(settings, ret){
 		if(username){
 			if(ret){
-				saveFile(__dirname+'/saves/'+username+'.json', settings, socket, username);
+				saveFile('./saves/'+username+'.json', settings, socket, username);
 			} else {
-				saveFile(__dirname+'/saves/'+username+'.json', settings);
+				saveFile('./saves/'+username+'.json', settings);
 			}
 		}
 	});
 	socket.on('Get Character List', function(callback){
 		if(CheckUser(username, 'Admin', true, socket)){
-			fs.readdir(__dirname+'/characters', function(err, files){
+			fs.readdir('./characters', function(err, files){
 				if(!err){
-					fs.readFile(__dirname+'/characters/charindex.json', 'utf8', function(err, charindex){
+					fs.readFile('./characters/charindex.json', 'utf8', function(err, charindex){
 						if(!err){
 							var ret = [];
 							charindex = JSON.parse(charindex);
 							files = files.sort(function (a, b){return a.toLowerCase().localeCompare(b.toLowerCase());});
 							files.forEach(function(file, index){
 								if(!file.endsWith('.json')){
-									var f = fs.readdirSync(__dirname+'/characters/'+file);
+									var f = fs.readdirSync('./characters/'+file);
 									if(f.length !== 0){//player with characters
 										var player = [];
 										f.forEach(function(chr){
@@ -1117,7 +1117,7 @@ io.on('connection', function(socket){
 							callback("You're still banned.");
 						} else {
 							//pull up user info
-							fs.readFile(__dirname+'/saves/'+username+'.json', 'utf8', function (err, info){
+							fs.readFile('./saves/'+username+'.json', 'utf8', function (err, info){
 								if(err){callback(err);} else {
 									setImmediate(function() {Setconnections(socket, username);});
 									info = JSON.parse(info);
@@ -1172,11 +1172,11 @@ io.on('connection', function(socket){
 					callback("Username already in use.");
 				} else {//new username
 					logins[username] = {password: password, permissions: 'Guest', muted: false};
-					fs.writeFile(__dirname+'/saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
+					fs.writeFile('./saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
 						if(!err){
 							fs.writeFile('logins.json', JSON.stringify(logins), function(err){
 								if(!err){
-									fs.mkdir(__dirname+'/characters/'+username, function(err){
+									fs.mkdir('./characters/'+username, function(err){
 										if(!err || err.code == 'EEXIST'){
 											setImmediate(function() {Setconnections(socket, username);});
 											addPlayer(username, socket, 'Guest', false);

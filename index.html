@@ -2172,6 +2172,9 @@
 						currenttab = Object.keys(players).map(function(player, index){
 							return (<div id={player} key={index} className='PLentry'>{players[player].afk ? '(AFK) ' : ''}{player + ' - ' + players[player].permissions}{menu}</div>);
 						});
+						currenttab = (<div className="charlist">
+							{currenttab}
+							</div>);
 						break;
 					case 'commands'://case for player commands tab
 						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglembut}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.save}>Save Data</div>, <div key='3' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='4' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='5' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='6' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='7' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='8' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='9' className='Command' onClick={this.show}>Show Rules</div>, <div key='10' className='Command' onClick={this.show}>Show MOTD</div>, <div key='11' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='12' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='13' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='14' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='15' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
@@ -2179,6 +2182,9 @@
 						this.props.settings.dice.forEach(function(dice, index){
 							currenttab.push(<div key={16+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
 						});
+						currenttab = (<div className="charlist">
+							{currenttab}
+							</div>);
 						break;
 					case 'admin'://case for the administrative commands tab
 						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.genmodal}>Mute</div>, <div key='6' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='7' className='Command' onClick={this.show}>List Bans</div>, <div key='8' className='Command' onClick={this.genmodal}>Ban</div>, <div key='9' className='Command' onClick={this.genmodal}>Unban</div>, <div key='10' className='Command' onClick={this.genmodal}>Show Admin Logs</div>, <div key='11' className='Command' onClick={this.refresh}>Open Lists</div>];
@@ -2199,6 +2205,9 @@
 							});
 							currenttab.push(charlist);
 						}
+						currenttab = (<div className="charlist">
+							{currenttab}
+							</div>);
 				}
 				var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 				return (
