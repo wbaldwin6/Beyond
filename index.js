@@ -493,6 +493,11 @@ process.stdin.on('readable', function() {//support for console commands.
 });
 
 var commands = {//console command list, formatted this way for convenience.
+	"Announce": function(message){
+		message = processHTML(message);
+		var msg = {className: 'OOC system message', post: '<font color="red" style="font-size:larger"><b>SERVER ANNOUNCEMENT: </b>'+message+'</font>'};
+		io.emit('OOCmessage', msg);
+	},
 	"Remove": function(names){//deletes user logins and saves outright.
 		var all = names.split(';');
 		fs.readFile('logins.json', 'utf8', function(err, logins){
