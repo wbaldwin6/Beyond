@@ -1676,7 +1676,7 @@
 			render: function(){
 				var modal = this.props.modal;
 				var name = modal.name;
-				var previewButton = this.props.modal.name == 'Set Profile' ? <button type="submit" onClick={this.preview}>Preview</button> : null;
+				var previewButton = (['Set Profile', 'Edit World Info'].indexOf(this.props.modal.name) > -1) ? <button type="submit" onClick={this.preview}>Preview</button> : null;
 				if(modal.charid){
 					if(modal.charname){
 						name+=' - '+modal.charname;
