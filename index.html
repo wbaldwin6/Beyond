@@ -1676,6 +1676,7 @@
 			render: function(){
 				var modal = this.props.modal;
 				var name = modal.name;
+				var previewButton = this.props.modal.name == 'Set Profile' ? <button type="submit" onClick={this.preview}>Preview</button> : null;
 				if(modal.charid){
 					if(modal.charname){
 						name+=' - '+modal.charname;
@@ -1686,19 +1687,11 @@
 				} else if(modal.name == 'Whisper') {
 					name+=' - '+modal.id;
 				}
-				if(this.props.modal.name == 'Set Profile'){
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:'auto'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
-					<button type="submit" onClick={this.post}>OK</button><button ref='Cancel' onClick={this.closeCheck}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> <button type="submit" onClick={this.preview}>Preview</button></div>
+					<button type="submit" onClick={this.post}>OK</button><button ref='Cancel' onClick={this.closeCheck}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> {previewButton}</div>
 				);
-				} else {
-				return(
-					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
-					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:'auto'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
-					<button type="submit" onClick={this.post}>OK</button><button ref='Cancel' onClick={this.closeCheck}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> </div>
-				);
-				}
 			}
 		});
 

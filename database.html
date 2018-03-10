@@ -37,6 +37,15 @@
 				cursor: ew-resize;
 			}
 			
+			.Red{
+				background-color:red;
+				border-color:red;
+			}
+
+			.Button{
+				outline:0;
+			}
+
 			.modal {
 				pointer-events: auto;
 				z-index: 1000;
@@ -437,7 +446,21 @@
 			},
 			
 			CancelButton: function(e) {
-				this.props.outerarea.setState({modal: undefined});
+				if(this.refs['textArea'].value && this.refs.Cancel.className != "Red Button"){
+					this.refs.Cancel.className = "Red Button";
+					this.refs.textArea.style['border-color'] = 'red';
+					this.refs.textArea.style['outline-color'] = 'red';
+				} else {
+					this.props.outerarea.setState({modal: undefined});
+				}
+			},
+
+			PreviewButton: function(){
+				var frame = "<body style='margin: 0'><iframe width='100%' height='100%' src='data:text/html," + encodeURIComponent(this.CleanContent()).replace(/'/g,"%27") + "'></iframe></body>";
+				var myw = window.open();
+				myw.document.open();
+				myw.document.write(frame);
+				myw.document.close();
 			},
 			
 			CleanContent: function() {
@@ -445,20 +468,29 @@
 				content = content.replace(/\r\n?|\n/g, "<br />");
 				return content;
 			},
+
+			TypeCheck: function(){
+				if(this.refs.Cancel.className = "Red Button"){
+					this.refs.Cancel.className = "";
+					this.refs.textArea.style['border-color'] = '';
+					this.refs.textArea.style['outline-color'] = '';
+				}
+			},
 			
 			render: function() {
 				if((typeof this.state.defaultText) === "string") {
 					var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{this.props.titletext}</div>;
-					var buttonOK = <button key='buttonOK' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.OKButton}>OK</button>;
-					var buttonCancel = <button key='buttonCancel' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.CancelButton}>Cancel</button>;
-					var textArea = <textarea key='textArea' ref="textArea" style={{minWidth: "100%", minHeight: "calc(100%-80px)"}} defaultValue={this.state.defaultText}></textarea>;
+					var buttonOK = <button key='buttonOK' type="button" style={{textAlign: "center"}} onClick={this.OKButton}>OK</button>;
+					var buttonCancel = <button key='buttonCancel' type="button" ref="Cancel" style={{textAlign: "center"}} onClick={this.CancelButton}>Cancel</button>;
+					var buttonPreview = <button key='buttonPreview' type="button" style={{textAlign: "center"}} onClick={this.PreviewButton}>Preview</button>;
+					var textArea = <textarea key='textArea' ref="textArea" style={{minWidth: "100%", minHeight: "calc(100%-80px)"}} defaultValue={this.state.defaultText} onKeyDown={this.TypeCheck}></textarea>;
 					var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4px 0px"}}>Name:</div>;
 					var inputName = <input key='inputName' type="text" ref="inputName" style={{width: "80%", height: "24px", margin: "4px 0px"}} defaultValue={this.props.funcname === 'edit' ? this.props.path[this.props.path.length-1] : ""}></input>;
 					return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
 								{titlebar}<br />
 								{labelName}{inputName}<br />
 								{textArea}<br />
-								{buttonOK}{buttonCancel}
+								{buttonOK}{buttonCancel}{buttonPreview}
 							</div>);
 				} else {
 					return <div className="modal" style={{display: "none"}}></div>;
