@@ -130,28 +130,27 @@
 				this.props.socket.on('UpdateError', function (err_msg) {
 					alert(err_msg);
 				});
-				this.props.socket.on('SetUsername', function(username, permissions) {
-					that.setState({username: username, permissions: permissions, loginState: username});
+				this.props.socket.on('SetUsername', function (username, permissions, password) {
+					//password is already in md5, this means we had a successful connection.
+					that.setState({username: username, pass: password, permissions: permissions, loginState: username});
 				});
-				this.props.socket.on('SetPermissions', function(permissions) {
+				this.props.socket.on('SetPermissions', function (permissions) {
 					that.setState({permissions: permissions});
-				});
-				this.props.socket.on('InitializeDatabase', function(username, permissions, dir) {
-					that.setState({username: username, permissions: permissions, directory: dir});
 				});
 				this.props.socket.on('disconnect', function() {
 					that.setState({loginState:'Disconnected'});
 				});
 				this.props.socket.on('reconnect', function() {
-					that.props.socket.emit('ReLogin', that.state.username, that.state.permissions);
-					that.setState({loginState:that.state.username});
+					that.props.socket.emit('DatabaseLogin', that.state.username, that.state.pass, function (response){
+						console.log(response);
+					});
 				});
 
 				if(document.cookie && document.cookie.match(/[; ^]?username=([^\s;]*)/)){
 					var username = decodeURIComponent(document.cookie.match(/[; ^]?username=([^\s;]*)/)[1]);
 					var password = decodeURIComponent(document.cookie.match(/[; ^]?password=([^\s;]*)/)[1]);
 					this.props.socket.emit('DatabaseLogin', username, md5(password), function (response){
-						that.setState({loginState:username});
+						console.log(response);
 					});
 				}
 			},
@@ -878,6 +877,7 @@
 				}
 				var that=this;
 				this.props.socket.emit('DatabaseLogin', username, md5(password), function (response){
+					console.log(response);
 					that.setState({title: response});
 				});
 			},

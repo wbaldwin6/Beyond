@@ -252,14 +252,12 @@ PathIsLocked: function(path) {
 	var curdir = toplevel;
 	var i = 0;
 	while(i < path.length) {
-		if(curdir.locked)
-			return true;
 		if(!("contents" in curdir))
 			return false;
 		curdir = curdir.contents[path[i]];
 		i++;
 	}
-	return false;
+	return curdir.locked;
 },
 
 SaveDatabase: function() {
@@ -288,7 +286,7 @@ InitializeDatabaseSocket: function(socket) {
 	var that = this;
 	var user = [socket, '', 'Guest'];
 	databaseSockets.push(user);
-	socket.emit('InitializeDatabase', '', 'Guest', toplevel);
+	socket.emit('UpdateDatabase', toplevel);
 	socket.on('disconnect', function() {
 		databaseSockets.splice(databaseSockets.indexOf(user), 1);
 	});
@@ -436,10 +434,6 @@ InitializeDatabaseSocket: function(socket) {
 			console.log('Failure to alter lock by '+user[1]+' on path '+path);
 		}
 	});
-	socket.on('ReLogin', function(username, permissions) {
-		databaseSockets.push(user);
-		socket.emit('InitializeDatabase', username, permissions, toplevel);
-	});
 	socket.on('DatabaseLogin', function(username, password, callback) {
 		fs.readFile('./logins.json', 'utf8', function(err, logins) {
 			if(err) {
@@ -459,10 +453,10 @@ InitializeDatabaseSocket: function(socket) {
 					} catch(err) {} //Couldn't read bans.json, so just assume they're fine
 					user[1] = username;
 					user[2] = logins[username].permissions;
-					socket.emit('SetUsername', username);
-					socket.emit('SetPermissions', logins[username].permissions);
+					socket.emit('SetUsername', username, logins[username].permissions, password);
 					callback('You have successfully logged in as ' + username + '!');
 					socket.emit('CloseModal');
+					socket.emit('UpdateDatabase', toplevel);
 				} else {
 					callback("Your password was incorrect.");
 				}
