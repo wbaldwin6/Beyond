@@ -294,7 +294,7 @@ InitializeDatabaseSocket: function(socket) {
 	});
 	socket.on('AddDirectory', function(path, name, creator, locked) {
 		if(!(user[1]) || !creator || user[2] !== 'Admin') {
-			socket.emit('UpdateError', 'You do not have permission to create directories!');
+			console.log('Attempt to create directory by '+user[1]);
 			return;
 		}
 		var dir = that.AddDirectory(path, name, creator, locked);
@@ -305,12 +305,12 @@ InitializeDatabaseSocket: function(socket) {
 			}
 			socket.emit('CloseModal');
 		} else {
-			socket.emit('UpdateError', 'That directory could not be created.');
+			console.log('Failure to create directory '+name+' on path '+path);
 		}
 	});
 	socket.on('AddEntry', function(path, name, creator, content) {
 		if(!(user[1]) || !creator || (user[2] !== 'Admin' && that.PathIsLocked(path))) {
-			socket.emit('UpdateError', 'You do not have permission to create entries in that directory.');
+			console.log('Attempt to create entry by '+user[1]+' in path '+path);
 			return;
 		}
 		var dir = that.AddEntry(path, name, creator, content);
@@ -321,17 +321,17 @@ InitializeDatabaseSocket: function(socket) {
 			}
 			socket.emit('CloseModal');
 		} else {
-			socket.emit('UpdateError', 'That file could not be created.');
+			console.log('Failure to create file '+name+' on path '+path);
 		}
 	});
 	socket.on('DeleteEntry', function(path) {
 		if(path.length === 0) {
-			socket.emit('UpdateError', 'Trying to delete the whole database, I see.');
+			console.log('Attempt to call DeleteEntry at toplevel by '+user[1]);
 			return;
 		}
 		var dir = that.GetDirectoryFromPath(path);
 		if(!(user[1]) || !(user[2] === 'Admin' || user[1] === dir.creator)) {
-			socket.emit('UpdateError', 'You do not have permission to delete that!');
+			console.log('Attempt to delete entry by '+user[1]+' in path '+path);
 			return;
 		}
 		var success = that.DeleteEntry(path);
@@ -341,27 +341,27 @@ InitializeDatabaseSocket: function(socket) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
 		} else {
-			socket.emit('UpdateError', 'That File Could Not Be Deleted!');
+			console.log('Failure to delete file on path '+path);
 		}
 	});
 	socket.on('EditEntry', function(path, name, content) {
 		var dir = that.GetDirectoryFromPath(path);
 		if(!(user[1]) || !(user[2] === 'Admin' || user[1] === dir.creator)) {
-			socket.emit('UpdateError', 'You do not have permission to edit that!');
+			console.log('Attempt to edit entry '+name+' by '+user[1]+' in path '+path);
 			return;
 		}
 		var success = false;
 		if(content) {
 			var pathname = that.GetPathnameFromPath(path) + ".html";
 			if(!that.SetEntryContent(pathname, content)) {
-				socket.emit('UpdateError', 'That page could not be editted.');
+				console.log('Failure to edit entry '+name+' on path '+path);
 			} else {
 				success = true;
 			}
 		}
 		if(name) {
 			if(!that.RenameEntry(path, name)) {
-				socket.emit('UpdateError', 'The name of the entry could not be changed.');
+				console.log('Failure to rename entry '+name+' on path '+path);
 			} else {
 				success = true;
 			}
@@ -383,7 +383,7 @@ InitializeDatabaseSocket: function(socket) {
 	});
 	socket.on('MoveEntry', function(oldpath, newpath) {
 		if(!(user[1]) || user[2] !== 'Admin') {
-			socket.emit('UpdateError', 'You do not have permission to move that.');
+			console.log('Attempt to move entry by '+user[1]+' in path '+oldpath);
 			return;
 		}
 		if(that.MoveEntry(oldpath, newpath)) {
@@ -393,12 +393,12 @@ InitializeDatabaseSocket: function(socket) {
 			}
 			socket.emit('CloseModal');
 		} else {
-			socket.emit('UpdateError', 'That could not be moved into the selected directory.');
+			console.log('Failure to move entry on path '+oldpath+' to path '+newpath);
 		}
 	});
 	socket.on('DragEntry', function(oldpath, newpath, after) {
 		if(!(user[1]) || user[2] !== 'Admin') {
-			socket.emit('UpdateError', 'You do not have permission to move that.');
+			console.log('Attempt to move entry by '+user[1]+' in path '+oldpath);
 			return;
 		}
 		if(that.DragEntry(oldpath, newpath, after)) {
@@ -407,12 +407,12 @@ InitializeDatabaseSocket: function(socket) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
 		} else {
-			socket.emit('UpdateError', 'That could not be moved into the selected directory.');
+			console.log('Failure to move entry on path '+oldpath+' to path '+newpath);
 		}
 	});
 	socket.on('RenameDirectory', function(path, newname, togglelock) {
 		if(!(user[1]) || user[2] !== 'Admin') {
-			socket.emit('UpdateError', 'You do not have permission to rename directories.');
+			console.log('Attempt to rename directory by '+user[1]+' in path '+path);
 			return;
 		}
 		if(that.RenameDirectory(path, newname, togglelock)) {
@@ -422,7 +422,7 @@ InitializeDatabaseSocket: function(socket) {
 			}
 			socket.emit('CloseModal');
 		} else {
-			socket.emit('UpdateError', 'The directory could not be renamed to the given name.');
+			console.log('Failure to rename directory on path '+path);
 		}
 	});
 	socket.on('LockDirectory', function(path) {
@@ -433,14 +433,14 @@ InitializeDatabaseSocket: function(socket) {
 			}
 			socket.emit('CloseModal');
 		} else {
-			socket.emit('UpdateError', 'You cannot change the locked status of that directory.');
+			console.log('Failure to alter lock by '+user[1]+' on path '+path);
 		}
 	});
 	socket.on('ReLogin', function(username, permissions) {
 		databaseSockets.push(user);
 		socket.emit('InitializeDatabase', username, permissions, toplevel);
 	});
-	socket.on('DatabaseLogin', function(username, password) {
+	socket.on('DatabaseLogin', function(username, password, callback) {
 		fs.readFile('./logins.json', 'utf8', function(err, logins) {
 			if(err) {
 				socket.emit('UpdateError', err);
@@ -461,13 +461,13 @@ InitializeDatabaseSocket: function(socket) {
 					user[2] = logins[username].permissions;
 					socket.emit('SetUsername', username);
 					socket.emit('SetPermissions', logins[username].permissions);
+					callback('You have successfully logged in as ' + username + '!');
 					socket.emit('CloseModal');
-					socket.emit('UpdateError', 'You have successfully logged in as ' + username + '!');
 				} else {
-					socket.emit('UpdateError', "Your password was incorrect.");
+					callback("Your password was incorrect.");
 				}
 			} else {
-				socket.emit('UpdateError', "That username was not in our list. Register in the main server before trying to log in.");
+				callback("That username was not in our list.");
 			}
 		});
 	});

@@ -27,6 +27,15 @@
 				width: 100%;
 				border: none;
 			}
+
+			.mtitle{
+				cursor: default;
+				pointer-events: none;
+				white-space: nowrap;
+				overflow-x: hidden;
+				width: 100%;
+				height: 24px;
+			}
 			
 			.gutter {
 				background-color: #d3d3d3;
@@ -101,7 +110,7 @@
 		//Properties: socket
 		var OuterArea = React.createClass({
 			getInitialState: function() {
-				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "Sk8torchic", contents: {}, order: []}, page: '', openness: {}, showNames: false};
+				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "", contents: {}, order: []}, page: '', openness: {}, showNames: false, loginState: 'Guest'};
 			},
 		
 			componentDidMount: function() {
@@ -122,7 +131,7 @@
 					alert(err_msg);
 				});
 				this.props.socket.on('SetUsername', function(username, permissions) {
-					that.setState({username: username, permissions: permissions});
+					that.setState({username: username, permissions: permissions, loginState: username});
 				});
 				this.props.socket.on('SetPermissions', function(permissions) {
 					that.setState({permissions: permissions});
@@ -131,12 +140,20 @@
 					that.setState({username: username, permissions: permissions, directory: dir});
 				});
 				this.props.socket.on('disconnect', function() {
-					alert('You have disconnected!');
+					that.setState({loginState:'Disconnected'});
 				});
 				this.props.socket.on('reconnect', function() {
 					that.props.socket.emit('ReLogin', that.state.username, that.state.permissions);
-					alert('You have reconnected!');
+					that.setState({loginState:that.state.username});
 				});
+
+				if(document.cookie && document.cookie.match(/[; ^]?username=([^\s;]*)/)){
+					var username = decodeURIComponent(document.cookie.match(/[; ^]?username=([^\s;]*)/)[1]);
+					var password = decodeURIComponent(document.cookie.match(/[; ^]?password=([^\s;]*)/)[1]);
+					this.props.socket.emit('DatabaseLogin', username, md5(password), function (response){
+						that.setState({loginState:username});
+					});
+				}
 			},
 			
 			GetDirectoryFromPath: function(path) {
@@ -294,9 +311,10 @@
 				var searchButton = <button key="SearchButton" onClick={this.OpenSearchModal} disabled={this.state.modal ? true : false} style={{zIndex: "500", position: "fixed", left: "0px", bottom: "0px"}}>Search</button>;
 				var toggleNamesButton = <button key="ToggleNames" onClick={this.ToggleNames} style={{zIndex: "500", position: "fixed", left: "54px", bottom: "0px"}}>Toggle Names</button>
 				var loginButton = <button key="LoginButton" onClick={this.AttemptLogin} style={{zIndex: "500", position: "fixed", left: "160px", bottom: "0px"}}>Login</button>
-				var dir = (<div key="Directory" id="Directory" style={{height: "100%-16px", overflowY: "auto"}}><DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} order={this.state.directory.order} parents={[]} /></div>);
+				var status = (<div ref="statusbar" key="LoginStatus" id="LoginStatus" className="mtitle" style={{height: "18px"}}>Login: {this.state.loginState}</div>);
+				var dir = (<div key="Directory" id="Directory" style={{height: "calc(100% - 20px)", overflowY: "auto"}}>{status}<DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} order={this.state.directory.order} parents={[]} /></div>);
 				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
-				return(<div onClick={this.closeContext}  onContextMenu={this.closeContext}>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}{toggleNamesButton}{loginButton}</div>);
+				return(<div onClick={this.closeContext} onContextMenu={this.closeContext}>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}{toggleNamesButton}{loginButton}</div>);
 			}
 		});
 		
@@ -401,6 +419,54 @@
 			return(<div draggable id={JSON.stringify(this.props.parents.concat([this.props.name]).slice(1))} className="databaseEntry" onDragStart={this.props.outerarea.entryDragStart} onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{"\xA0".repeat(this.props.parents.length*4)}{this.props.name}{this.props.outerarea.state.showNames ? " (By " + this.props.creator + ")" : ""}</div>);
 			}
 		});
+
+		//drag functionality is common across modals.
+		var startDrag = function(e){
+			if(e.target.getAttribute('class') == "modal"){//only START for the modal containers.
+				e.stopPropagation();
+				e.preventDefault();
+				var rect = this.refs['this'].getBoundingClientRect();
+				if(rect.right-e.clientX < 20 && rect.bottom-e.clientY < 20){
+					this.setState({initialposition: {x: e.clientX, y: e.clientY}, resize: true});
+				} else {
+					this.setState({initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}, resize: false});
+				}
+				document.addEventListener('mousemove', this.drag);
+				document.addEventListener('mouseup', this.stopDrag);
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			}
+		};
+
+		var drag = function(e){
+			e.stopPropagation();
+			e.preventDefault();
+			var initpos = this.state.initialposition;
+			var x = e.clientX-initpos.x;
+			var y = e.clientY-initpos.y;
+			var rect = this.refs['this'].getBoundingClientRect();
+			if(this.state.resize){
+				x = x+this.state.width;
+				y = y+(this.state.height || 0);
+				if(this.state.minwidth > +x){x = this.state.minwidth;}
+				if(this.state.minheight && this.state.minheight > +y){y = this.state.minheight;}
+				if(x+rect.left > document.body.clientWidth){x=document.body.clientWidth-rect.left;}
+				if(y+rect.top > document.body.clientHeight){y=document.body.clientHeight-rect.top;}
+				this.setState({width: x, height: y, initialposition: {x: e.clientX, y: e.clientY}});
+			} else {
+				if(x < 0){x=0;} if(y < 0){y=0;}
+				if(x+rect.width > document.body.clientWidth){x=document.body.clientWidth-rect.width;}
+				if(y+rect.height > document.body.clientHeight){y=document.body.clientHeight-rect.height;}
+				this.setState({x: x, y: y});
+			}
+		};
+
+		var stopDrag = function(e){
+			e.stopPropagation();
+			e.preventDefault();
+			document.removeEventListener('mousemove', this.drag);
+			document.removeEventListener('mouseup', this.stopDrag);
+			document.getElementById('iFrame').style.pointerEvents = "auto";
+		};
 		
 		//Properties: socket, path, funcname, titletext, outerarea
 		var EditEntryModal = React.createClass({
@@ -416,9 +482,9 @@
 						that.setState({defaultText: page.replace(/<br \/>/g, "\n")});
 					});
 				} else {
-					return {defaultText: '<html><body style="color:white;background-color:black;">\nYour Message Here\n</body></html>', x: 100, y: 100};
+					return {defaultText: '<html><body style="color:white;background-color:black;">\nYour Message Here\n</body></html>', x: 100, y: 100, width: 300, height: 200, minheight: 110, minwidth: 220};
 				}
-				return {x: 100, y: 100};
+				return {x: 100, y: 100, width: 300, height: 200, minheight: 110, minwidth: 220};
 			},
 			
 			OKButton: function(e) {
@@ -479,54 +545,30 @@
 			
 			render: function() {
 				if((typeof this.state.defaultText) === "string") {
-					var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{this.props.titletext}</div>;
+					var titlebar = <div key='titlebar' className="mtitle">{this.props.titletext}</div>;
 					var buttonOK = <button key='buttonOK' type="button" style={{textAlign: "center"}} onClick={this.OKButton}>OK</button>;
 					var buttonCancel = <button key='buttonCancel' type="button" ref="Cancel" style={{textAlign: "center"}} onClick={this.CancelButton}>Cancel</button>;
 					var buttonPreview = <button key='buttonPreview' type="button" style={{textAlign: "center"}} onClick={this.PreviewButton}>Preview</button>;
-					var textArea = <textarea key='textArea' ref="textArea" style={{minWidth: "100%", minHeight: "calc(100%-80px)"}} defaultValue={this.state.defaultText} onKeyDown={this.TypeCheck}></textarea>;
+					var textArea = <textarea key='textArea' ref="textArea" style={{resize: 'none', width:'100%', height:"calc(100% - 77px)", minHeight:32}} defaultValue={this.state.defaultText} autoFocus onKeyDown={this.TypeCheck}></textarea>;
 					var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4px 0px"}}>Name:</div>;
 					var inputName = <input key='inputName' type="text" ref="inputName" style={{width: "80%", height: "24px", margin: "4px 0px"}} defaultValue={this.props.funcname === 'edit' ? this.props.path[this.props.path.length-1] : ""}></input>;
-					return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+					var draghandle = <img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/>;
+					return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}}>
 								{titlebar}<br />
 								{labelName}{inputName}<br />
 								{textArea}<br />
-								{buttonOK}{buttonCancel}{buttonPreview}
+								{buttonOK}{buttonCancel}{buttonPreview}{draghandle}
 							</div>);
 				} else {
 					return <div className="modal" style={{display: "none"}}></div>;
 				}
 			},
 			
-			startDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "none";
-			},
-			
-			drag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				var initpos = this.state.initpos;
-				var x = e.clientX - initpos.x;
-				var y = e.clientY - initpos.y;
-				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
-				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
-				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
-				if(x < 0) x = 0;
-				if(y < 0) y = 0;
-				this.setState({x: x, y: y});
-			},
-			
-			stopDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "auto";
-			}
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag
 		});
 		
 		var DeleteEntryModal = React.createClass({
@@ -545,47 +587,22 @@
 			
 			render: function() {
 				var filename = this.props.path[this.props.path.length-1];
-				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Delete ' + filename}</div>;
+				var titlebar = <div key='titlebar' className="mtitle">{'Delete ' + filename}</div>;
 				var labelAreYouSure = <div key='labelAreYouSure' style={{margin: "4 0"}}>{'Are you sure you want to delete ' + filename + '?'}</div>;
 				var buttonYes = <button key='buttonYes' type="button" onClick={this.YesButton}>Yes</button>;
 				var buttonNo = <button key='buttonNo' type="button" onClick={this.NoButton}>No</button>;
-				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelAreYouSure}<br />
 							{buttonYes}{buttonNo}
 						</div>);
 			},
 			
-			startDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "none";
-			},
-			
-			drag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				var initpos = this.state.initpos;
-				var x = e.clientX - initpos.x;
-				var y = e.clientY - initpos.y;
-				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
-				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
-				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
-				if(x < 0) x = 0;
-				if(y < 0) y = 0;
-				this.setState({x: x, y: y});
-			},
-			
-			stopDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "auto";
-			}
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag
 		});
 		
 		var AddDirectoryModal = React.createClass({
@@ -608,13 +625,13 @@
 				var pathname = 'database/';
 				for(var i = 0; i < this.props.path.length; i++)
 					pathname += this.props.path[i] + '/';
-				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Add Directory to ' + pathname}</div>;
+				var titlebar = <div key='titlebar' className="mtitle">{'Add Directory to ' + pathname}</div>;
 				var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4 0"}}>Name: </div>;
 				var inputName = <input key='inputName' ref='inputName' type="text" style={{width: "80%", height: "24px", margin: "4 0"}}></input>;
 				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
 				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
 				var checkLocked = <div><input key='checkLocked' ref='checkLocked' type="checkbox" style={{color: "white"}}></input>Locked?</div>;
-				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelName}{inputName}<br />
 							{checkLocked}<br />
@@ -622,36 +639,11 @@
 						</div>);
 			},
 			
-			startDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "none";
-			},
-			
-			drag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				var initpos = this.state.initpos;
-				var x = e.clientX - initpos.x;
-				var y = e.clientY - initpos.y;
-				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
-				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
-				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
-				if(x < 0) x = 0;
-				if(y < 0) y = 0;
-				this.setState({x: x, y: y});
-			},
-			
-			stopDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "auto";
-			}
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag
 		});
 		
 		var MoveEntryModal = React.createClass({
@@ -680,7 +672,7 @@
 			
 			render: function() {
 				var dirname = this.props.path[this.props.path.length-1]
-				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Move ' + dirname}</div>;
+				var titlebar = <div key='titlebar' className="mtitle">{'Move ' + dirname}</div>;
 				var buttonOK = <button key='buttonOK' type="button" onClick={this.OKButton}>OK</button>;
 				var buttonCancel = <button key='buttonCancel' type="button" onClick={this.CancelButton}>Cancel</button>;
 				var labelAsk;
@@ -689,43 +681,18 @@
 				} else {
 					labelAsk = <div key='labelAsk'>Select a target directory on the left.</div>;
 				}
-				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelAsk}<br />
 							{buttonOK}{buttonCancel}
 						</div>);
 			},
 			
-			startDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "none";
-			},
-			
-			drag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				var initpos = this.state.initpos;
-				var x = e.clientX - initpos.x;
-				var y = e.clientY - initpos.y;
-				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
-				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
-				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
-				if(x < 0) x = 0;
-				if(y < 0) y = 0;
-				this.setState({x: x, y: y});
-			},
-			
-			stopDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "auto";
-			}
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag
 		});
 		
 		var RenameDirectoryModal = React.createClass({
@@ -750,13 +717,13 @@
 			
 			render: function() {
 				var dirname = this.props.path[this.props.path.length - 1];
-				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{'Rename ' + dirname}</div>;
+				var titlebar = <div key='titlebar' className="mtitle">{'Rename ' + dirname}</div>;
 				var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4 0"}}>Name: </div>;
 				var inputName = <input key='inputName' ref='inputName' type="text" style={{width: "80%", height: "24px", margin: "4 0"}}></input>;
 				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
 				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
 				var checkLocked = <div><input key='checkLocked' ref='checkLocked' type="checkbox" style={{color: "white"}}></input>{this.props.locked ? 'Unlock' : 'Lock'}</div>;
-				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelName}{inputName}<br />
 							{checkLocked}<br />
@@ -764,36 +731,11 @@
 						</div>);
 			},
 			
-			startDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "none";
-			},
-			
-			drag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				var initpos = this.state.initpos;
-				var x = e.clientX - initpos.x;
-				var y = e.clientY - initpos.y;
-				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
-				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
-				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
-				if(x < 0) x = 0;
-				if(y < 0) y = 0;
-				this.setState({x: x, y: y});
-			},
-			
-			stopDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "auto";
-			}
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag
 		});
 		
 		var LockDirectoryModal = React.createClass({
@@ -812,47 +754,22 @@
 			
 			render: function() {
 				var filename = this.props.path[this.props.path.length-1];
-				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>{(this.props.locked ? 'Unlock ' : 'Lock ') + filename}</div>;
+				var titlebar = <div key='titlebar' className="mtitle">{(this.props.locked ? 'Unlock ' : 'Lock ') + filename}</div>;
 				var labelAreYouSure = <div key='labelAreYouSure' style={{margin: "4 0"}}>{'Are you sure you want to ' + (this.props.locked ? 'unlock ' : 'lock ') + filename + '?'}</div>;
 				var buttonYes = <button key='buttonYes' type="button" onClick={this.YesButton}>Yes</button>;
 				var buttonNo = <button key='buttonNo' type="button" onClick={this.NoButton}>No</button>;
-				return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelAreYouSure}<br />
 							{buttonYes}{buttonNo}
 						</div>);
 			},
 			
-			startDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "none";
-			},
-			
-			drag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				var initpos = this.state.initpos;
-				var x = e.clientX - initpos.x;
-				var y = e.clientY - initpos.y;
-				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
-				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
-				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
-				if(x < 0) x = 0;
-				if(y < 0) y = 0;
-				this.setState({x: x, y: y});
-			},
-			
-			stopDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "auto";
-			}
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag
 		});
 
 		var SearchDirectoryModal = React.createClass({
@@ -903,7 +820,7 @@
 			},
 			
 			render: function() {
-				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>Search the Database</div>;
+				var titlebar = <div key='titlebar' className="mtitle">Search the Database</div>;
 				var searchTitleLabel = <div key='searchTitleLabel'>Title: </div>;
 				var searchTitleInput = <input key='searchTitleInput' ref='searchTitleInput' type='text'></input>;
 				var searchBodyLabel = <div key='searchBodyLabel'>Content: </div>;
@@ -917,42 +834,17 @@
 								{searchButton}{closeButton}
 							  </div>;
 				var results = <div key='Results' id='Results' style={{overflowY: 'auto', overflowX: 'auto'}}>{this.state.searchResults}</div>;
-				return <div className="modal" style={{left: this.state.x, top: this.state.y}}>
+				return <div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 						{titlebar}<br />
 						{options}{results}
 					   </div>;
 			},
 			
-			startDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "none";
-			},
-			
-			drag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				var initpos = this.state.initpos;
-				var x = e.clientX - initpos.x;
-				var y = e.clientY - initpos.y;
-				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
-				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
-				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
-				if(x < 0) x = 0;
-				if(y < 0) y = 0;
-				this.setState({x: x, y: y});
-			},
-			
-			stopDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "auto";
-			}
+			startDrag: startDrag,
+
+			drag: drag,
+
+			stopDrag: stopDrag
 		});
 		
 		var SearchResultDiv = React.createClass({render: function() {
@@ -974,7 +866,7 @@
 		//The Modal for trying to log in
 		var LoginModal = React.createClass({
 			getInitialState: function() {
-				return {x: 100, y: 100}
+				return {x: 100, y: 100, title:"Enter your username and password."}
 			},
 
 			OKButton: function(e) {
@@ -984,7 +876,10 @@
 					document.cookie = "username="+encodeURIComponent(username);
 					document.cookie = "password="+encodeURIComponent(password);
 				}
-				this.props.socket.emit('DatabaseLogin', username, md5(password));
+				var that=this;
+				this.props.socket.emit('DatabaseLogin', username, md5(password), function (response){
+					that.setState({title: response});
+				});
 			},
 
 			CancelButton: function(e) {
@@ -1013,7 +908,7 @@
 			},
 
 			render: function() {
-				var titlebar = <div key='titlebar' onMouseDown={this.startDrag} style={{width: "100%", height: "24px"}}>Enter your username and password.</div>;
+				var titlebar = <div key='titlebar' className="mtitle">{this.state.title}</div>;
 					var buttonOK = <button key='buttonOK' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.OKButton}>OK</button>;
 					var buttonCancel = <button key='buttonCancel' type="button" style={{width: "50%", height: "24px", textAlign: "center"}} onClick={this.CancelButton}>Cancel</button>;
 					var labelName = <div key='labelName' style={{width: "50%", height: "24px", margin: "4px 0px"}}>Username:</div>;
@@ -1021,7 +916,7 @@
 					var labelPass = <div key='labelPass' style={{width: "50%", height: "24px", margin: "4px 0px"}}>Password:</div>;
 					var inputPass = <input key='inputPass' type="text" ref="inputPass" style={{width: "50%", height: "24px", margin: "4px 0px"}} defaultValue="" placeholder="Password" onKeyDown={this.enterCheck}></input>;
 					var chkRemember = <input type="checkbox" name="Remember" ref="Remember" defaultChecked={false}/>
-					return (<div className="modal" style={{left: this.state.x, top: this.state.y}}>
+					return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 								{titlebar}<br />
 								{labelName}{inputName}<br />
 								{labelPass}{inputPass}<br />
@@ -1030,36 +925,11 @@
 							</div>);
 			},
 
-			startDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setState({initpos: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}});
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "none";
-			},
+			startDrag: startDrag,
 
-			drag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				var initpos = this.state.initpos;
-				var x = e.clientX - initpos.x;
-				var y = e.clientY - initpos.y;
-				var rect = ReactDOM.findDOMNode(this).getBoundingClientRect();
-				if(x + rect.width > document.body.clientWidth) x = document.body.clientWidth - rect.width;
-				if(y + rect.height > document.body.clientHeight) y = document.body.clientHeight - rect.height;
-				if(x < 0) x = 0;
-				if(y < 0) y = 0;
-				this.setState({x: x, y: y});
-			},
+			drag: drag,
 
-			stopDrag: function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-				document.removeEventListener('mousemove', this.drag);
-				document.removeEventListener('mouseup', this.stopDrag);
-				document.getElementById('iFrame').style.pointerEvents = "auto";
-			}
+			stopDrag: stopDrag
 		});
 
 		//Functions for searching the Database, using a trie
