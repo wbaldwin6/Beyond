@@ -900,9 +900,9 @@
 			enterCheck: function(e){
 				if(e.keyCode == 13){
 					if(e.target.name == 'password'){
-						this.submission(e);
+						this.OKButton(e);
 					} else if(e.target.value.length >= 6) {
-						this.refs.password.focus();
+						this.refs.inputPass.focus();
 					}
 				}
 			},
@@ -914,7 +914,7 @@
 					var labelName = <div key='labelName' style={{width: "50%", height: "24px", margin: "4px 0px"}}>Username:</div>;
 					var inputName = <input key='inputName' type="text" ref="inputName" style={{width: "50%", height: "24px", margin: "4px 0px"}} defaultValue="" placeholder="Username" onKeyDown={this.enterCheck}></input>;
 					var labelPass = <div key='labelPass' style={{width: "50%", height: "24px", margin: "4px 0px"}}>Password:</div>;
-					var inputPass = <input key='inputPass' type="text" ref="inputPass" style={{width: "50%", height: "24px", margin: "4px 0px"}} defaultValue="" placeholder="Password" onKeyDown={this.enterCheck}></input>;
+					var inputPass = <input key='inputPass' name="password" type="text" ref="inputPass" style={{width: "50%", height: "24px", margin: "4px 0px"}} defaultValue="" placeholder="Password" onKeyDown={this.enterCheck}></input>;
 					var chkRemember = <input type="checkbox" name="Remember" ref="Remember" defaultChecked={false}/>
 					return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 								{titlebar}<br />

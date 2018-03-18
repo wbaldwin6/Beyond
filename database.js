@@ -454,14 +454,14 @@ InitializeDatabaseSocket: function(socket) {
 					user[1] = username;
 					user[2] = logins[username].permissions;
 					socket.emit('SetUsername', username, logins[username].permissions, password);
-					callback('You have successfully logged in as ' + username + '!');
+					if(callback){callback('You have successfully logged in as ' + username + '!');}
 					socket.emit('CloseModal');
 					socket.emit('UpdateDatabase', toplevel);
 				} else {
-					callback("Your password was incorrect.");
+					if(callback){callback("Your password was incorrect.");}
 				}
 			} else {
-				callback("That username was not in our list.");
+				if(callback){callback("That username was not in our list.");}
 			}
 		});
 	});
