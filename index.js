@@ -1,7 +1,8 @@
 var fs = require('fs');
 var express = require('express');
 var app = express();
-var http = require('http').Server(app);
+var httputil = require('http');
+var http = httputil.Server(app);
 var io = require('socket.io')(http);
 var jsdom = require('jsdom');
 var sanitizeHtml = require('sanitize-html');
@@ -654,10 +655,52 @@ var commands = {//console command list, formatted this way for convenience.
 			}
 		});
 	},
+	"SetPublic": function(yn){
+		var res = false;
+		if(yn == 'true'){res = true;}
+		if(!isNaN(yn)){res = +yn;}
+		serversettings.pub = res;
+		var pubset = 'private';
+		if(res){pubset='public';}
+		var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">The server has been set '+pubset+'.</font>'};
+		fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
+			if(err){console.log(err);} else {io.emit('OOCmessage', msg); setImmediate(function() {SendToHub();});}
+		});
+	},
 	"Shutdown": function(name){//Self-explanatory.
 		console.log("Shutting down now.");
 		process.exit();
 	},
+};
+
+var SendToHub = function(){
+	//acquire title and pub from serversettings, and the playerlist.
+	var hubping = {title: serversettings.title, id: serversettings.pub, playerlist: playerlist, port: http.address().port};
+	var data = JSON.stringify(hubping);
+
+	var options = {
+		host: 'HUBADDRESS',
+		port: 80,
+		path: '/server',
+		method: 'POST',
+	    headers: {
+	        'Content-Type': 'application/json',
+	        'Content-Length': Buffer.byteLength(data)
+	    }
+	};
+
+	var req = httputil.request(options, function(res){
+		res.setEncoding('utf8');
+		res.on('data', function (chunk) {
+			console.log('BODY: ' + chunk);
+		});
+	});
+
+	req.on('error', function(e) {
+		console.log('problem with request: ' + e.message);
+	});
+	req.write(data);
+	req.end();
 };
 
 var cleanup = function(username){
@@ -665,7 +708,7 @@ var cleanup = function(username){
 		delete users[username];
 	}
 	if(playerlist[username]){delete playerlist[username];}
-}
+};
 
 var saveFile = function(filename, data, socket, username){
 	fs.writeFile(filename, data, function(err){
