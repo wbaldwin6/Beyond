@@ -43,6 +43,7 @@ try{//make sure the banlist file exists BEFORE proceeding.
 var serversettings;
 try{
 	serversettings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
+	if(serversettings.pub){setImmediate(function() {SendToHub();});}
 } catch(e) {
 	var profile = '<style>body{background-color:black}</style><font style="font-size:16px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i><br><br><b>Age:</b> <i>In years, typically.</i><br><br><b>Gender:</b> <i>____</i><br><br><b>Species:</b> <i> </i><br><br><b>Height:</b> <i> </i><br><br><b>History:</b> <i>Any other relevant information can be have fields added.</i>';
 	serversettings = {motd: '', rules: 'Rule 0: Be respectful.', profile: profile, title: 'Beyond'};
@@ -657,6 +658,7 @@ var commands = {//console command list, formatted this way for convenience.
 	},
 	"SetPublic": function(yn){
 		var res = false;
+		console.log(yn);
 		if(yn == 'true'){res = true;}
 		if(!isNaN(yn)){res = +yn;}
 		serversettings.pub = res;
@@ -673,34 +675,41 @@ var commands = {//console command list, formatted this way for convenience.
 	},
 };
 
+var hubfailures = 0;
+
 var SendToHub = function(){
 	//acquire title and pub from serversettings, and the playerlist.
-	var hubping = {title: serversettings.title, id: serversettings.pub, playerlist: playerlist, port: http.address().port};
-	var data = JSON.stringify(hubping);
+	if(hubfailures < 3 && serversettings.pub){//if we've failed to reach the hub three consecutive times or are no longer public, stop trying.
+		var hubping = {title: serversettings.title, id: serversettings.pub, playerlist: playerlist, port: http.address().port};
+		var data = JSON.stringify(hubping);
 
-	var options = {
-		host: 'HUBADDRESS',
-		port: 80,
-		path: '/server',
-		method: 'POST',
-	    headers: {
-	        'Content-Type': 'application/json',
-	        'Content-Length': Buffer.byteLength(data)
-	    }
-	};
+		var options = {
+			host: '76.28.205.5',
+			port: 55555,
+			path: '/server',
+			method: 'POST',
+		    headers: {
+		        'Content-Type': 'application/json',
+		        'Content-Length': Buffer.byteLength(data)
+		    }
+		};
 
-	var req = httputil.request(options, function(res){
-		res.setEncoding('utf8');
-		res.on('data', function (chunk) {
-			console.log('BODY: ' + chunk);
+		var req = httputil.request(options, function(res){
+			res.setEncoding('utf8');
+			res.on('data', function (chunk) {
+				hubfailures = 0;
+			});
 		});
-	});
 
-	req.on('error', function(e) {
-		console.log('problem with request: ' + e.message);
-	});
-	req.write(data);
-	req.end();
+		req.on('error', function(e) {
+			hubfailures++;
+			console.log('problem with request: ' + e.message);
+			console.log(hubfailures);
+		});
+		req.write(data);
+		req.end();
+		setTimeout(function() {SendToHub();}, 120000);//renew this every two minutes.
+	}
 };
 
 var cleanup = function(username){

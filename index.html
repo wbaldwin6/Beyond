@@ -1630,6 +1630,8 @@
 						}
 						settings.rooms[post].push(modata.charid);
 						this.props.handleSettings(settings, this.props.characters);
+					} else if (modata.name == 'Input full Discord ID#'){
+						this.props.socket.emit('AdminCommand', 'SetPublic', post);
 					} else {//find the right id
 						var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
 						var room = null;
@@ -2078,13 +2080,11 @@
 					}
 				} else if(type == 'Notifications'){
 					this.props.modalpush({id: [], name: name, type: 'notifications'});
+				} else if(type == 'Public'){
+					this.props.modalpush({id: [], name: 'Input full Discord ID#', type: 'action'});
 				} else if(['Player', 'Admin'].indexOf(this.props.permissions) > -1){//Narrate or Set Room
 					this.props.modalpush({id: [], name: name, type: 'action'});
 				}
-			},
-
-			setpub: function(){
-				this.props.socket.emit('AdminCommand', 'SetPublic', true);
 			},
 
 			setpriv: function(){
@@ -2278,7 +2278,7 @@
 							</div>);
 						break;
 					case 'admin'://case for the administrative commands tab
-						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.setpub}>Set Public</div>, <div key='6' className='Command' onClick={this.setpriv}>Set Private</div>, <div key='7' className='Command' onClick={this.genmodal}>Mute</div>, <div key='6' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='8' className='Command' onClick={this.show}>List Bans</div>, <div key='9' className='Command' onClick={this.genmodal}>Ban</div>, <div key='10' className='Command' onClick={this.genmodal}>Unban</div>, <div key='11' className='Command' onClick={this.genmodal}>Show Admin Logs</div>, <div key='12' className='Command' onClick={this.refresh}>Open Lists</div>];
+						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.genmodal}>Set Public</div>, <div key='6' className='Command' onClick={this.setpriv}>Set Private</div>, <div key='7' className='Command' onClick={this.genmodal}>Mute</div>, <div key='8' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='9' className='Command' onClick={this.show}>List Bans</div>, <div key='10' className='Command' onClick={this.genmodal}>Ban</div>, <div key='11' className='Command' onClick={this.genmodal}>Unban</div>, <div key='12' className='Command' onClick={this.genmodal}>Show Admin Logs</div>, <div key='13' className='Command' onClick={this.refresh}>Open Lists</div>];
 						if(this.state.charindex){
 							var characters = this.state.charindex;
 							var charlist = characters.map(function(player, i){//players loop
