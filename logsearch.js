@@ -7,11 +7,11 @@ var monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
 
 //This function returns a "Promise", which will "resolve" when it is done
 //When the promise resolves, the searchLogs function will know to send its information to the client
-function searchLogsByFilename(stringToFind, filename) {
+function searchLogsByFilename(stringToFind, filename, read) {
     if(!filename.endsWith('.html')) { //Not a log file
         return '';
     } else {
-        var data = fs.readFileSync("./logs/" + filename, 'utf8');
+        var data = fs.readFileSync("."+read+filename, 'utf8');
         if(data){
             var logfile = parser.parseFromString(data); //Convert the file into a DOM object
             var bodyOfFile = logfile.getElementsByTagName("body")[0]; //Grab the body of the DOM
@@ -26,9 +26,11 @@ function searchLogsByFilename(stringToFind, filename) {
  
 //This function takes a string and an HTTP Response object
 //Search all the log files, then send the list of good results back to the response
-function searchLogs(stringToFind) {
+function searchLogs(stringToFind, room) {
     var errorReport = '<body style="background-color:black;color:white;"><b>An error occurred trying to search the logs. Please try again later.</b><br />';
-    fs.readdir("./logs", function(err, files) {
+    var read = "/logs/";
+    if(room){read += room+"/";}
+    fs.readdir("."+read, function(err, files) {
         if(err) {
             process.send(errorReport + err + '</body>'); //An error has occured, so tell the user.
             process.exit();
@@ -37,10 +39,10 @@ function searchLogs(stringToFind) {
             process.send('<body style="background-color:black;color:white;">');
             var success = false;
             for(var i = 0; i < files.length; i++){
-                var result = searchLogsByFilename(stringToFind, files[i]);
+                var result = searchLogsByFilename(stringToFind, files[i], read);
                 if(result){
                     success = true;
-                    process.send('<b><a href="/logs/'+result+'" style="color:blue;">' + result.replace(/([0-9]+)_([0-9]+)_([0-9]+).html/, function(match, p1, p2, p3, offset, string) {
+                    process.send('<b><a href="'+read+result+'" style="color:blue;">' + result.replace(/([0-9]+)_([0-9]+)_([0-9]+).html/, function(match, p1, p2, p3, offset, string) {
                         return monthenum[parseInt(p2)-1] + ' ' + p3 + ', ' + p1; //Convert "YYYY_MM_DD.html" into "Monthname DD, YYYY"
                     }) + '</b><br />');
                 }
@@ -55,5 +57,6 @@ function searchLogs(stringToFind) {
 }
 
 process.on('message', function(m){
-    searchLogs(m);
+    var mess = JSON.parse(m);
+    searchLogs(mess.stf, mess.room);
 });

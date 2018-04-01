@@ -11,17 +11,32 @@ var cp = require('child_process');
 
 //Set up the search request for the logs
 app.get('/logs/search/:search', function(req, res) {
-    var stringToFind = req.params.search;
-    var child = cp.fork(__dirname+'/logsearch.js');
-    child.send(stringToFind);
+	var stringToFind = req.params.search;
+	var child = cp.fork(__dirname+'/logsearch.js');
+	child.send(JSON.stringify({stf: stringToFind}));
 
-    child.on('message', function(m){
-        res.write(m);
-    });
+	child.on('message', function(m){
+		res.write(m);
+	});
 
-    child.on('exit', function(){
-        res.end();
-    });
+	child.on('exit', function(){
+		res.end();
+	});
+});
+
+app.get('/logs/:name/search/:search', function(req, res){
+	var stringToFind = req.params.search;
+	var room = req.params.name;
+	var child = cp.fork(__dirname+'/logsearch.js');
+	child.send(JSON.stringify({stf: stringToFind, room: room}));
+
+	child.on('message', function(m){
+		res.write(m);
+	});
+
+	child.on('exit', function(){
+		res.end();
+	});
 });
 
 //Make sure the database exists
@@ -93,12 +108,22 @@ try{
 	if(e.code != 'EEXIST'){throw e;}
 }
 
-var users = {};//maps username to sockets. YES, we need both!
-var playerlist = {};//Having three feels superfluous, but I think O(1) is more important than a bit of extra memory.
+var users = {};//maps username to their sockets and the rooms the sockets are in.
+var playerlist = {};//a map of rooms and the users therein, mainly for display purposes.
+var playercheck = {};//used for quickly checking permissions and mutedness and who is logged in, such as when sending to the hub.
 var idlist = {};
 
 app.get('/', function(req, res){
 	res.sendFile(__dirname + '/index.html');
+});
+
+app.get('/rooms/:roomname', function(req, res){
+	var name = req.params.roomname;
+	if(!name || name == '0'){
+		res.send('Invalid room name.');
+	} else {
+		res.sendFile(__dirname + '/index.html');
+	}
 });
 
 app.get('/worldinfo', function(req, res){
@@ -127,6 +152,42 @@ app.get('/logs/:name', function(req, res){
 	var name = req.params.name;
 	if(name.endsWith('.html')){
 		res.sendFile(name, {root: './logs/'});
+	} else {
+		fs.readdir('./logs/'+name, function(err, files){
+			if(!err){
+				var ret = '<head><title>Logs ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
+				var months = {};
+				files.forEach(function(file, index){
+					if(file.endsWith('.html')){//make a separate header for each month, THEN worry about collapsibility
+						var month = file.substring(0, 7);
+						if(!months[month]){
+							months[month] = true;
+							ret += '</div>';
+							var monthname = monthenum[month.split('_')[1]-1]+' '+month.split('_')[0];
+							ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+month+'\')">'+monthname+'</h2>';
+							//Make a div starting here and ending when we hit the next month or the end
+							ret += '<div id='+month+' style="display: none;">';
+						}
+						ret += '<a href="/logs/'+name+'/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a><br><br>';
+					}
+				});
+				//Code for sending Search requests and receiving the results go here.
+				ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/'+name+'/search/\' + searchTerm);};</script>';
+				ret += '<form onsubmit=\'searchLogs()\'><span style="color:white;">Search Logs:</span><input type=\'text\' id=\'txtSearch\'></form><br /><button type=\'button\' onclick=\'searchLogs()\'>Search</button>';
+				ret += '</body>';
+				res.send(ret);
+			} else {
+				res.send(err);
+			}
+		});
+	}
+});
+
+app.get('/logs/:name/:logfile', function(req, res){
+	var room = req.params.name;
+	var name = req.params.logfile;
+	if(name.endsWith('.html')){
+		res.sendFile(name, {root: './logs/'+room+'/'});
 	}
 });
 
@@ -208,10 +269,10 @@ app.get('/logs', function(req, res){
 
 app.use('/faceicons', express.static('./faceicons'));
 
-var openLog = function (logfile){//takes in a Date object
+var openLog = function (logfile, room){
 	try{
 		fs.accessSync(logfile, fs.R_OK | fs.W_OK);
-		htm = jsdom.jsdom(fs.readFileSync(logfile, 'utf8'));
+		logfiles[room] = {lname: logfile, htm: jsdom.jsdom(fs.readFileSync(logfile, 'utf8'))};
 	} catch(e){//today's logs don't exist, make them!
 		//this won't change, so just making it a static string (albeit a long one) is more effiicient.
 		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action, div.log, div.narration{font-weight: bold;} div.narration{text-align: center;} div.narration span.timestamp{position: absolute; left: 0;} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} .IC{} .OOC{} .deleted{}</style>';
@@ -222,18 +283,28 @@ var openLog = function (logfile){//takes in a Date object
 		var body = '<body><div class="buttons" style="width: auto; position:fixed; bottom: 0; right: 0;"><button onclick="te(this,5)">Hide Timestamps</button><button onclick="te(this,8)">Hide Deletes</button><button onclick="tog(0,1)">OOC Only</button><button onclick="tog(1,0)">IC Only</button><button onclick="tog(1,1)">Both</button></div>'+script+'</body>';
 		var initialhtml = '<html><head><title>Logs for '+new Date().toLocaleString('en-us', {month: "long", day:"2-digit"})+
 		'</title>'+style+'<link rel="icon" href="/faceicons/favicon.png"></head>'+body+'</html>';
+		if(room != '0'){
+			try{//attempt to make the room directory.
+				fs.mkdirSync('./logs/'+room);
+			} catch(e){//do nothing if it already exists.
+				if(e.code != 'EEXIST'){throw e;}
+			}
+		}
 		fs.writeFileSync(logfile, initialhtml);
-		htm = jsdom.jsdom(initialhtml);
+		logfiles[room] = {lname: logfile, htm: jsdom.jsdom(initialhtml)};
 	}
 };
 //initial opening when the server is activated
-var logday = function(today){
-	return './logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+("0"+today.getDate()).slice(-2)+'.html'
+var logday = function(today, room){
+	if(room != '0'){
+		return './logs/'+room+'/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+("0"+today.getDate()).slice(-2)+'.html';
+	}
+	return './logs/'+today.getFullYear()+"_"+("0"+(today.getMonth()+1)).slice(-2)+"_"+("0"+today.getDate()).slice(-2)+'.html';
 };
 var today = new Date();
-var logfile = logday(today);
-var htm = null;
-openLog(logfile);
+var logfile = logday(today, '0');
+var logfiles = {};
+openLog(logfile, '0');
 
 var userdefaults = {
 	settings: {
@@ -248,13 +319,13 @@ var userdefaults = {
 	]
 };
 
-var toLog = function (message){
+var toLog = function (message, room){
 	var today = new Date();
-	if(logday(today) != logfile){//new day
-		logfile = logday(today);
-		openLog(logfile);
-		//NOW proceed using htm
+	//only use logfiles[room].htm after this check
+	if(!logfiles[room] || logday(today, room) != logfiles[room].lname){//file unopened or from yesterday
+		openLog(logday(today, room), room);
 	}
+	var htm = logfiles[room].htm;//the file has been opened or created by this point.
 	var logmsg = htm.createElement('div');
 	logmsg.className = message.className;
 	if(message.id){//no need to do a complicated 'is this an IC post' check if I can do this.
@@ -268,31 +339,33 @@ var toLog = function (message){
 	var classparam = message.className.split(" ")[1];
 	switch(classparam){
 		case 'message':
-			generateOOCmessage(logmsg, message.username, message.post, message.color);
+			generateOOCmessage(logmsg, message.username, message.post, message.color, room);
 			break;
 		case 'log':
-			generateOOClog(logmsg, message.username, message.post);
+			generateOOClog(logmsg, message.username, message.post, room);
 			break;
 		case 'say':
-			generatePost(logmsg, message.username, message.post, message.character, true, message.className.startsWith('O'), message.unnamed);
+			generatePost(logmsg, message.username, message.post, message.character, true, message.className.startsWith('O'), message.unnamed, room);
 			break;
 		case 'action':
-			generatePost(logmsg, message.username, message.post, message.character, false, message.className.startsWith('O'), message.unnamed);
+			generatePost(logmsg, message.username, message.post, message.character, false, message.className.startsWith('O'), message.unnamed, room);
 			break;
 		case 'narration':
-			generateNarration(logmsg, message.username, message.post, message.color);
+			generateNarration(logmsg, message.username, message.post, message.color, room);
 	}
 	htm.body.appendChild(logmsg);
 	var br = htm.createElement('br');
 	br.className = message.className.split(" ")[0];
 	htm.body.appendChild(br);
-	fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
+	fs.writeFile(logfiles[room].lname, htm.documentElement.outerHTML, function(error){
 		if(error){console.log(error);}
 	});
 };
 
-var editLog = function(message){
+var editLog = function(message, room){
 	var today = new Date();
+	if(!logfiles[room]){return;}//safety abort.
+	var htm = logfiles[room].htm;
 	var target = htm.getElementById(message.id);
 	if(target && target.children[0].textContent.indexOf('[Deleted at') == -1){
 		var logmsg;
@@ -306,7 +379,7 @@ var editLog = function(message){
 			ts.textContent = '['+message.username+' '+'Edited at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 			logmsg.appendChild(ts);
 			var classparam = logmsg.className.split(" ")[1];
-			generatePost(logmsg, message.username, message.post, message.character, (classparam == 'say'), false, message.unnamed);
+			generatePost(logmsg, message.username, message.post, message.character, (classparam == 'say'), false, message.unnamed, room);
 		} else {//quick edit
 			if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//probably the best way to check for edits.
 				logmsg = target.nextElementSibling.cloneNode(true);
@@ -344,7 +417,7 @@ var editLog = function(message){
 			target.style.display = "none";
 			htm.body.insertBefore(logmsg, e);
 		}
-		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
+		fs.writeFile(logfiles[room].lname, htm.documentElement.outerHTML, function(error){
 			if(error){console.log(error);}
 		});
 	}
@@ -357,8 +430,10 @@ var addid = function(id, username){
 	}
 };
 
-var deleteLog = function(id){
+var deleteLog = function(id, room){
 	var today = new Date();
+	if(!logfiles[room]){return;}//safety abort.
+	var htm = logfiles[room].htm;
 	var target = htm.getElementById(id);
 	if(target && target.children[0].textContent.indexOf('[Deleted at') == -1){
 		target.className += ' deleted';
@@ -366,13 +441,14 @@ var deleteLog = function(id){
 		if(target.nextElementSibling.id && target.nextElementSibling.id == target.id){//has an edit!
 			target.nextElementSibling.children[0].textContent += '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 		}
-		fs.writeFile(logfile, htm.documentElement.outerHTML, function(error){
+		fs.writeFile(logfiles[room].lname, htm.documentElement.outerHTML, function(error){
 			if(error){console.log(error);}
 		});
 	}
 };
 
-var generateOOCmessage = function (message, username, post, color){
+var generateOOCmessage = function (message, username, post, color, room){
+	var htm = logfiles[room].htm;
 	message.appendChild(htm.createTextNode("( "));//open parentheses
 
 	cur = htm.createElement('b');//create username
@@ -387,12 +463,14 @@ var generateOOCmessage = function (message, username, post, color){
 	message.appendChild(htm.createTextNode(" )"));//close parentheses
 };
 
-var generateOOClog = function (message, username, post){
+var generateOOClog = function (message, username, post, room){
+	var htm = logfiles[room].htm;
 	var cur = htm.createTextNode("| "+username+" "+post+" |");
 	message.appendChild(cur);
 };
 
-var generateNarration = function (message, username, post, color){
+var generateNarration = function (message, username, post, color, room){
+	var htm = logfiles[room].htm;
 	var cur = htm.createElement('br');
 	message.appendChild(cur);
 	cur = htm.createElement('span');
@@ -401,7 +479,8 @@ var generateNarration = function (message, username, post, color){
 	message.appendChild(cur);
 }
 
-var generatePost = function (message, username, post, character, say, omit, unnamed){
+var generatePost = function (message, username, post, character, say, omit, unnamed, room){
+	var htm = logfiles[room].htm;
 	message.style.fontFamily = character.fontStyle;
 	//image section
 	var cur = htm.createElement('img');
@@ -461,22 +540,29 @@ var processHTML = function(message){
 			'font': ['color', 'style']
 		}});
 		message = message.replace(/<(.*?)>/g, function(match, p1, offset, string) {
-		    return "<" + p1.replace(/style\s*=\s*"(.*?)"/g, function(match, p1, offset, string) {
-		        return 'style="' + p1.replace(/(^|;)((?!(text-decoration|text-shadow|font-.*|outline-.*|color))[-A-Za-z])*:.+?\b/g, "") + '"'
-		    }) + ">";
+			return "<" + p1.replace(/style\s*=\s*"(.*?)"/g, function(match, p1, offset, string) {
+				return 'style="' + p1.replace(/(^|;)((?!(text-decoration|text-shadow|font-.*|outline-.*|color))[-A-Za-z])*:.+?\b/g, "") + '"'
+			}) + ">";
 		});
 	}
 	return message;
 };
 
-var addPlayer = function(username, socket, permissions, muted){
-	users[username] = socket;
-	playerlist[username] = {permissions: permissions, muted: muted};
+var addPlayer = function(username, socket, permissions, muted, socketroom){
+	if(!users[username]){users[username]={}; playercheck[username] = {permissions: permissions, muted: muted};}
+	users[username][socketroom] = socket;
+	if(!playerlist[socketroom]){playerlist[socketroom]={};}
+	playerlist[socketroom][username] = {permissions: permissions};
 };
 
-var removePlayer = function(username){
-	delete users[username];
-	delete playerlist[username];
+var removePlayer = function(username, socketroom){
+	delete users[username][socketroom];
+	//check if the user has any other rooms open, if not, clear it out.
+	if (Object.getOwnPropertyNames(users[username]).length == 0){
+		delete users[username];
+		delete playercheck[username];
+	}
+	delete playerlist[socketroom][username];
 };
 process.stdin.setEncoding('utf8');
 process.stdin.on('readable', function() {//support for console commands.
@@ -494,6 +580,17 @@ process.stdin.on('readable', function() {//support for console commands.
 	}
 });
 
+var disconnectall = function(usersockets){//takes in users[name] and disconnects all sockets, returning IP address. Pretty much for boot/ban purposes.
+	var retval = false;
+	for (var socket in usersockets){
+		// skip loop if the property is from prototype
+		if (!usersockets.hasOwnProperty(socket)) continue;
+		if (!retval){retval = usersockets[socket].request.connection.remoteAddress;}
+		usersockets[socket].disconnect();
+	}
+	return retval;
+};
+
 var commands = {//console command list, formatted this way for convenience.
 	"Announce": function(message){
 		message = processHTML(message);
@@ -508,7 +605,7 @@ var commands = {//console command list, formatted this way for convenience.
 				logins = JSON.parse(logins);
 				all.forEach(function(name, index){
 					if(logins[name]){
-						if(users[name]){users[name].disconnect();}
+						if(users[name]){disconnectall(users[name]);}
 						delete logins[name];
 						out += name+' ';
 						fs.unlink('./saves/'+name+'.json', function(err){
@@ -531,8 +628,8 @@ var commands = {//console command list, formatted this way for convenience.
 				logins = JSON.parse(logins);
 				if(logins[name]){
 					logins[name].muted = true;
-					if(playerlist[name]){
-						playerlist[name].muted = true;
+					if(playercheck[name]){
+						playercheck[name].muted = true;
 					}
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
 						if(err){console.log(err);} else {console.log(name+' has been muted.');}
@@ -547,8 +644,8 @@ var commands = {//console command list, formatted this way for convenience.
 				logins = JSON.parse(logins);
 				if(logins[name]){
 					logins[name].muted = false;
-					if(playerlist[name]){
-						playerlist[name].muted = false;
+					if(playercheck[name]){
+						playercheck[name].muted = false;
 					}
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
 						if(err){console.log(err);} else {console.log(name+' has been unmuted.');}
@@ -562,10 +659,11 @@ var commands = {//console command list, formatted this way for convenience.
 			if(err){console.log(err);} else {
 				bans = JSON.parse(bans);
 				if(users[name]){
-					var ip = users[name].request.connection.remoteAddress;
-					bans.ips.push(ip); banlist.ips.push(ip);
-					bans.users[name] = ip; banlist.users[name] = ip;
-					users[name].disconnect();
+					var ip = disconnectall(users[name]);
+					if(ip){
+						bans.ips.push(ip); banlist.ips.push(ip);
+						bans.users[name] = ip; banlist.users[name] = ip;
+					}
 				} else if(name.startsWith(':')){
 					bans.ips.push(name); banlist.ips.push(name);
 				} else {
@@ -608,11 +706,14 @@ var commands = {//console command list, formatted this way for convenience.
 	},
 	"Boot": function(name){//Just logs them out.
 		if(users[name]){
-			users[name].disconnect();
-			setTimeout(function() {cleanup(name);}, 500);
+			disconnectall(users[name]);
 		} else {
-			if(playerlist[name]){//not in users, but on the playerlist.
-				delete playerlist[name];
+			for (var room in playerlist){
+				// skip loop if the property is from prototype
+				if (!playerlist.hasOwnProperty(room)) continue;
+				if(playerlist[room][name]){//not in users, but on the playerlist.
+					delete playerlist[room][name];
+				}
 			}//this is the best we can do without any socket info, but it gets them off the playerlist.
 			console.log(name+' is not logged in.');
 		}
@@ -637,16 +738,23 @@ var commands = {//console command list, formatted this way for convenience.
 				logins = JSON.parse(logins);
 				if(logins[name]){
 					logins[name].permissions = level;
-					if(playerlist[name]){
-						playerlist[name].permissions = level;
-						io.emit('PlayerList', playerlist);
+					for (var room in playerlist){
+						if (!playerlist.hasOwnProperty(room)) continue;
+						if(playerlist[room][name]){//any room where the user is connected
+							playerlist[room][name].permissions = level;
+							io.to(room).emit('PlayerList', playerlist[room]);
+						}
+					}
+					if(playercheck[name]){
+						playercheck[name].permissions = level;
 					}
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
 						if(err){console.log(err);} else {
 							console.log(name+' is now a(n) '+level+'.');
-							if(users[name]){
+							if(users[name] && users[name]['0']){
 								var msg = {className: 'OOC system message', post: '<font color="red">You are now a(n) '+level+'.</font>'};
-								users[name].emit('OOCmessage', msg);
+								//It should be sufficient to send this to the default room most of the time.
+								users[name]['0'].emit('OOCmessage', msg);
 							}
 						}
 					});
@@ -680,7 +788,7 @@ var hubfailures = 0;
 var SendToHub = function(){
 	//acquire title and pub from serversettings, and the playerlist.
 	if(hubfailures < 3 && serversettings.pub){//if we've failed to reach the hub three consecutive times or are no longer public, stop trying.
-		var hubping = {title: serversettings.title, id: serversettings.pub, playerlist: playerlist, port: http.address().port};
+		var hubping = {title: serversettings.title, id: serversettings.pub, playerlist: playercheck, port: http.address().port};
 		var data = JSON.stringify(hubping);
 
 		var options = {
@@ -688,10 +796,10 @@ var SendToHub = function(){
 			port: 55555,
 			path: '/server',
 			method: 'POST',
-		    headers: {
-		        'Content-Type': 'application/json',
-		        'Content-Length': Buffer.byteLength(data)
-		    }
+			headers: {
+				'Content-Type': 'application/json',
+				'Content-Length': Buffer.byteLength(data)
+			}
 		};
 
 		var req = httputil.request(options, function(res){
@@ -710,13 +818,6 @@ var SendToHub = function(){
 		req.end();
 		setTimeout(function() {SendToHub();}, 120000);//renew this every two minutes.
 	}
-};
-
-var cleanup = function(username){
-	if(users[username]){//is it still there after trying to disconnect?
-		delete users[username];
-	}
-	if(playerlist[username]){delete playerlist[username];}
 };
 
 var saveFile = function(filename, data, socket, username){
@@ -743,47 +844,36 @@ var adminLog = function(username, command, target){
 var CheckUser = function(username, minimumPermission, muteusable, socket){
 	if(!username){return false;}
 	if(minimumPermission == 'Admin'){
-		if(playerlist[username].permissions == 'Admin'){
+		if(playercheck[username].permissions == 'Admin'){
 			return true;
 		} else {
 			console.log(username+' attempted to use an admin command.');
 			return false;
 		}
 	}
-	if(!muteusable && playerlist[username].muted){
+	if(!muteusable && playercheck[username].muted){
 		socket.emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">You are currently muted.</font>'});
 		return false;
 	}
 	if(minimumPermission == 'Player'){
-		return (['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1);
+		return (['Player', 'Admin'].indexOf(playercheck[username].permissions) > -1);
 	}
 	return true;//If we're here, username is present, muteusable is true (the command can be used even when muted), and it requires no permissions.
 };
 
-var Setconnections = function(socket, user){//username will definitely be present or something is wrong enough to warrant throwing.
+var Setconnections = function(socket, user, sroom){//username will definitely be present or something is wrong enough to warrant throwing.
 	var username = user;
+	var socketroom = sroom;
 
-	socket.on('Join Room', function(room){
-		if(CheckUser(username, 'Player', true, socket)){
-			socket.join(room);
-			io.to(room).emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">'+username+' has entered Room '+room+'</font>'});
-		}
-	});
-	socket.on('Leave Room', function(room){
-		if(CheckUser(username, 'Player', true, socket)){
-			io.to(room).emit('OOCmessage', {className: 'OOC system message', post: '<font style="color:red;">'+username+' has left Room '+room+'</font>'});
-			socket.leave(room);
-		}
-	});
 	socket.on('OOCmessage', function(message, color){
 		message = processHTML(message);
 		var msg = {className: 'OOC message', username: username, post: message, color: color};
 		if(msg.post && CheckUser(username, 'Guest', false, socket)){
-			io.emit('OOCmessage', msg);
-			toLog(msg);
+			io.to(socketroom).emit('OOCmessage', msg);
+			toLog(msg, socketroom);
 		}
 	});
-	socket.on('Narrate', function(message, color, room, callback){
+	socket.on('Narrate', function(message, color, room, callback){//room is deprecated, but removing it causes more potential communication issues than it's worth to remove.
 		if(callback){callback();}
 		if(CheckUser(username, 'Player', false, socket)){
 			message = processHTML(message);
@@ -791,26 +881,21 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			msg.id = postnum++;
 			addid(msg.id, username);
 			fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
-			if(room){
-				msg.post = '<span style="color:white;">['+room+']</span> '+msg.post;
-				io.to(room).emit('ICmessage', msg);
-			} else {
-				io.emit('ICmessage', msg);
-				toLog(msg);
-			}
+			io.to(socketroom).emit('ICmessage', msg);
+			toLog(msg, socketroom);
 		}
 	});
 	socket.on('Whisper', function(message, target){
-		if(username && users[target]){//if they logged out midwhisper or they send an invalid one somehow we need to stop that.
+		if(username && users[target] && users[target][socketroom]){//if they logged out midwhisper or they send an invalid one somehow we need to stop that.
 			message = processHTML(message);
 			socket.emit('OOCmessage', {className: 'OOC whisper', target: target, post:message});
-			users[target].emit('OOCmessage', {className: 'OOC whisper', username: username, post: message});
+			users[target][socketroom].emit('OOCmessage', {className: 'OOC whisper', username: username, post: message});
 		}//no logging, OBVIOUSLY. What's an admin window?
 	});
 	socket.on('AFK', function(on){
-		if(playerlist[username] && on != playerlist[username].afk){
-			playerlist[username].afk = on;
-			io.emit('PlayerList', playerlist);
+		if(playerlist[socketroom] && playerlist[socketroom][username] && on != playerlist[socketroom][username].afk){
+			playerlist[socketroom][username].afk = on;
+			io.to(socketroom).emit('PlayerList', playerlist[socketroom]);
 		}
 	});
 	socket.on('Dice', function(dice, result, color, priv){
@@ -821,11 +906,11 @@ var Setconnections = function(socket, user){//username will definitely be presen
 				post +=' ('+total+')';
 			}
 			var msg = {className: 'OOC dice', post: post, color: color};
-			if(priv || playerlist[username].muted){
+			if(priv || playercheck[username].muted){
 				msg.post = msg.post + ' (Private)';
 				socket.emit('OOCmessage', msg);
 			} else {
-				io.emit('OOCmessage', msg);
+				io.to(socketroom).emit('OOCmessage', msg);
 			}
 		}
 	});
@@ -857,7 +942,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			if(type.startsWith('O') || type.startsWith('T')){//omit say or omit action
 				className = 'OOC ' + className;
 				call = 'OOCmessage';
-			} else if(['Player', 'Admin'].indexOf(playerlist[username].permissions) > -1) {//IC say or action
+			} else if(['Player', 'Admin'].indexOf(playercheck[username].permissions) > -1) {//IC say or action
 				msg.id = postnum++;
 				addid(msg.id, username);
 				className = 'IC ' + className;
@@ -869,17 +954,9 @@ var Setconnections = function(socket, user){//username will definitely be presen
 				msg.className = 'Test'+msg.className;
 				msg.post += ' (Test)';
 				socket.emit(call, msg);
-			} else if(typeof room === 'string' && call){
-				if(character.customHTML){
-					msg.character.customHTML = '<span style="color:white;">['+room+']</span> '+msg.character.customHTML;
-				} else {msg.character.customHTML = '<span style="color:white;">['+room+']</span> '+msg.character.name;}
-				if(msg.unnamed){
-					msg.post = '<span style="color:white;">['+room+']</span> '+msg.post;
-				}
-				io.to(room).emit(call, msg);
 			} else if(call) {//If it doesn't have a call(IE they didn't pass the player/admin test) drop the message
-				io.emit(call, msg);
-				toLog(msg);
+				io.to(socketroom).emit(call, msg);
+				toLog(msg, socketroom);
 			}
 		}
 	});
@@ -893,7 +970,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			var msg = {id: postid, post: message+'*'};
 			io.emit('ICedit', msg);
 			msg.username = username;
-			editLog(msg);
+			editLog(msg, socketroom);
 		}
 	});
 	socket.on('Cedit', function(message, character, type, postid){
@@ -918,7 +995,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			}
 			io.emit('ICedit', msg);
 			msg.username = username;
-			editLog(msg);
+			editLog(msg, socketroom);
 		}
 	});
 	socket.on('Delete Post', function(id){
@@ -927,7 +1004,7 @@ var Setconnections = function(socket, user){//username will definitely be presen
 			return;
 		}
 		if(CheckUser(username, 'Player', false, socket)){
-			deleteLog(id);
+			deleteLog(id, socketroom);
 			io.emit('ICdel', id);
 		}
 	});
@@ -1010,14 +1087,14 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		var d = n.pop();
 		n = n.join('-');
 		//this is a very unique case, so we don't use CheckUser.
-		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync('./characters').indexOf(n) > -1))){
+		if(username && (username == n || (playercheck[username].permissions == 'Admin' && fs.readdirSync('./characters').indexOf(n) > -1))){
 			var dirmessage = '/characters/'+encodeURIComponent(n)+'/'+d+'.html';
 			var dir = './characters/'+n+'/'+d+'.html';
 			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dirmessage+'" target="_blank">here.</a>'+'</font>'};
 			fs.writeFile(dir, profile.replace(/\r\n?|\n/g, "<br />"), function(err){
 				if(err){console.log(err);} else {socket.emit('OOCmessage', msg);}
 			});
-			if(username != n && playerlist[username].permissions == 'Admin'){
+			if(username != n && playercheck[username].permissions == 'Admin'){
 				adminLog(username, 'Set Profile', id);
 			}
 		}
@@ -1027,11 +1104,11 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		var d = n.pop();
 		n = n.join('-');
 		//if I add any more 'admin or specific user' commands I may add it to CheckUser, but currently these are the only two.
-		if(username && (username == n || (playerlist[username].permissions == 'Admin' && fs.readdirSync('./characters').indexOf(n) > -1))){
+		if(username && (username == n || (playercheck[username].permissions == 'Admin' && fs.readdirSync('./characters').indexOf(n) > -1))){
 			var dir = './characters/'+n+'/'+d+'.html';
 			fs.unlink(dir, function(err){
 				if(err && err.code != 'ENOENT'){console.log(err);} else {
-					if(username != n && playerlist[username].permissions == 'Admin'){
+					if(username != n && playercheck[username].permissions == 'Admin'){
 						adminLog(username, 'Delete Profile', id);
 					}
 				}
@@ -1093,11 +1170,11 @@ var Setconnections = function(socket, user){//username will definitely be presen
 		}
 	});
 	socket.on('disconnect', function(){
-		removePlayer(username);
+		removePlayer(username, socketroom);
 		var msg = {className: 'OOC log message', username: username, post: "has logged off"}
-		io.emit('OOCmessage', msg);
-		toLog(msg);
-		io.emit('PlayerList', playerlist);
+		io.to(socketroom).emit('OOCmessage', msg);
+		toLog(msg, socketroom);
+		io.to(socketroom).emit('PlayerList', playerlist[socketroom]);
 		console.log(username + ' ('+socket.request.connection.remoteAddress+') has disconnected.');
 	});
 	socket.on('save', function(settings, ret){
@@ -1106,6 +1183,12 @@ var Setconnections = function(socket, user){//username will definitely be presen
 				saveFile('./saves/'+username+'.json', settings, socket, username);
 			} else {
 				saveFile('./saves/'+username+'.json', settings);
+				//go through all user sockets and send an update.
+				usersockets = users[username];
+				for (var socket in usersockets){
+					if (!usersockets.hasOwnProperty(socket)) continue;
+					usersockets[socket].emit('UserDataUpdate', settings);
+				}
 			}
 		}
 	});
@@ -1156,7 +1239,7 @@ io.on('connection', function(socket){
 	if(serversettings.title){
 		socket.emit('Title', serversettings.title);
 	}
-	socket.on('login', function(username, password, relog, callback){
+	socket.on('login', function(username, password, room, callback){
 		if(username.endsWith(' ')){
 			callback("Please do not end your username with a space.");
 			return;
@@ -1164,11 +1247,15 @@ io.on('connection', function(socket){
 		fs.readFile('logins.json', 'utf8', function(err, logins){
 			if(err){callback(err);} else {
 				logins = JSON.parse(logins);
+				var roomname = '0';
+				if(room && typeof room === 'string'){
+					roomname = room;
+				}
 				if(logins[username]){//valid username
-					if(users[username]){//already on the list?
+					if(users[username] && users[username][roomname]){//already on the list?
 						callback("User already logged in!");
 					} else if(logins[username].password == password){//valid login
-						addPlayer(username, socket, logins[username].permissions, logins[username].muted);
+						addPlayer(username, socket, logins[username].permissions, logins[username].muted, roomname);
 						if(banlist.users[username]){//this is so mean.
 							commands['Ban'](username);
 							callback("You're still banned.");
@@ -1176,22 +1263,15 @@ io.on('connection', function(socket){
 							//pull up user info
 							fs.readFile('./saves/'+username+'.json', 'utf8', function (err, info){
 								if(err){callback(err);} else {
-									setImmediate(function() {Setconnections(socket, username);});
+									socket.join(roomname);
+									setImmediate(function() {Setconnections(socket, username, roomname);});
 									info = JSON.parse(info);
 									callback(info);
-									if(info.settings.room){
-										socket.join(info.settings.room);
-									}
-									Object.keys(info.settings.rooms).forEach(function(room){
-										if(typeof room === 'string'){
-											socket.join(room);
-										}
-									});
 									console.log(socket.id+" has logged in as "+username);
 									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-									io.emit('OOCmessage', msg);
-									io.emit('PlayerList', playerlist);
-									if(!relog){
+									io.to(roomname).emit('OOCmessage', msg);
+									io.to(roomname).emit('PlayerList', playerlist[roomname]);
+									if(!room){
 										if(serversettings.rules){
 											socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
 										}
@@ -1199,7 +1279,7 @@ io.on('connection', function(socket){
 											socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
 										}
 									}
-									toLog(msg);
+									toLog(msg, roomname);
 								}
 							});
 						}
@@ -1235,21 +1315,22 @@ io.on('connection', function(socket){
 								if(!err){
 									fs.mkdir('./characters/'+username, function(err){
 										if(!err || err.code == 'EEXIST'){
+											socket.join('0');
 											setImmediate(function() {Setconnections(socket, username);});
-											addPlayer(username, socket, 'Guest', false);
+											addPlayer(username, socket, 'Guest', false, '0'); //no registration on rooms
 											//create new user info
 											callback(userdefaults);
 											console.log(socket.id+" has logged in as "+username);
 											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-											io.emit('OOCmessage', msg);
-											io.emit('PlayerList', playerlist);
+											io.to('0').emit('OOCmessage', msg);
+											io.to('0').emit('PlayerList', playerlist['0']);
 											if(serversettings.rules){
 												socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
 											}
 											if(serversettings.motd){
 												socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
 											}
-											toLog(msg);
+											toLog(msg, '0');
 										} else {callback(err);}
 									});
 								} else {callback(err);}

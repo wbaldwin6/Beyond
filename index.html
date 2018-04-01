@@ -405,7 +405,7 @@
 
 		var resetTimer = function(e){idleInterval.postMessage(0)};
 
-		var timersetup = function(){idleInterval = new Worker("idle.js"); idleInterval.onmessage = idleresponse; document.onmousemove = resetTimer; document.onkeypress = resetTimer;}
+		var timersetup = function(){idleInterval = new Worker("/idle.js"); idleInterval.onmessage = idleresponse; document.onmousemove = resetTimer; document.onkeypress = resetTimer;}
 
 		var back = function(e){
 			if(!idleInterval){socket.emit('AFK', false); timersetup();}
@@ -455,7 +455,9 @@
 				if(navigator.appName == 'Microsoft Internet Explorer' || /edge|mobi/i.test(navigator.userAgent) || ((!window.chrome) && (typeof InstallTrigger == 'undefined'))){
 					modals.push({type: 'warning'});
 				}
-				return {settings: {}, characters: [], modal: modals, permissions: 'Guest', username: '', pass: '', players: {}};
+				var room = document.URL.split('/');
+				if(room.indexOf('rooms') >= -1){room = room[room.length-1];} else {room = '';}
+				return {settings: {}, characters: [], modal: modals, permissions: 'Guest', username: '', pass: '', players: {}, socketroom: room};
 			},
 
 			focusf: function(e){
@@ -484,10 +486,14 @@
 					if(players[that.state.username]){ret.permissions = players[that.state.username].permissions;}
 					that.setState(ret);
 				});
+				this.props.socket.on('UserDataUpdate', function(data){
+					data = JSON.parse(data);
+					that.setState(data);
+				});
 				var recfun = function(){
 					if(!reconnected){
 						console.log('Connected, logging in...');
-						that.props.socket.emit('login', that.state.username, that.state.pass, true, function(res){
+						that.props.socket.emit('login', that.state.username, that.state.pass, that.state.socketroom ? that.state.socketroom : true, function(res){
 							if(res.settings){
 								console.log('Logged in successfully (as far as I can tell).');
 								//that.handleSettings(res.settings, res.characters);this SHOULDN'T change.
@@ -565,9 +571,6 @@
 							case 'character':
 								//add a check for 'if we're in doubleclick mode' to put open/close here
 								options = ['Modify Derivatives', 'Set Active Character', 'Set Profile'];
-								if(['Player', 'Admin'].indexOf(this.state.permissions) > -1){
-									options.push('Join Room', 'Leave Room');
-								}
 								options.push('Delete Character');
 								break;
 							case 'derivative':
@@ -780,7 +783,6 @@
 						//fallthrough
 					case 'Persistent Narrate':
 						//fallthrough
-					case 'Join Room':
 						newmodal.type = 'action';
 						break;
 					case 'Full Edit':
@@ -812,25 +814,6 @@
 					case 'Delete Profile':
 						newmodal.charid = newmodal.id.join(','); newmodal.charname = this.state.context.target.textContent;
 						newmodal.type = 'delete';
-						break;
-					case 'Leave Room':
-						var settings = this.state.settings;
-						var rooms = Object.keys(settings.rooms);
-						var ind = -1;
-						for(var i=0; i < rooms.length && ind < 0; i++){//stop if we find it
-							ind = settings.rooms[rooms[i]].indexOf(newmodal.charid);
-						}
-						if(ind > -1){//it's in this room
-							i--;
-							settings.rooms[rooms[i]].splice(ind, 1);
-							if(settings.rooms[rooms[i]].length < 1){//no characters remaining in room
-								if(settings.room != rooms[i]){//not narrating here either
-									this.props.socket.emit('Leave Room', rooms[i]);
-								}
-								delete settings.rooms[rooms[i]];
-							}
-						}
-						this.handleSettings(settings, this.state.characters);
 						break;
 					case 'Mute':
 						//fallthrough
@@ -886,7 +869,7 @@
 
 				return (
 					<div style={{height: "calc(100vh - 19px)"}} onContextMenu={this.contextMenu} onClick={this.closeContext}>
-						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings}/>
+						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings} socketroom={this.state.socketroom}/>
 						{context}
 						<div id="left">
 							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions} systemmessage={this.refs.OOCbox ? this.refs.OOCbox.systemmessage : null} contextMenu={this.contextMenu}/>
@@ -964,7 +947,7 @@
 					if(modal){
 						switch(modal.type){
 							case 'login'://basically hardcoded and single-purpose.
-								return(<LoginModal key={index} id={index} socket={that.props.socket} handleSettings={that.props.handleSettings} setUser={that.props.setUser} closeModal={that.props.closeModal}/>);
+								return(<LoginModal key={index} id={index} socket={that.props.socket} handleSettings={that.props.handleSettings} setUser={that.props.setUser} closeModal={that.props.closeModal} socketroom={that.props.socketroom}/>);
 							case 'character'://character creation/edit modal.
 								//TODO: Figure out how not to need to send settings.
 								return(<CharacterModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
@@ -1053,7 +1036,8 @@
 						document.cookie = "password="+encodeURIComponent(password);
 					}
 					var ind = e.target.parentNode.getAttribute('id');
-					this.props.socket.emit(type, username, md5(password), false, function (response){
+
+					this.props.socket.emit(type, username, md5(password), this.props.socketroom ? this.props.socketroom : false, function (response){
 						if(response.settings){
 							that.props.handleSettings(response.settings, response.characters);
 							that.props.setUser(username, md5(password));
@@ -1093,7 +1077,7 @@
 						<input id="login" type="text" name="password" ref="password" placeholder="Password" onKeyDown={this.enterCheck}/><br/>
 						<input type="checkbox" name="Remember" ref="Remember" defaultChecked={false}/><b>Remember me</b><br/>
 						<button type="submit" id="login" onClick={this.submission}>Login</button>
-						<button type="submit" id="register" onClick={this.submission}>Register</button><br/>
+						{this.props.socketroom ? null : <button type="submit" id="register" onClick={this.submission}>Register</button>}<br/>
 						<b>{this.state.loginmessage}</b><br/>
 						<iframe src='/worldinfo' style={{width:'95%', height:'85%'}}/>
 					</div>);
@@ -1439,20 +1423,6 @@
 					trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
 					if(trueid){
 						characters[trueid[0]].splice(trueid[1], 1);
-						//have to remove it from the room as well
-						var rooms = Object.keys(this.props.settings.rooms);
-						var ind = -1;
-						for(var i=0; i < rooms.length && ind < 0; i++){
-							ind = this.props.settings.rooms[rooms[i]].indexOf(modata.charid);
-						}
-						if(ind > -1){
-							i--;
-							this.props.settings.rooms[rooms[i]].splice(ind, 1);
-							if(this.props.settings.rooms[rooms[i]].length < 1){
-								this.props.socket.emit('Leave Room', rooms[i]);
-								delete this.props.settings.rooms[rooms[i]];
-							}
-						}
 					}
 					//tell it to delete the profile too.
 					this.props.socket.emit('Delete Profile', modata.charid);
@@ -1561,16 +1531,7 @@
 				var modal = e.target.parentNode;
 				var modata = this.props.modal;
 				var post = this.refs['text'].value;
-				if(modata.name == 'Set Room'){//should allow null
-						if(this.props.settings.room && !this.props.settings.rooms[this.props.settings.room]){//we were in a room and we have no characters in it
-							this.props.socket.emit('Leave Room', this.props.settings.room);
-						}
-						this.props.settings.room = post;
-						if(post){
-							this.props.socket.emit('Join Room', post);
-						}
-						this.props.handleSettings(this.props.settings, this.props.characters);
-				} else if(post && !this.state.wait){
+				if(post && !this.state.wait){
 					if(modata.name.startsWith('Show')){
 						return;
 					}
@@ -1583,7 +1544,7 @@
 					} else if(modata.name == 'Narrate'){
 						var that = this;
 						var to = setTimeout(this.unWait, 1000);
-						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room, function(){
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, null, function(){
 							clearTimeout(to);
 							that.props.closeModal(that.props.id);
 						});
@@ -1591,7 +1552,7 @@
 						return;
 					} else if(modata.name == 'Persistent Narrate'){
 						var that = this;
-						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, this.props.settings.room, function(){
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, null, function(){
 							that.refs['text'].value = '';
 						});
 						this.setState({wait: true});
@@ -1604,45 +1565,11 @@
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
 						return;
-					} else if(modata.name == 'Join Room'){
-						var settings = this.props.settings;
-						if(!settings.rooms[post]){//not in this room yet
-							if(settings.room != post){//not narrating in it either.
-								this.props.socket.emit('Join Room', post);
-							}
-							settings.rooms[post] = [];
-						}
-						//need to remove them from their previous room too if applicable
-						var rooms = Object.keys(settings.rooms);
-						var ind = -1;
-						for(var i=0; i < rooms.length && ind < 0; i++){//stop if we find it
-							ind = settings.rooms[rooms[i]].indexOf(modata.charid);
-						}
-						if(ind > -1){//it's in this room
-							i--;
-							settings.rooms[rooms[i]].splice(ind, 1);
-							if(settings.rooms[rooms[i]].length < 1){//no characters remaining in room
-								if(settings.room != rooms[i]){//not narrating here either
-									this.props.socket.emit('Leave Room', rooms[i]);
-								}
-								delete settings.rooms[rooms[i]];
-							}
-						}
-						settings.rooms[post].push(modata.charid);
-						this.props.handleSettings(settings, this.props.characters);
 					} else if (modata.name == 'Input full Discord ID#'){
 						this.props.socket.emit('AdminCommand', 'SetPublic', post);
 					} else {//find the right id
 						var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
 						var room = null;
-						if(modata.name == 'Say' || modata.name == 'Action' || modata.name == 'Unnamed Action'){//only for IC posts.
-							var rooms = Object.keys(this.props.settings.rooms);
-							for(var i=0; i < rooms.length && !room; i++){
-								if(this.props.settings.rooms[rooms[i]].indexOf(modata.charid) > -1){//it's in this room
-									room = rooms[i];
-								}
-							}
-						}
 						if(trueid){
 							var deriv = this.props.characters[trueid[0]][trueid[1]][trueid[2]];
 							var that = this;
@@ -1741,14 +1668,6 @@
 					var did = this.state.id.id;
 					var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
 					var room = null;
-					if(win == 'IC'){//only for IC posts.
-						var rooms = Object.keys(this.props.settings.rooms);
-						for(var i=0; i < rooms.length && !room; i++){
-							if(this.props.settings.rooms[rooms[i]].indexOf(modata.charid) > -1){//it's in this room
-								room = rooms[i];
-							}
-						}
-					}
 					if(trueid){
 						deriv = this.props.characters[trueid[0]][trueid[1]][did];
 						if(modata.name != 'Full Edit'){
@@ -2082,7 +2001,7 @@
 					this.props.modalpush({id: [], name: name, type: 'notifications'});
 				} else if(type == 'Public'){
 					this.props.modalpush({id: [], name: 'Input full Discord ID#', type: 'action'});
-				} else if(['Player', 'Admin'].indexOf(this.props.permissions) > -1){//Narrate or Set Room
+				} else if(['Player', 'Admin'].indexOf(this.props.permissions) > -1){//Narrate
 					this.props.modalpush({id: [], name: name, type: 'action'});
 				}
 			},
@@ -2103,30 +2022,6 @@
 
 			show: function(e){
 				this.props.socket.emit(e.target.textContent);
-			},
-
-			rooms: function(e){
-				var message = '<b>Your Room</b>: '+this.props.settings.room;
-				var rooms = Object.keys(this.props.settings.rooms);
-				var that = this;
-				var idlist = {};
-				this.props.characters.forEach(function(group){
-					group.forEach(function(chr, i){
-						if(typeof chr !== 'string'){//skip the names
-							idlist[chr[0].id] = chr[0].name;
-						}
-					});
-				});
-				rooms.forEach(function(room, j){
-					message += '<br />';
-					message += room + ': ';
-					//add specific characters
-					that.props.settings.rooms[room].forEach(function(chr, i){
-						if(i){message += ', ';}//add before any character but the first
-						message += idlist[chr];
-					});
-				});
-				this.props.systemmessage(message);
 			},
 
 			roll: function(e){
@@ -2268,10 +2163,10 @@
 							</div>);
 						break;
 					case 'commands'://case for player commands tab
-						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglembut}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.save}>Save Data</div>, <div key='3' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='4' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='5' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='6' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='7' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='8' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='9' className='Command' onClick={this.show}>Show Rules</div>, <div key='10' className='Command' onClick={this.show}>Show MOTD</div>, <div key='11' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='12' className='Command' onClick={this.rooms}>Show Rooms</div>, <div key='13' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='14' className='Command' onClick={this.genmodal}>Set Room</div>, <div key='15' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglembut}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.save}>Save Data</div>, <div key='3' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='4' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='5' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='6' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='7' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='8' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='9' className='Command' onClick={this.show}>Show Rules</div>, <div key='10' className='Command' onClick={this.show}>Show MOTD</div>, <div key='11' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='12' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='13' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={16+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
+							currenttab.push(<div key={14+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
 						});
 						currenttab = (<div className="charlist">
 							{currenttab}
