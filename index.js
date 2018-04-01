@@ -781,6 +781,33 @@ var commands = {//console command list, formatted this way for convenience.
 		console.log("Shutting down now.");
 		process.exit();
 	},
+	"CleanLogs": function(kbsize){//goes through log files and deletes any that are below a given size.
+		fs.readdir('./logs', function(err, files){
+			if(!err){
+				files.forEach(function(file, index){
+					if(file.endsWith('.html')){//file
+						var stat = fs.statSync('./logs/'+file);
+						if(stat.size/1000 < kbsize){
+							fs.unlink('./logs/'+file, function(err){if(err) console.log(err);});
+						}
+					} else if(!file.endsWith('.txt')) {//folder
+						fs.readdir('./logs/'+file, function(err, files){
+							if(!err){
+								files.forEach(function(filename, index){
+									if(filename.endsWith('.html')){
+										var stat = fs.statSync('./logs/'+file+'/'+filename);
+										if(stat.size/1000 < kbsize){
+											fs.unlink('./logs/'+file+'/'+filename, function(err){if(err) console.log(err);});
+										}
+									}
+								});
+							} else {console.log(err);}
+						});
+					}
+				});
+			} else {console.log(err);}
+		});
+	},
 };
 
 var hubfailures = 0;

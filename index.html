@@ -872,7 +872,7 @@
 						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings} socketroom={this.state.socketroom}/>
 						{context}
 						<div id="left">
-							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions} systemmessage={this.refs.OOCbox ? this.refs.OOCbox.systemmessage : null} contextMenu={this.contextMenu}/>
+							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions} systemmessage={this.refs.OOCbox ? this.refs.OOCbox.systemmessage : null} contextMenu={this.contextMenu} socketroom={this.state.socketroom}/>
 						</div>
 						<div id="OI">
 							<div id="IC">
@@ -1056,6 +1056,19 @@
 					this.refs.username.value = decodeURIComponent(c.match(/[; ^]?username=([^\s;]*)/)[1]);
 					this.refs.password.value = decodeURIComponent(c.match(/[; ^]?password=([^\s;]*)/)[1]);
 					this.refs.password.focus();
+					if(this.props.socketroom){
+						var that=this;
+						this.props.socket.emit('login', this.refs.username.value, md5(this.refs.password.value), this.props.socketroom, function (response){
+							if(response.settings){
+								that.props.handleSettings(response.settings, response.characters);
+								that.props.setUser(that.refs.username.value, md5(that.refs.password.value));
+								that.props.closeModal(that.refs.this.id);
+								reconnected = true;
+							} else {
+								that.setState({loginmessage: response.code || response});
+							}
+						});
+					}
 				} else {
 					this.refs.username.focus();
 				}
@@ -1072,7 +1085,7 @@
 			},
 
 			render: function(){
-				return(<div id={this.props.id} className="modal" style={{textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
+				return(<div id={this.props.id} ref='this' className="modal" style={{textAlign:'center', height:'100%', width:'100%', paddingTop:'30px'}}>
 						<input type="text" name="username" ref="username" placeholder="Username" onKeyDown={this.enterCheck}/><br/>
 						<input id="login" type="text" name="password" ref="password" placeholder="Password" onKeyDown={this.enterCheck}/><br/>
 						<input type="checkbox" name="Remember" ref="Remember" defaultChecked={false}/><b>Remember me</b><br/>
@@ -1560,7 +1573,7 @@
 						return;
 					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info', 'Edit Title'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
-					} else if(['Ban', 'Mute', 'Unban', 'Unmute'].indexOf(modata.name) > -1){
+					} else if(['Ban', 'Mute', 'Unban', 'Unmute', 'CleanLogs'].indexOf(modata.name) > -1){
 						this.props.socket.emit('AdminCommand', modata.name, post);
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
@@ -1987,7 +2000,9 @@
 				var name = e.target.textContent;
 				var type = name.split(' '); type = type[type.length-1];
 				var that = this;
-				if(['Rules', 'MOTD', 'Profile', 'Info', 'Logs'].indexOf(type) > -1){
+				if(name == "Clean Logs"){
+					this.props.modalpush({id: [], name: 'CleanLogs', type: 'action'});
+				} else if(['Rules', 'MOTD', 'Profile', 'Info', 'Logs'].indexOf(type) > -1){
 					var res = function(response){
 						if(response){response = sanitize(response);}
 						that.props.modalpush({id: [], name: name, type: 'action', post: response});
@@ -2163,7 +2178,7 @@
 							</div>);
 						break;
 					case 'commands'://case for player commands tab
-						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglembut}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.save}>Save Data</div>, <div key='3' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='4' className='Command' onClick={function(e){window.open('/logs');}}>Open Logs</div>, <div key='5' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='6' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='7' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='8' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='9' className='Command' onClick={this.show}>Show Rules</div>, <div key='10' className='Command' onClick={this.show}>Show MOTD</div>, <div key='11' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='12' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='13' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglembut}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.save}>Save Data</div>, <div key='3' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='4' className='Command' onClick={function(e){window.open(that.props.socketroom ? '/logs/'+that.props.socketroom : '/logs');}}>Open Logs</div>, <div key='5' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='6' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='7' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='8' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='9' className='Command' onClick={this.show}>Show Rules</div>, <div key='10' className='Command' onClick={this.show}>Show MOTD</div>, <div key='11' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='12' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='13' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
 							currenttab.push(<div key={14+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
@@ -2173,7 +2188,7 @@
 							</div>);
 						break;
 					case 'admin'://case for the administrative commands tab
-						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.genmodal}>Set Public</div>, <div key='6' className='Command' onClick={this.setpriv}>Set Private</div>, <div key='7' className='Command' onClick={this.genmodal}>Mute</div>, <div key='8' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='9' className='Command' onClick={this.show}>List Bans</div>, <div key='10' className='Command' onClick={this.genmodal}>Ban</div>, <div key='11' className='Command' onClick={this.genmodal}>Unban</div>, <div key='12' className='Command' onClick={this.genmodal}>Show Admin Logs</div>, <div key='13' className='Command' onClick={this.refresh}>Open Lists</div>];
+						currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.genmodal}>Set Public</div>, <div key='6' className='Command' onClick={this.setpriv}>Set Private</div>, <div key='7' className='Command' onClick={this.genmodal}>Mute</div>, <div key='8' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='9' className='Command' onClick={this.show}>List Bans</div>, <div key='10' className='Command' onClick={this.genmodal}>Ban</div>, <div key='11' className='Command' onClick={this.genmodal}>Unban</div>, <div key='12' className='Command' onClick={this.genmodal}>Clean Logs</div>, <div key='13' className='Command' onClick={this.genmodal}>Show Admin Logs</div>, <div key='14' className='Command' onClick={this.refresh}>Open Lists</div>];
 						if(this.state.charindex){
 							var characters = this.state.charindex;
 							var charlist = characters.map(function(player, i){//players loop
