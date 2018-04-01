@@ -90,8 +90,8 @@ if(!fs.existsSync('./faceicons')){fs.mkdirSync('./faceicons');}
 if(!fs.existsSync('./faceicons/num.txt')){fs.writeFile('./faceicons/num.txt', 0);} else {fs.readFile('./faceicons/num.txt','utf8',function(err,num){iconnum=+num;});}
 if(!fs.existsSync('./faceicons/img_trans.gif')){fs.writeFile('./faceicons/img_trans.gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');}
 if(!fs.existsSync('./faceicons/img_trans.png')){fs.writeFile('./faceicons/img_trans.png', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');}
-if(!fs.existsSync('./faceicons/favicon.png')){fs.writeFile('./faceicons/favicon.png', 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAADXUAAA11AFeZeUIAAACKElEQVQ4jaWTO2hUURCGvzn33t272TW7S7QwGpVtTBSxsLAUUwYhiPjCQhQLBdFCNFiJoIWFCGonCmITNKCFUYlCiCIp1CJFJGgwaHEjJIImxn3dc8Yi7iY+EhEHBg5T/Od/zAhAc3Oz8g8VRZHU3j7A5MTH19fOdbY1pBtIJAM830OMAcBZh41jKuUK32aK+mjgjXZH0TugUAdIJQPWFZqk8/iDBX/tvrzdLc2lzMbW5cTWrerpG7kKHPUBUEdp6utv9ObXnmN39entA4Cyu2MDPX0jHQAGQICZz1/+ql2MwU8kyObSBgjrEhAozxSBhQ19eH2XqqoYYxh48QFgcA4AQYxw5eBq1LnaCM8PSC3JkGnKQxyLi632D45y6cazIrBjHgMhzKQR0Gq5LC62qFO1Gku1VKZaKuvE5JScOdvL85djAOkas1kPjJDOZ0llG0mmG/ASgRqvFqPFVmNpTPl0Hd7Cob2b8X3zqQbwIwVI53PsPN1fS+CnJG52bcJZS2FlXk4daWdtYVnu5Pn7w8B6A6DOEWZmWUVRJL/2/guvEM+ggDplW3ubFFryrXUJxhi8wF80wiAMESOoczhrpdCSn/MAI9g4XhQgkQoxxsNaS7Vc0bdjk1L3II4tpenZTfzTHjy+tU89EXHWYisV7vQO8X58aqhulu/J8MUTW9ckU2EQhEkTJALj+T4YAVW11qmNrZueLpr+wVFz78nIuCor6gD/c87fAZie5tVJv8TeAAAAAElFTkSuQmCC', 'base64');}
-if(!fs.existsSync('./faceicons/notice.png')){fs.writeFile('./faceicons/notice.png', 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAADXUAAA11AFeZeUIAAAB4ElEQVQ4jaWTP28TQRDFf7u+851ln+0EEzmKiE5BigAXSOgsCtoI0QEdJR+Amu9AzzegoaWJKKhoQPJJKMWVECkKAoTDv9g+27feobj4EkchCDHF7hYzb957M6sAoigS/iHiOFbztwKoQXJ4Y+0q9QAcF7wS+E6eMbYwnsBkAoOhvNj/Kff6oz1gA8ABWFYKBpnq6toZ/TRQodcuW2oVfVccnousPzhInwKPAFiHRKolOU9KFEUi97sitzsinbYBPszh82M4+7t4R0PFh3pFA34h4Zjqnw3tNUYCgUJrUscHeANHJoaQ7MI1cE+UzBlZaDiweQnay4KGi9vv0n5mq0VqCImACNoKrgieCJ7Nby3iYqWzKo832jZHPMVbuwpaPmgLZEAmC3kZitGUJ5cv8PbWJj4cFLYAYICwTTdszRdEcSJ6cQyTDIxRN1sB6Z3rTfVyJwE6DoAVgVYD+otbNo9uFEnv2/sjaywoUVuV8pVX6TSX4AD47um6xWgG+RiNhalRW3Xv2AO8Ekyz8wGWqlByYGZgPJbtL4eqaD42M/j8HfTKmXvQWzVCVlYYA4OU9MeA17BTmOVDki65Ic26y0qg8T2N7+XMslk+4aGxZFP9bO+rfvjx1ycLawXA/3zn3yXMuSxJ72rcAAAAAElFTkSuQmCC', 'base64');}
+if(!fs.existsSync('./faceicons/favicon.png')){fs.writeFile('./faceicons/favicon.png', 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4gQBDzgSNR5bAgAAAA9QTFRF////AAAAz7E34sE8/9VD2dvC6gAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAAmklEQVQoz22S0Q2FMAhFGcHWCQQXMHYBk+4/0ytQoCXvfp5Q5NwIJQKS+nKQUybonCC19Z0MoBuEHAw+XSbkWQATascCoOLbvw1Q6/sED0C9HZw8MB76UhkY4LKPyMAAOA+jrqejhUqyvSDZGgjbYsBtZx+LbYFku/UhFzwJ/O/jzn2ELWofYUuzD7NF68PjfZh+6oOayuXf4QciHi6tIdMmKQAAAABJRU5ErkJggg==', 'base64');}
+if(!fs.existsSync('./faceicons/notice.png')){fs.writeFile('./faceicons/notice.png', 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB+IEARACC2OmyfYAAAAPUExURf///wAAAM83O+I8QP9DTK3GnwYAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAJpJREFUKM9tktENhTAIRRnB1gkEFzB2AZPuP9MrUKAl736eUOTcCCUCkvpykFMm6JwgtfWdDKAbhBwMPl0m5FkAE2rHAqDi278NUOv7BA9AvR2cPDAe+lIZGOCyj8jAADgPo66no4VKsr0g2RoI22LAbWcfi22BZLv1IRc8Cfzv4859hC1qH2FLsw+zRevD432YfuqDmsrl3+EHIh4urSHTJikAAAAASUVORK5CYII=', 'base64');}
 if(!fs.existsSync('./faceicons/box.png')){fs.writeFile('./faceicons/box.png', 'iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAADXUAAA11AFeZeUIAAABA0lEQVRoge2asYoCMRRFz4i4EUR2FiwUG9n//5SttdVWS1enmy2SgThMkWIhF7kHwp3p7uGle2nuhJ43YJ7yF3iMjjIBWOY5iDyAG3BNeatSr5xP4CvLNhe5AhfgnFKZLbBL2TAxkTNwBE5V6pVzADqgJ16tdixyAU4rup86/cq4E56kSRCvVjerW+n/sIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImoMe/ZAfA6xBQ5pj63MN7AHNsAaWAwiS+LifUd8UdBUqVfOnleRMDWRPv0rs8nO5ESa7FuZ9ei8TKTNsqtSr5wFseuQH3+zPCfjk5ftQQAAAABJRU5ErkJggg==', 'base64');}
 if(!fs.existsSync('./faceicons/handle.png')){fs.writeFile('./faceicons/handle.png', 'iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAADXUAAA11AFeZeUIAAAAB3RJTUUH4QIUDyUsZQAKFgAAAMpJREFUOMvt1DtrAlEQxfE/+/28IgbiVNaCsIZAHoVv10JFSUifLgckWMwntBlhsVlfjeDpLgw/zp1i4JFHKuNS5lLn8M5uYO6An5uALu2AGjC4GnRpC9SBQTIrrgJd+geawCiZFS59XwwG1ghs6tIG6F4ExjePsRxYng0G1gTmgS0DWyWz97NAl/5KO+sH9hrYW3k2O3Fnz8Akmq0DWxywaF8NRrMGMEtm48B6wFcy+4iZX+CpEnRpAbQCG7qUl7CXEtYGPu/nWOwBIGxhMKJusmIAAAAASUVORK5CYII=', 'base64');}
 
@@ -531,7 +531,7 @@ var generatePost = function (message, username, post, character, say, omit, unna
 var processHTML = function(message){
 	var test = /<|>/.test(message);
 	message = message.replace(/(\s|^)(https?:\/\/\S+)/ig, "$1<a href=\"$2\" target=\"_blank\">$2</a>");
-	message = message.replace(/\r\n?|\n/g, "<br />");
+	message = message.replace(/\r\n?|\n(?!([^<]+)?>)/g, "<br />");
 	if(test){//we skip it if we don't even find any tags (prior to potentially adding them ourselves)
 		message = sanitizeHtml(message, {allowedTags: ['a', 'b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'sub', 'u'],
 		allowedAttributes: {
@@ -1091,7 +1091,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			var dirmessage = '/characters/'+encodeURIComponent(n)+'/'+d+'.html';
 			var dir = './characters/'+n+'/'+d+'.html';
 			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dirmessage+'" target="_blank">here.</a>'+'</font>'};
-			fs.writeFile(dir, profile.replace(/\r\n?|\n/g, "<br />"), function(err){
+			fs.writeFile(dir, profile.replace(/\r\n?|\n(?!([^<]+)?>)(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />"), function(err){
 				if(err){console.log(err);} else {socket.emit('OOCmessage', msg);}
 			});
 			if(username != n && playercheck[username].permissions == 'Admin'){
@@ -1135,7 +1135,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	});
 	socket.on('Edit Default Profile', function(message){
 		if(CheckUser(username, 'Admin', true, socket)){
-			serversettings.profile = message.replace(/\r\n?|\n/g, "<br />");//no HTML checking here
+			serversettings.profile = message.replace(/\r\n?|\n(?!([^<]+)?>)(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />");//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Default Profile', null);}
@@ -1145,7 +1145,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	socket.on('Edit World Info', function(message){
 		if(CheckUser(username, 'Admin', true, socket)){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
-			fs.writeFile('worldinfo.html', message.replace(/\r\n?|\n/g, "<br />"), function(err){
+			fs.writeFile('worldinfo.html', message.replace(/\r\n?|\n(?!([^<]+)?>)(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />"), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit World Info', null);}
 			});
 		}

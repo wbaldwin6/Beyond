@@ -530,7 +530,7 @@
 			
 			CleanContent: function() {
 				var content = this.refs.textArea.value;
-				content = content.replace(/\r\n?|\n/g, "<br />");
+				content = content.replace(/\r\n?|\n(?!([^<]+)?>)(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />");
 				return content;
 			},
 
