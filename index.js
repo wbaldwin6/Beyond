@@ -549,7 +549,7 @@ var processHTML = function(message){
 };
 
 var addPlayer = function(username, socket, permissions, muted, socketroom){
-	if(!users[username]){users[username]={}; playercheck[username] = {permissions: permissions, muted: muted};}
+	if(!users[username]){users[username]={}; playercheck[username] = {permissions: permissions, muted: muted}; console.log(username+' has logged in.');}
 	users[username][socketroom] = socket;
 	if(!playerlist[socketroom]){playerlist[socketroom]={};}
 	playerlist[socketroom][username] = {permissions: permissions};
@@ -561,8 +561,17 @@ var removePlayer = function(username, socketroom){
 	if (Object.getOwnPropertyNames(users[username]).length == 0){
 		delete users[username];
 		delete playercheck[username];
+		console.log(username+' has disconnected.');
 	}
-	delete playerlist[socketroom][username];
+	if(playerlist[socketroom]){
+		if(playerlist[socketroom][username]){
+			delete playerlist[socketroom][username];
+		} else {
+			console.log(username+' not found in room '+socketroom+' when expected for removal.');
+		}
+	} else {
+		console.log('Room '+socketroom+' not found when expected for player removal.');
+	}
 };
 process.stdin.setEncoding('utf8');
 process.stdin.on('readable', function() {//support for console commands.
@@ -1202,7 +1211,6 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		io.to(socketroom).emit('OOCmessage', msg);
 		toLog(msg, socketroom);
 		io.to(socketroom).emit('PlayerList', playerlist[socketroom]);
-		console.log(username + ' ('+socket.request.connection.remoteAddress+') has disconnected.');
 	});
 	socket.on('save', function(settings, ret){
 		if(username){
@@ -1294,7 +1302,6 @@ io.on('connection', function(socket){
 									setImmediate(function() {Setconnections(socket, username, roomname);});
 									info = JSON.parse(info);
 									callback(info);
-									console.log(socket.id+" has logged in as "+username);
 									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
 									io.to(roomname).emit('OOCmessage', msg);
 									io.to(roomname).emit('PlayerList', playerlist[roomname]);
@@ -1319,7 +1326,6 @@ io.on('connection', function(socket){
 			}
 		});
 	});
-	console.log('a user connected');
 	socket.on('register', function(username, password, du, callback){
 		if(username.endsWith(' ')){
 			callback("Please do not end your username with a space.");
@@ -1347,7 +1353,6 @@ io.on('connection', function(socket){
 											addPlayer(username, socket, 'Guest', false, '0'); //no registration on rooms
 											//create new user info
 											callback(userdefaults);
-											console.log(socket.id+" has logged in as "+username);
 											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
 											io.to('0').emit('OOCmessage', msg);
 											io.to('0').emit('PlayerList', playerlist['0']);
