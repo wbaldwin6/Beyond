@@ -390,11 +390,6 @@
 
 		var title = 'Beyond';
 
-		socket.on('Title', function(message){
-			if(document.title.startsWith('(AFK) ')){document.title = '(AFK) '+message;} else {document.title = message;}
-			title = message;
-		});
-
 		var idleInterval;// = new Worker("idle.js");
 		var idleresponse = function(e){//sends only when the timer hits the designated point
 			socket.emit('AFK', true); idleInterval.terminate(); idleInterval = null;
@@ -489,6 +484,14 @@
 				this.props.socket.on('UserDataUpdate', function(data){
 					data = JSON.parse(data);
 					that.setState(data);
+				});
+				this.props.socket.on('Title', function(message){
+					if(document.title.startsWith('(AFK) ')){document.title = '(AFK) '+message;} else {document.title = message;}
+					if(that.state.socketroom){
+						document.title += ' ('+that.state.socketroom+')'; title = message+' ('+that.state.socketroom+')';
+					} else {
+						title = message;
+					}
 				});
 				var recfun = function(){
 					if(!reconnected){
@@ -1524,8 +1527,12 @@
 			enterCheck: function(e){
 				if(e.keyCode == 13 && !e.shiftKey && !this.refs.toggle.checked){//hit enter without shift or toggle check.
 					this.post(e);
-				} else if(this.refs.Cancel.className = "Red Button"){//no need to test this if we're about to close it.
+				} else if(this.refs.Cancel.className == "Red Button"){//no need to test this if we're about to close it.
 					this.refs.Cancel.className = "";
+					this.refs.text.style['border-color'] = '';
+					this.refs.text.style['outline-color'] = '';
+				} else if(this.refs.Send.className == "Red Button"){
+					this.refs.Send.className = "";
 					this.refs.text.style['border-color'] = '';
 					this.refs.text.style['outline-color'] = '';
 				}
@@ -1574,6 +1581,16 @@
 					} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info', 'Edit Title'].indexOf(modata.name) > -1){
 						this.props.socket.emit(modata.name, post);
 					} else if(['Ban', 'Mute', 'Unban', 'Unmute', 'CleanLogs'].indexOf(modata.name) > -1){
+						if(modata.name == 'CleanLogs'){
+							if(Number.isNaN(post)){
+								return;
+							} else if(post > 8 && this.refs.Send.className != "Red Button"){//safety check: a quick 'are you sure' to prevent people from accidentally deleting everything by mistyping a huge number.
+								this.refs.Send.className = "Red Button";
+								this.refs.text.style['border-color'] = 'red';
+								this.refs.text.style['outline-color'] = 'red';
+								return;
+							}
+						}
 						this.props.socket.emit('AdminCommand', modata.name, post);
 					} else if(modata.name == 'Set Profile'){
 						this.props.socket.emit(modata.name, post, modata.charid);
@@ -1632,7 +1649,7 @@
 				return(
 					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
 					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:'auto'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
-					<button type="submit" onClick={this.post}>OK</button><button ref='Cancel' onClick={this.closeCheck}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> {previewButton}</div>
+					<button ref='Send' type="submit" onClick={this.post}>OK</button><button ref='Cancel' onClick={this.closeCheck}>Cancel</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> {previewButton}</div>
 				);
 			}
 		});
@@ -1649,7 +1666,7 @@
 			stopDrag: stopDrag,
 
 			enterCheck: function(e){
-				if(this.refs.Close.className = "Red Button"){
+				if(this.refs.Close.className == "Red Button"){
 					this.refs.Close.className = "";
 					this.refs.text.style['border-color'] = '';
 					this.refs.text.style['outline-color'] = '';
