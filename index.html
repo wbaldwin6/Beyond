@@ -1979,7 +1979,7 @@
 				var ret = {};
 				this.state.notify.forEach(function(note){
 					if(note.OOC || note.IC){//only valid ones
-						ret[note.name] = {OOC: note.OOC, IC: note.IC};
+						ret[encodeURIComponent(note.name)] = {OOC: note.OOC, IC: note.IC};
 					}
 				});
 				if(this.props.modal.name == 'Set Notifications'){
