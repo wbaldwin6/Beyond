@@ -901,24 +901,35 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	var username = user;
 	var socketroom = sroom;
 
+	socket.on('Set Rooms', function(rooms, oldrooms){
+		var result = rooms.filter(function(i) {return oldrooms.indexOf(i) < 0;});//everything in rooms that isn't in oldrooms needs to be joined
+		result.forEach(function(element){
+			socket.join(element);
+		});
+		var result = oldrooms.filter(function(i) {return rooms.indexOf(i) < 0;});//everything in oldrooms that isn't in rooms needs to be left
+		result.forEach(function(element){
+			socket.leave(element);
+		});
+	});
 	socket.on('OOCmessage', function(message, color){
 		message = processHTML(message);
-		var msg = {className: 'OOC message', username: username, post: message, color: color};
+		var msg = {className: 'OOC message', username: username, post: message, color: color, room: socketroom};
 		if(msg.post && CheckUser(username, 'Guest', false, socket)){
 			io.to(socketroom).emit('OOCmessage', msg);
 			toLog(msg, socketroom);
 		}
 	});
-	socket.on('Narrate', function(message, color, room, callback){//room is deprecated, but removing it causes more potential communication issues than it's worth to remove.
+	socket.on('Narrate', function(message, color, room, callback){
 		if(callback){callback();}
+		var sendroom = room || socketroom;
 		if(CheckUser(username, 'Player', false, socket)){
 			message = processHTML(message);
-			var msg = {className: 'IC narration message', username: username, post: message, color: color};
+			var msg = {className: 'IC narration message', username: username, post: message, color: color, room: sendroom};
 			msg.id = postnum++;
 			addid(msg.id, username);
 			fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
-			io.to(socketroom).emit('ICmessage', msg);
-			toLog(msg, socketroom);
+			io.to(sendroom).emit('ICmessage', msg);
+			toLog(msg, sendroom);
 		}
 	});
 	socket.on('Whisper', function(message, target){
@@ -941,7 +952,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 				var total = result.reduce(function(a,b){return a+b;});
 				post +=' ('+total+')';
 			}
-			var msg = {className: 'OOC dice', post: post, color: color};
+			var msg = {className: 'OOC dice', post: post, color: color, room: socketroom};
 			if(priv || playercheck[username].muted){
 				msg.post = msg.post + ' (Private)';
 				socket.emit('OOCmessage', msg);
@@ -952,6 +963,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	});
 	socket.on('characterPost', function(message, character, type, room, callback){
 		if(callback){callback();}
+		var sendroom = room || socketroom;
 		if(CheckUser(username, 'Guest', false, socket) && character){//We do not check for Player status here, only if it's IC.
 			if(character.customHTML){
 				character.customHTML = sanitizeHtml(character.customHTML, {allowedTags: ['b', 'br', 'em', 'font', 'i', 's', 'span', 'strong', 'sup', 'u'],
@@ -965,7 +977,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 				message = character.textHTML+message;
 			}
 			message = processHTML(message); //one nice thing processHTML does for us is automatically close the tags.
-			var msg = {character: character, post: message, username: username};
+			var msg = {character: character, post: message, username: username, room: sendroom};
 			if(type.startsWith('Unnamed')){
 				msg.unnamed = true;
 				type = type.substr(type.indexOf(' ')+1); //remove the 'Unnamed' from the start, it has done its job.
@@ -991,8 +1003,8 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 				msg.post += ' (Test)';
 				socket.emit(call, msg);
 			} else if(call) {//If it doesn't have a call(IE they didn't pass the player/admin test) drop the message
-				io.to(socketroom).emit(call, msg);
-				toLog(msg, socketroom);
+				io.to(sendroom).emit(call, msg);
+				toLog(msg, sendroom);
 			}
 		}
 	});
@@ -1207,7 +1219,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	});
 	socket.on('disconnect', function(){
 		removePlayer(username, socketroom);
-		var msg = {className: 'OOC log message', username: username, post: "has logged off"}
+		var msg = {className: 'OOC log message', username: username, post: "has logged off", room: socketroom}
 		io.to(socketroom).emit('OOCmessage', msg);
 		toLog(msg, socketroom);
 		io.to(socketroom).emit('PlayerList', playerlist[socketroom]);
@@ -1302,7 +1314,14 @@ io.on('connection', function(socket){
 									setImmediate(function() {Setconnections(socket, username, roomname);});
 									info = JSON.parse(info);
 									callback(info);
-									var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+									if(roomname == '0'){//if we're in the main room, we join other rooms to listen.
+										Object.keys(info.settings.rooms).forEach(function(room){
+											if(typeof room === 'string'){
+												socket.join(room);
+											}
+										});
+									}
+									var msg = {className: 'OOC log message', username: username, post: "has logged on", room: roomname};
 									io.to(roomname).emit('OOCmessage', msg);
 									io.to(roomname).emit('PlayerList', playerlist[roomname]);
 									if(!room){
@@ -1349,7 +1368,7 @@ io.on('connection', function(socket){
 									fs.mkdir('./characters/'+username, function(err){
 										if(!err || err.code == 'EEXIST'){
 											socket.join('0');
-											setImmediate(function() {Setconnections(socket, username);});
+											setImmediate(function() {Setconnections(socket, username, '0');});
 											addPlayer(username, socket, 'Guest', false, '0'); //no registration on rooms
 											//create new user info
 											callback(userdefaults);

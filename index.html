@@ -237,6 +237,15 @@
 				border: 0;
 				height:17px;
 			}
+			input.room, select.room{
+				position: absolute;
+				right: 0px;
+				top: 0px;
+				width: 30%;
+				padding: 0;
+				border: 0;
+				height:17px;
+			}
 			.Command:hover{
 				color: white;
 			}
@@ -879,10 +888,10 @@
 						</div>
 						<div id="OI">
 							<div id="IC">
-								<IChandler ref="ICbox" socket={this.props.socket} notify={this.state.settings.notify}/>
+								<IChandler ref="ICbox" socket={this.props.socket} notify={this.state.settings.notify} rooms={this.state.settings.rooms} socketroom={this.state.socketroom ? true : false}/>
 							</div>
 							<div id="OOC">
-								<OOChandler ref="OOCbox" socket={this.props.socket} notify={this.state.settings.notify}/>
+								<OOChandler ref="OOCbox" socket={this.props.socket} notify={this.state.settings.notify} rooms={this.state.settings.rooms} socketroom={this.state.socketroom ? true : false}/>
 							</div>
 						</div>
 						<input className="OOCbar" type="text" ref="OOCbar" placeholder="Input an OOC message" onKeyPress={this.handleEnter}/>
@@ -959,11 +968,11 @@
 							case 'delete'://'are you sure?'
 								return(<DeleteModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
 							case 'action':
-								return(<ActionModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+								return(<ActionModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal} socketroom={that.props.socketroom}/>);
 							case 'active':
-								return(<ActiveModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} closeModal={that.props.closeModal}/>);
+								return(<ActiveModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} closeModal={that.props.closeModal} socketroom={that.props.socketroom}/>);
 							case 'notifications':
-								return(<NotificationModal key={index} id={index} modal={modal} characters={that.props.characters} settings={that.props.settings} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
+								return(<NotificationModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal}/>);
 							case 'warning':
 								return(<WarningModal key={index} id={index} closeModal={that.props.closeModal}/>);
 						}
@@ -1292,7 +1301,7 @@
 							return (<option key={ind} value={ind}>{group[0]}</option>);
 						}
 					});
-					groupdropdown = (<select className="char" ref={'group'}>{grouption}</select>);
+					groupdropdown = (<select className="rooms" ref={'group'}>{grouption}</select>);
 					name = modal.name;
 				} else {
 					trueid = this.props.verifyID(modal.charid, modal.id, modal.icpos);
@@ -1551,6 +1560,7 @@
 				var modal = e.target.parentNode;
 				var modata = this.props.modal;
 				var post = this.refs['text'].value;
+				var room = this.refs['roomlist'] && this.refs['roomlist'].value != 'None' ? this.refs['roomlist'].value : null;
 				if(post && !this.state.wait){
 					if(modata.name.startsWith('Show')){
 						return;
@@ -1564,7 +1574,7 @@
 					} else if(modata.name == 'Narrate'){
 						var that = this;
 						var to = setTimeout(this.unWait, 1000);
-						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, null, function(){
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, room, function(){
 							clearTimeout(to);
 							that.props.closeModal(that.props.id);
 						});
@@ -1572,7 +1582,7 @@
 						return;
 					} else if(modata.name == 'Persistent Narrate'){
 						var that = this;
-						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, null, function(){
+						this.props.socket.emit('Narrate', post, this.props.settings.textcolor, room, function(){
 							that.refs['text'].value = '';
 						});
 						this.setState({wait: true});
@@ -1599,7 +1609,6 @@
 						this.props.socket.emit('AdminCommand', 'SetPublic', post);
 					} else {//find the right id
 						var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
-						var room = null;
 						if(trueid){
 							var deriv = this.props.characters[trueid[0]][trueid[1]][trueid[2]];
 							var that = this;
@@ -1633,6 +1642,7 @@
 			},
 
 			render: function(){
+				var roomable = ['Narrate', 'Persistent Narrate', 'Say', 'Action', 'Unnamed Action', 'Omit Say', 'Omit Action', 'Unnamed Omit Action'];
 				var modal = this.props.modal;
 				var name = modal.name;
 				var previewButton = (['Set Profile', 'Edit World Info'].indexOf(this.props.modal.name) > -1) ? <button type="submit" onClick={this.preview}>Preview</button> : null;
@@ -1646,8 +1656,18 @@
 				} else if(modal.name == 'Whisper') {
 					name+=' - '+modal.id;
 				}
+				var dropdown = null;
+				if(!this.props.socketroom && roomable.indexOf(this.props.modal.name) > -1 && Object.keys(this.props.settings.rooms).length){
+					var options = [<option key={0}>None</option>];
+					var ind = 1;
+					Object.keys(this.props.settings.rooms).forEach(function(roomname){
+						options.push(<option key={ind}>{roomname}</option>);
+						ind++;
+					});
+					dropdown = (<select className="room" ref={'roomlist'} style={{whiteSpace: 'nowrap'}}>{options}</select>);
+				}
 				return(
-					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span><br/>
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag}><span className="mtitle">{name}</span>{dropdown}<br/>
 					<textarea defaultValue={modal.post || ''} autoFocus style={{resize: 'none', width:'100%', height:'auto'}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
 					<button ref='Send' type="submit" onClick={this.post}>OK</button><button ref='Cancel' onClick={this.closeCheck}>{this.props.modal.name == 'Set Profile' ? 'Close' : 'Cancel'}</button><input title="Check this to disable sending messages on Enter." type="checkbox" ref="toggle" defaultChecked={this.props.settings.echeck || false}/><img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/> {previewButton}</div>
 				);
@@ -1685,6 +1705,7 @@
 				var win = this.refs['win'].textContent;
 				var deriv = null;
 				var un = false;
+				var room = this.refs['roomlist'] && this.refs['roomlist'].value != 'None' ? this.refs['roomlist'].value : null;
 				if(win != 'IC'){
 					if(name == 'Unnamed'){
 						name = 'Unnamed '+win+' Action';//omit or test
@@ -1697,7 +1718,6 @@
 				if(post && this.state.id && !this.state.wait){//find the right id
 					var did = this.state.id.id;
 					var trueid = this.props.verifyID(modata.charid, modata.id, modata.icpos);
-					var room = null;
 					if(trueid){
 						deriv = this.props.characters[trueid[0]][trueid[1]][did];
 						if(modata.name != 'Full Edit'){
@@ -1809,8 +1829,10 @@
 				}
 			},
 
-			focus: function(){
-				this.refs.text.focus();
+			focus: function(e){
+				if(e.target.className != 'room'){//messes up the dropdown otherwise.
+					this.refs.text.focus();
+				}
 			},
 
 			minimize: function(){
@@ -1877,8 +1899,18 @@
 						return(<img key={i3} id={i3} src='/faceicons/img_trans.gif' height='50px' width='50px' style={{backgroundImage: 'url(/faceicons/'+deriv.icon+'.png)', backgroundPosition: '-'+deriv.icpos.left+'px -'+deriv.icpos.top+'px'}}/>);
 					}
 				});//grab the derivatives in here
+				var dropdown = null;
+				if(!this.props.socketroom && this.props.modal.name != 'Full Edit' > -1 && Object.keys(this.props.settings.rooms).length){
+					var options = [<option key={0}>None</option>];
+					var ind = 1;
+					Object.keys(this.props.settings.rooms).forEach(function(roomname){
+						options.push(<option key={ind}>{roomname}</option>);
+						ind++;
+					});
+					dropdown = (<select className="room" ref={'roomlist'} style={{whiteSpace: 'nowrap', right: 18}} onClick={null}>{options}</select>);
+				}
 				return(
-					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag} onClick={this.focus}><span className="mtitle">{name}</span><span onClick={this.minimize} style={{position: 'absolute', right:0, top: 0, cursor: "default"}}>[-]</span><br/>
+					<div ref="this" className="modal" style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag} onClick={this.focus}><span className="mtitle">{name}</span>{dropdown}<span onClick={this.minimize} style={{position: 'absolute', right:0, top: 0, cursor: "default"}}>[-]</span><br/>
 					<div ref="img" onClick={this.select} style={{height: imgheight, maxWidth:'100%', background: 'none'}}>{images}</div><br/>
 					<div style={{width: '100%', whiteSpace: 'nowrap', background:'none'}}><span ref="prev" className="mtitle" style={{fontWeight: 'bold', width:'auto', padding: '2px 5px 0px 0px', background: 'none'}}/><span ref='win' style={{width:'auto', paddingRight: '5px', background: 'none'}} className='Command' onClick={this.toggle}>{this.state.win}</span><span ref='type' style={{width:'auto', background: 'none'}} className='Command' onClick={this.toggle}>{this.state.pt}</span>{pm}</div><br/>
 					<textarea defaultValue={this.state.post || ''} autoFocus style={{resize: 'none', width:'100%', height:hei, minHeight:32}} ref={'text'} onKeyDown={this.enterCheck}></textarea><br/>
@@ -1891,10 +1923,19 @@
 		var NotificationModal = React.createClass({
 			getInitialState: function(){
 				var not = [{name: '', OOC: false, IC: false}];
-				if(this.props.settings.notify){//notify is an object with usernames mapped to objects with OOC and IC
-					var notify = this.props.settings.notify
-					var not = Object.keys(notify).map(function(username){
-						return {name: username, OOC: notify[username].OOC, IC: notify[username].IC};
+				var list = null;
+				if(this.props.modal.name == 'Set Notifications' && this.props.settings.notify){//notify is an object with usernames mapped to objects with OOC and IC
+					list = this.props.settings.notify;
+				} else if(this.props.modal.name == 'Set Rooms' && Object.getOwnPropertyNames(this.props.settings.rooms).length) {//rooms are too, now.
+					if(this.props.settings.rooms[Object.keys(this.props.settings.rooms)[0]][0]){//any old lingering rooms, which were arrays, must be purged.
+						this.props.settings.rooms = {};
+					} else {//we test this by seeing if the room key has anything in it besides OOC and IC, by checking the first index of its array.
+						list = this.props.settings.rooms;
+					}
+				}
+				if(list){
+					not = Object.keys(list).map(function(entry){
+						return {name: entry, OOC: list[entry].OOC, IC: list[entry].IC};
 					});
 				}
 				return {x: '25%', y: '25%', notify: not.slice()};//not an anti-pattern for this use case.
@@ -1941,8 +1982,14 @@
 						ret[note.name] = {OOC: note.OOC, IC: note.IC};
 					}
 				});
-				this.props.settings.notify = ret;
-				this.props.handleSettings(this.props.settings, this.props.characters);
+				if(this.props.modal.name == 'Set Notifications'){
+					this.props.settings.notify = ret;
+					this.props.handleSettings(this.props.settings, this.props.characters);
+				} else if(this.props.modal.name == 'Set Rooms') {
+					this.props.socket.emit('Set Rooms', Object.keys(ret), Object.keys(this.props.settings.rooms));
+					this.props.settings.rooms = ret;
+					this.props.handleSettings(this.props.settings, this.props.characters);
+				}
 				this.props.closeModal(this.props.id);
 			},
 
@@ -2029,7 +2076,7 @@
 					} else {
 						this.props.socket.emit('Show '+type, res);
 					}
-				} else if(type == 'Notifications'){
+				} else if(type == 'Notifications' || type == 'Rooms'){
 					this.props.modalpush({id: [], name: name, type: 'notifications'});
 				} else if(type == 'Public'){
 					this.props.modalpush({id: [], name: 'Input full Discord ID#', type: 'action'});
@@ -2195,10 +2242,11 @@
 							</div>);
 						break;
 					case 'commands'://case for player commands tab
-						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglembut}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.save}>Save Data</div>, <div key='3' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='4' className='Command' onClick={function(e){window.open(that.props.socketroom ? '/logs/'+that.props.socketroom : '/logs');}}>Open Logs</div>, <div key='5' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='6' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='7' className='Command' onClick={this.genmodal}>Narrate</div>,<div key='8' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='9' className='Command' onClick={this.show}>Show Rules</div>, <div key='10' className='Command' onClick={this.show}>Show MOTD</div>, <div key='11' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='12' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='13' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						currenttab=[<div key='0' className='Command' onClick={this.toggleecheck}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglembut}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.save}>Save Data</div>, <div key='3' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='4' className='Command' onClick={function(e){window.open(that.props.socketroom ? '/logs/'+that.props.socketroom : '/logs');}}>Open Logs</div>, <div key='5' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='6' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='7' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='8' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='10' className='Command' onClick={this.show}>Show Rules</div>, <div key='11' className='Command' onClick={this.show}>Show MOTD</div>, <div key='12' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='13' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='14' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+						if(!this.props.socketroom){currenttab.splice(9, 0, (<div key='9' className='Command' onClick={this.genmodal}>Set Rooms</div>));}
 						var that = this;
 						this.props.settings.dice.forEach(function(dice, index){
-							currenttab.push(<div key={14+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
+							currenttab.push(<div key={15+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
 						});
 						currenttab = (<div className="charlist">
 							{currenttab}
@@ -2295,11 +2343,13 @@
 
 			render: function(){
 				var message = this.props.message;
+				var socketroom = this.props.socketroom;
 				var character = message.character;//worst case it's just null and then it won't be getting used anyway.
 				var classparam = message.className.split(" ")[1];
+				var room = (!socketroom && message.room && message.room != '0') ? '['+message.room+']' : null;
 				switch(classparam){
 					case 'message'://ooc message
-						return (<div id={message.username} className={message.className}>( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> ){'\r'}</div>);
+						return (<div id={message.username} className={message.className}>{room}( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> ){'\r'}</div>);
 					case 'whisper'://ooc whisper
 						if(message.username){
 							return (<div id={message.username} className={message.className}>( <b>{message.username+' whispered to you: '}</b><span ref="post"></span> ){'\r'}</div>);
@@ -2307,13 +2357,13 @@
 							return (<div className={message.className}>( <b>{'You whispered to '+message.target+': '}</b><span ref="post"></span> ){'\r'}</div>);
 						}
 					case 'narration'://ic narration message
-						return (<div id={message.id} data={message.username} className={message.className}><br/><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
+						return (<div id={message.id} data={message.username} className={message.className}>{room}<br/><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
 					case 'dice'://ooc dice message
-						return (<div className={message.className}><span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
+						return (<div className={message.className}>{room}<span ref="post" style={{color: message.color}}></span>{'\r'}</div>);
 					case 'log':
-						return (<div className={message.className}>{"| "+message.username+" "+message.post+" |"}{'\r'}</div>);
+						return (<div className={message.className}>{room}{"| "+message.username+" "+message.post+" |"}{'\r'}</div>);
 					case 'system'://just the post itself.
-						return (<div className={message.className}><span ref="post"></span>{'\r'}</div>);
+						return (<div className={message.className}>{room}<span ref="post"></span>{'\r'}</div>);
 					case 'say'://fallthrough
 					case 'action':
 						var charid = character.id.split('-');
@@ -2322,7 +2372,7 @@
 						var edit = [];
 						if(message.id){edit.push(character.id);}//worst case message.id is undefined
 						//if(!message.className.startsWith('O') && !message.className.startsWith('T')){edit.push('Narrate');}//IC post
-						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><a href={'/characters/'+charid+'/'+d+'.html'} target="_blank"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/></a> <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
+						return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><a href={'/characters/'+charid+'/'+d+'.html'} target="_blank"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/></a>{room} <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
 				}
 			}
 		});
@@ -2357,6 +2407,12 @@
 			componentDidMount: function(){
 				var that = this;
 				this.props.socket.on('ICmessage', function(message){
+					if(!that.props.socketroom && message.room && message.room != '0'){//it's from a room.
+						//if it doesn't have the IC flag set, drop the post.
+						if(!that.props.rooms[message.room] || !that.props.rooms[message.room].IC){
+							return;
+						}
+					}
 					var newm = that.state.messages.slice();
 					var ids = that.state.ids;
 					ids[message.id] = newm.length;//index this post to its id
@@ -2376,7 +2432,7 @@
 							}
 						}
 					}
-					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
+					newm.push(<Message key={newm.length} message={message} highlight={highlight} socketroom={that.props.socketroom}/>);
 					that.setState({messages: newm, ids: ids});
 				});
 
@@ -2458,6 +2514,12 @@
 			componentDidMount: function(){
 				var that = this;
 				this.props.socket.on('OOCmessage', function(message){
+					if(!that.props.socketroom && message.room && message.room != '0'){//it's from a room.
+						//if it doesn't have the OOC flag set, drop the post.
+						if(!that.props.rooms[message.room] || !that.props.rooms[message.room].OOC){
+							return;
+						}
+					}
 					var newm = that.state.messages.slice();
 					var highlight = false;
 					if((message.className.split(" ")[1] == 'whisper' && message.username) || (message.character && that.props.notify && ((that.props.notify[message.username] && that.props.notify[message.username].OOC) || (message.character && that.props.notify[message.character.name] && that.props.notify[message.character.name].OOC)))){
@@ -2467,7 +2529,7 @@
 							document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
 						}
 					}
-					newm.push(<Message key={newm.length} message={message} highlight={highlight}/>);
+					newm.push(<Message key={newm.length} message={message} highlight={highlight} socketroom={that.props.socketroom}/>);
 					that.setState({messages: newm});
 				});
 				this.props.socket.on('disconnect', function(){
