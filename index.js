@@ -563,6 +563,9 @@ var removePlayer = function(username, socketroom){
 		delete playercheck[username];
 		console.log(username+' has disconnected.');
 	}
+	if(socketroom != '0' && users[username] && users[username]['0'] && users[username]['0'].rooms[socketroom]){//don't remove from playerlist if main room is connected.
+		return;
+	}
 	if(playerlist[socketroom]){
 		if(playerlist[socketroom][username]){
 			delete playerlist[socketroom][username];
@@ -751,7 +754,7 @@ var commands = {//console command list, formatted this way for convenience.
 						if (!playerlist.hasOwnProperty(room)) continue;
 						if(playerlist[room][name]){//any room where the user is connected
 							playerlist[room][name].permissions = level;
-							io.to(room).emit('PlayerList', playerlist[room]);
+							io.to(room).emit('PlayerList', playerlist[room], room);
 						}
 					}
 					if(playercheck[name]){
@@ -897,6 +900,29 @@ var CheckUser = function(username, minimumPermission, muteusable, socket){
 	return true;//If we're here, username is present, muteusable is true (the command can be used even when muted), and it requires no permissions.
 };
 
+var Roomer = function(socket, user, room, permissions, join){
+	if(join){
+		if(!playerlist[room]){playerlist[room]={};}
+		playerlist[room][user] = {permissions: permissions};
+		socket.join(room);
+		io.to(room).emit('PlayerList', playerlist[room], room);
+	} else {
+		if(playerlist[room]){
+			if(playerlist[room][user]){
+				delete playerlist[room][user];
+				io.to(room).emit('PlayerList', playerlist[room], room);
+				if(socket){
+					socket.leave(room);
+				}
+			} else {
+				console.log(user+' not found in room '+room+' when expected for removal.');
+			}
+		} else {
+			console.log('Room '+room+' not found when expected for player removal.');
+		}
+	}
+};
+
 var Setconnections = function(socket, user, sroom){//username will definitely be present or something is wrong enough to warrant throwing.
 	var username = user;
 	var socketroom = sroom;
@@ -904,11 +930,11 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	socket.on('Set Rooms', function(rooms, oldrooms){
 		var result = rooms.filter(function(i) {return oldrooms.indexOf(i) < 0;});//everything in rooms that isn't in oldrooms needs to be joined
 		result.forEach(function(element){
-			socket.join(element);
+			Roomer(socket, username, element, playercheck[username].permissions, true);
 		});
 		var result = oldrooms.filter(function(i) {return rooms.indexOf(i) < 0;});//everything in oldrooms that isn't in rooms needs to be left
 		result.forEach(function(element){
-			socket.leave(element);
+			Roomer(socket, username, element, playercheck[username].permissions, false);
 		});
 	});
 	socket.on('OOCmessage', function(message, color){
@@ -932,17 +958,20 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			toLog(msg, sendroom);
 		}
 	});
-	socket.on('Whisper', function(message, target){
-		if(username && users[target] && users[target][socketroom]){//if they logged out midwhisper or they send an invalid one somehow we need to stop that.
-			message = processHTML(message);
-			socket.emit('OOCmessage', {className: 'OOC whisper', target: target, post:message});
-			users[target][socketroom].emit('OOCmessage', {className: 'OOC whisper', username: username, post: message});
+	socket.on('Whisper', function(message, target, room){
+		if(username && users[target]){//if the user cannot be found, do not attempt.
+			var sendroom = users[target][socketroom] ? socketroom : (room || '0');//if they're in the same room, try this first, then room data, then the default room.
+			if(users[target][sendroom]){//if the sendroom still is not a room they're in, stop.
+				message = processHTML(message);
+				socket.emit('OOCmessage', {className: 'OOC whisper', target: target, post: message});
+				users[target][sendroom].emit('OOCmessage', {className: 'OOC whisper', username: username, post: message, room: socketroom});
+			}
 		}//no logging, OBVIOUSLY. What's an admin window?
 	});
 	socket.on('AFK', function(on){
 		if(playerlist[socketroom] && playerlist[socketroom][username] && on != playerlist[socketroom][username].afk){
 			playerlist[socketroom][username].afk = on;
-			io.to(socketroom).emit('PlayerList', playerlist[socketroom]);
+			io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);
 		}
 	});
 	socket.on('Dice', function(dice, result, color, priv){
@@ -1218,11 +1247,19 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		}
 	});
 	socket.on('disconnect', function(){
+		if(socketroom == '0'){//remove from all the rooms we're in.
+			for (var room in playerlist){
+				if (!playerlist.hasOwnProperty(room) || room == '0') continue;
+				if(playerlist[room][username]){//any room where the user is connected
+					Roomer(null, username, room, playercheck[username].permissions, false);
+				}
+			}
+		}
 		removePlayer(username, socketroom);
 		var msg = {className: 'OOC log message', username: username, post: "has logged off", room: socketroom}
 		io.to(socketroom).emit('OOCmessage', msg);
 		toLog(msg, socketroom);
-		io.to(socketroom).emit('PlayerList', playerlist[socketroom]);
+		io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);
 	});
 	socket.on('save', function(settings, ret){
 		if(username){
@@ -1317,13 +1354,13 @@ io.on('connection', function(socket){
 									if(roomname == '0'){//if we're in the main room, we join other rooms to listen.
 										Object.keys(info.settings.rooms).forEach(function(room){
 											if(typeof room === 'string'){
-												socket.join(room);
+												Roomer(socket, username, room, logins[username].permissions, true);
 											}
 										});
 									}
 									var msg = {className: 'OOC log message', username: username, post: "has logged on", room: roomname};
 									io.to(roomname).emit('OOCmessage', msg);
-									io.to(roomname).emit('PlayerList', playerlist[roomname]);
+									io.to(roomname).emit('PlayerList', playerlist[roomname], roomname);
 									if(!room){
 										if(serversettings.rules){
 											socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
@@ -1374,7 +1411,7 @@ io.on('connection', function(socket){
 											callback(userdefaults);
 											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
 											io.to('0').emit('OOCmessage', msg);
-											io.to('0').emit('PlayerList', playerlist['0']);
+											io.to('0').emit('PlayerList', playerlist['0'], '0');
 											if(serversettings.rules){
 												socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
 											}

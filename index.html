@@ -25,6 +25,11 @@
 				overflow-y: auto;
 				height: calc(100% - 54px);
 			}
+			div.playlist{
+				flex-grow: 1;
+				overflow-y: auto;
+				height: calc(100% - 54px);
+			}
 			div.character{
 				padding: 5 0 5 0;
 			}
@@ -485,10 +490,16 @@
 				//If split.js ever breaks on me I'll probably code the sliders based on it instead of dealing with it including that bug, but it isn't worth the effort right now.
 				document.getElementById('left').style.width = "calc(25% - 5px)";
 				document.getElementById('OI').style.width = "calc(75% - 5px)";
-				this.props.socket.on('PlayerList', function(players){
-					var ret = {players: players};
-					if(players[that.state.username]){ret.permissions = players[that.state.username].permissions;}
-					that.setState(ret);
+				this.props.socket.on('PlayerList', function(players, room){
+					var ret = null;
+					if(room == '0' || room == that.state.socketroom){//only update if it's from the right room
+						ret = {players: players};
+						if(players[that.state.username]){ret.permissions = players[that.state.username].permissions;}
+					} else if(room && !that.state.socketroom){//playerlist from a Set Rooms listen
+						ret = {roomplayers: that.state.roomplayers || {}};
+						ret.roomplayers[room] = players;
+					}
+					if(ret){that.setState(ret);}
 				});
 				this.props.socket.on('UserDataUpdate', function(data){
 					data = JSON.parse(data);
@@ -772,6 +783,7 @@
 						//fallthrough
 					case 'Whisper':
 						newmodal.id = id.join(',');//doesn't harm edit as long as you make modata.id[0] into modata.id there, it should only be one number
+						newmodal.data = this.state.context.target.getAttribute('data');
 						//fallthrough
 					case 'Say':
 						//fallthrough
@@ -884,7 +896,7 @@
 						<ModalHandler socket={this.props.socket} handleSettings={this.handleSettings} setUser={this.setUser} modal={this.state.modal} closeModal={this.closeModal} characters={this.state.characters} settings={this.state.settings} socketroom={this.state.socketroom}/>
 						{context}
 						<div id="left">
-							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} modalpush={this.modalpush} permissions={this.state.permissions} systemmessage={this.refs.OOCbox ? this.refs.OOCbox.systemmessage : null} contextMenu={this.contextMenu} socketroom={this.state.socketroom}/>
+							<ChartabHandler socket={this.props.socket} handleSettings={this.handleSettings} characters={this.state.characters} settings={this.state.settings} players={this.state.players} roomplayers={this.state.roomplayers} modalpush={this.modalpush} permissions={this.state.permissions} systemmessage={this.refs.OOCbox ? this.refs.OOCbox.systemmessage : null} contextMenu={this.contextMenu} socketroom={this.state.socketroom}/>
 						</div>
 						<div id="OI">
 							<div id="IC">
@@ -1570,7 +1582,7 @@
 							this.props.socket.emit('ICedit', post, modata.id);
 						}
 					} else if(modata.name == 'Whisper'){
-						this.props.socket.emit('Whisper', post, modata.id);
+						this.props.socket.emit('Whisper', post, modata.id, modata.data);
 					} else if(modata.name == 'Narrate'){
 						var that = this;
 						var to = setTimeout(this.unWait, 1000);
@@ -2237,7 +2249,19 @@
 						currenttab = Object.keys(players).map(function(player, index){
 							return (<div id={player} key={index} className='PLentry'>{players[player].afk ? '(AFK) ' : ''}{player + ' - ' + players[player].permissions}{menu}</div>);
 						});
-						currenttab = (<div className="charlist">
+						var ind = currenttab.length;
+						if(this.props.roomplayers){
+							var roomplayers = this.props.roomplayers;
+							var test = Object.keys(roomplayers).forEach(function(room){
+								if(that.props.settings.rooms && that.props.settings.rooms[room] && Object.keys(roomplayers[room]).length){//don't list empty rooms or rooms we've left.
+									currenttab.push(<h3 key={ind++} style={{pointerEvents:'none', textAlign:'center'}}>-<br/>{room}<br/>-</h3>);
+									Object.keys(roomplayers[room]).forEach(function(player){
+										currenttab.push(<div id={player} data={room} key={ind++} className='PLentry'>{roomplayers[room][player].afk ? '(AFK) ' : ''}{player + ' - ' + roomplayers[room][player].permissions}{menu}</div>);
+									});
+								}
+							});
+						}
+						currenttab = (<div className="playlist">
 							{currenttab}
 							</div>);
 						break;
@@ -2248,7 +2272,7 @@
 						this.props.settings.dice.forEach(function(dice, index){
 							currenttab.push(<div key={15+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
 						});
-						currenttab = (<div className="charlist">
+						currenttab = (<div className="playlist">
 							{currenttab}
 							</div>);
 						break;
@@ -2271,7 +2295,7 @@
 							});
 							currenttab.push(charlist);
 						}
-						currenttab = (<div className="charlist">
+						currenttab = (<div className="playlist">
 							{currenttab}
 							</div>);
 				}
@@ -2349,10 +2373,10 @@
 				var room = (!socketroom && message.room && message.room != '0') ? '['+message.room+']' : null;
 				switch(classparam){
 					case 'message'://ooc message
-						return (<div id={message.username} className={message.className}>{room}( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> ){'\r'}</div>);
+						return (<div id={message.username} data={message.room} className={message.className}>{room}( <b>{message.username+': '}</b><span ref="post" style={{color: message.color}}></span> ){'\r'}</div>);
 					case 'whisper'://ooc whisper
 						if(message.username){
-							return (<div id={message.username} className={message.className}>( <b>{message.username+' whispered to you: '}</b><span ref="post"></span> ){'\r'}</div>);
+							return (<div id={message.username} data={message.room} className={message.className}>( <b>{message.username+' whispered to you: '}</b><span ref="post"></span> ){'\r'}</div>);
 						} else if(message.target){
 							return (<div className={message.className}>( <b>{'You whispered to '+message.target+': '}</b><span ref="post"></span> ){'\r'}</div>);
 						}
