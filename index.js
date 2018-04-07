@@ -352,6 +352,8 @@ var toLog = function (message, room){
 			break;
 		case 'narration':
 			generateNarration(logmsg, message.username, message.post, message.color, room);
+		case 'dice':
+			generateDice(logmsg, message.username, message.post, message.color, room);
 	}
 	htm.body.appendChild(logmsg);
 	var br = htm.createElement('br');
@@ -477,7 +479,15 @@ var generateNarration = function (message, username, post, color, room){
 	cur.style.color = color;
 	cur.innerHTML = post;
 	message.appendChild(cur);
-}
+};
+
+var generateDice = function (message, username, post, color, room){
+	var htm = logfiles[room].htm;
+	cur = htm.createElement('b');//should be bolded for consistency
+	cur.style.color = color;
+	cur.textContent = ' '+post;
+	message.appendChild(cur);
+};
 
 var generatePost = function (message, username, post, character, say, omit, unnamed, room){
 	var htm = logfiles[room].htm;
@@ -981,12 +991,13 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 				var total = result.reduce(function(a,b){return a+b;});
 				post +=' ('+total+')';
 			}
-			var msg = {className: 'OOC dice', post: post, color: color, room: socketroom};
+			var msg = {className: 'OOC dice', post: post, color: color, username: username, room: socketroom};
 			if(priv || playercheck[username].muted){
 				msg.post = msg.post + ' (Private)';
 				socket.emit('OOCmessage', msg);
 			} else {
 				io.to(socketroom).emit('OOCmessage', msg);
+				toLog(msg, socketroom);
 			}
 		}
 	});
