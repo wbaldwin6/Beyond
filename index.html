@@ -1301,8 +1301,8 @@
 				var trueid;
 				var name;
 				if(modal.id.length == 1){//new character
-					nameColor = '#ffffff';
-					color = '#ffffff';
+					nameColor = this.props.settings.textcolor || '#ffffff';
+					color = this.props.settings.textcolor || '#ffffff';
 					fontStyle = 'Times New Roman';
 					customHTML = '';
 					textHTML = '';

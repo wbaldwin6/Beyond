@@ -1,6 +1,6 @@
 {
   "name": "beyond",
-  "version": "0.2.31",
+  "version": "0.2.32",
   "description": "A chat program for roleplaying, to support multiple characters, actions, and expressions.",
   "main": "index.js",
   "scripts": {
