@@ -308,7 +308,7 @@ openLog(logfile, '0');
 
 var userdefaults = {
 	settings: {
-		textcolor: 'white',
+		textcolor: '#ffffff',
 		characterIDs: 0,
 		dice: [],
 		rooms: {},
