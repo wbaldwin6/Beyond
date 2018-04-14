@@ -352,6 +352,7 @@ var toLog = function (message, room){
 			break;
 		case 'narration':
 			generateNarration(logmsg, message.username, message.post, message.color, room);
+			break;
 		case 'dice':
 			generateDice(logmsg, message.username, message.post, message.color, room);
 	}
