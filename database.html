@@ -309,7 +309,7 @@
 				}
 				var searchButton = <button key="SearchButton" onClick={this.OpenSearchModal} disabled={this.state.modal ? true : false} style={{zIndex: "500", position: "fixed", left: "0px", bottom: "0px"}}>Search</button>;
 				var toggleNamesButton = <button key="ToggleNames" onClick={this.ToggleNames} style={{zIndex: "500", position: "fixed", left: "54px", bottom: "0px"}}>Toggle Names</button>
-				var loginButton = <button key="LoginButton" onClick={this.AttemptLogin} style={{zIndex: "500", position: "fixed", left: "160px", bottom: "0px"}}>Login</button>
+				var loginButton = <button key="LoginButton" onClick={this.AttemptLogin} disabled={this.state.modal ? true : false} style={{zIndex: "500", position: "fixed", left: "160px", bottom: "0px"}}>Login</button>
 				var status = (<div ref="statusbar" key="LoginStatus" id="LoginStatus" className="mtitle" style={{height: "18px"}}>Login: {this.state.loginState}</div>);
 				var dir = (<div key="Directory" id="Directory" style={{height: "calc(100% - 20px)", overflowY: "auto"}}>{status}<DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} order={this.state.directory.order} parents={[]} /></div>);
 				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
@@ -530,7 +530,7 @@
 			
 			CleanContent: function() {
 				var content = this.refs.textArea.value;
-				content = content.replace(/\r\n?|\n(?!([^<]+)?>)(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />");
+				content = content.replace(/\r\n?|\n(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />");
 				return content;
 			},
 

@@ -9,6 +9,8 @@ var sanitizeHtml = require('sanitize-html');
 var database = require('./database');
 var cp = require('child_process');
 
+const lineBreakHelper = /\r\n?|\n(?!([^<]+)?(<\/style>|<\/script>))/g;
+
 //Set up the search request for the logs
 app.get('/logs/search/:search', function(req, res) {
 	var stringToFind = req.params.search;
@@ -132,6 +134,10 @@ app.get('/worldinfo', function(req, res){
 
 app.get('/idle.js', function(req, res){
 	res.sendFile(__dirname + '/idle.js');
+});
+
+app.get('/client.js', function(req, res){
+	res.sendFile(__dirname + '/client.js');
 });
 
 app.get('/database', function(req, res){
@@ -1180,7 +1186,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			var dirmessage = '/characters/'+encodeURIComponent(n)+'/'+d+'.html';
 			var dir = './characters/'+n+'/'+d+'.html';
 			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dirmessage+'" target="_blank">here.</a>'+'</font>'};
-			fs.writeFile(dir, profile.replace(/\r\n?|\n(?!([^<]+)?>)(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />"), function(err){
+			fs.writeFile(dir, profile.replace(lineBreakHelper, "<br />"), function(err){
 				if(err){console.log(err);} else {socket.emit('OOCmessage', msg);}
 			});
 			if(username != n && playercheck[username].permissions == 'Admin'){
@@ -1224,7 +1230,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	});
 	socket.on('Edit Default Profile', function(message){
 		if(CheckUser(username, 'Admin', true, socket)){
-			serversettings.profile = message.replace(/\r\n?|\n(?!([^<]+)?>)(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />");//no HTML checking here
+			serversettings.profile = message.replace(lineBreakHelper, "<br />");//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Default Profile', null);}
@@ -1234,7 +1240,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	socket.on('Edit World Info', function(message){
 		if(CheckUser(username, 'Admin', true, socket)){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
-			fs.writeFile('worldinfo.html', message.replace(/\r\n?|\n(?!([^<]+)?>)(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />"), function(err){
+			fs.writeFile('worldinfo.html', message.replace(lineBreakHelper, "<br />"), function(err){
 				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit World Info', null);}
 			});
 		}

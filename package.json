@@ -1,6 +1,6 @@
 {
   "name": "beyond",
-  "version": "0.2.32",
+  "version": "0.2.4",
   "description": "A chat program for roleplaying, to support multiple characters, actions, and expressions.",
   "main": "index.js",
   "scripts": {
@@ -14,7 +14,14 @@
     "jsdom": "^9.5.0",
     "sanitize-html": "^1.13.0",
     "socket.io": "^1.4.8",
-	"dom-parser": "^0.1.5",
-	"promise": "^8.0.1"
+    "dom-parser": "^0.1.5",
+    "promise": "^8.0.1"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-minify": "^0.4.0",
+    "babel-plugin-transform-react-jsx": "^6.24.1",
+    "babel-preset-minify": "^0.4.0",
+    "babel-preset-react": "^6.24.1"
   }
 }
