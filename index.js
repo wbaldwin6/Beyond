@@ -328,7 +328,14 @@ var userdefaults = {
 var toLog = function (message, room){
 	var today = new Date();
 	//only use logfiles[room].htm after this check
-	if(!logfiles[room] || logday(today, room) != logfiles[room].lname){//file unopened or from yesterday
+	if(!logfiles[room]){//file unopened
+		openLog(logday(today, room), room);
+	} else if(logday(today, room) != logfiles[room].lname){//file from yesterday
+		if(!logfiles[room].dirty){//room has had no dirtying posts
+			fs.unlink(logfiles[room].lname, function(err){
+				if(err){console.log(err);}
+			});//no real harm if it fails at this point as we'll no longer write to it.
+		}
 		openLog(logday(today, room), room);
 	}
 	var htm = logfiles[room].htm;//the file has been opened or created by this point.
@@ -343,6 +350,7 @@ var toLog = function (message, room){
 	ts.textContent = '['+message.username+' '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 	logmsg.appendChild(ts);
 	var classparam = message.className.split(" ")[1];
+	if(!logfiles[room].dirty && classparam != 'log'){logfiles[room].dirty = true;}//posts other than logins are present and this hasn't been set yet.
 	switch(classparam){
 		case 'message':
 			generateOOCmessage(logmsg, message.username, message.post, message.color, room);
@@ -807,6 +815,13 @@ var commands = {//console command list, formatted this way for convenience.
 		});
 	},
 	"Shutdown": function(name){//Self-explanatory.
+		Object.keys(logfiles).forEach(function(room){
+			if(!logfiles[room].dirty){//room has had no dirtying posts
+				fs.unlink(logfiles[room].lname, function(err){
+					if(err){console.log(err);}
+				});//no real harm if it fails at this point as we'll no longer write to it.
+			}
+		});
 		console.log("Shutting down now.");
 		process.exit();
 	},
@@ -1341,110 +1356,101 @@ io.on('connection', function(socket){
 	if(serversettings.title){
 		socket.emit('Title', serversettings.title);
 	}
-	socket.on('login', function(username, password, room, callback){
-		if(username.endsWith(' ')){
-			callback("Please do not end your username with a space.");
-			return;
-		}
+	socket.on('disconnectall', function(username, password, callback){
+		if(username.endsWith(' ')){callback("Please do not end your username with a space."); return;}
 		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){callback(err);} else {
-				logins = JSON.parse(logins);
-				var roomname = '0';
-				if(room && typeof room === 'string'){
-					roomname = room;
-				}
-				if(logins[username]){//valid username
-					if(users[username] && users[username][roomname]){//already on the list?
-						callback("User already logged in!");
-					} else if(logins[username].password == password){//valid login
-						addPlayer(username, socket, logins[username].permissions, logins[username].muted, roomname);
-						if(banlist.users[username]){//this is so mean.
-							commands['Ban'](username);
-							callback("You're still banned.");
-						} else {
-							//pull up user info
-							fs.readFile('./saves/'+username+'.json', 'utf8', function (err, info){
-								if(err){callback(err);} else {
-									socket.join(roomname);
-									setImmediate(function() {Setconnections(socket, username, roomname);});
-									info = JSON.parse(info);
-									callback(info);
-									if(roomname == '0'){//if we're in the main room, we join other rooms to listen.
-										Object.keys(info.settings.rooms).forEach(function(room){
-											if(typeof room === 'string'){
-												Roomer(socket, username, room, logins[username].permissions, true);
-											}
-										});
-									}
-									var msg = {className: 'OOC log message', username: username, post: "has logged on", room: roomname};
-									io.to(roomname).emit('OOCmessage', msg);
-									io.to(roomname).emit('PlayerList', playerlist[roomname], roomname);
-									if(!room){
-										if(serversettings.rules){
-											socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
-										}
-										if(serversettings.motd){
-											socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
-										}
-									}
-									toLog(msg, roomname);
-								}
-							});
-						}
-					} else {//invalid login
-						callback("Password does not match the given username.");
-					}
-				} else {//invalid username
-					callback(username+" is not in our list yet.");
-				}
+			if(err){callback(err); return;}
+			logins = JSON.parse(logins);
+			if(!logins[username]){callback(username+" is not in our list yet."); return;}
+			if(!users[username]){callback(username+" is not logged in."); return;}
+			if(logins[username].password != password){callback("Password does not match the given username."); return;}
+			//if all conditions are true, they have permission and reason to disconnect.
+			disconnectall(users[username]);
+			if(users[username]){delete users[username];}//if all else fails, make sure they can login.
+		});
+	});
+	socket.on('login', function(username, password, room, callback){
+		if(username.endsWith(' ')){callback("Please do not end your username with a space."); return;}
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){callback(err); return;}
+			logins = JSON.parse(logins);
+			var roomname = '0';
+			if(room && typeof room === 'string'){
+				roomname = room;
 			}
+			if(!logins[username]){callback(username+" is not in our list yet."); return;}//invalid username
+			if(users[username] && users[username][roomname]){callback("User already logged in!"); return;}//already on the list?
+			if(logins[username].password != password){callback("Password does not match the given username."); return;}//invalid login
+			addPlayer(username, socket, logins[username].permissions, logins[username].muted, roomname);
+			if(banlist.users[username]){//this is so mean.
+				commands['Ban'](username);
+				callback("You're still banned.");
+				return;
+			}
+			//pull up user info
+			fs.readFile('./saves/'+username+'.json', 'utf8', function (err, info){
+				if(err){callback(err); return;}
+				socket.join(roomname);
+				setImmediate(function() {Setconnections(socket, username, roomname);});
+				info = JSON.parse(info);
+				callback(info);
+				if(roomname == '0'){//if we're in the main room, we join other rooms to listen.
+					Object.keys(info.settings.rooms).forEach(function(room){
+						if(typeof room === 'string'){
+							Roomer(socket, username, room, logins[username].permissions, true);
+						}
+					});
+				}
+				var msg = {className: 'OOC log message', username: username, post: "has logged on", room: roomname};
+				io.to(roomname).emit('OOCmessage', msg);
+				io.to(roomname).emit('PlayerList', playerlist[roomname], roomname);
+				if(!room){
+					if(serversettings.rules){
+						socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
+					}
+					if(serversettings.motd){
+						socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
+					}
+				}
+				toLog(msg, roomname);
+			});
 		});
 	});
 	socket.on('register', function(username, password, du, callback){
-		if(username.endsWith(' ')){
-			callback("Please do not end your username with a space.");
-			return;
-		}
+		if(username.endsWith(' ')){callback("Please do not end your username with a space."); return;}
 		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){callback(err);} else {
-				logins = JSON.parse(logins);
-				var loginstest = {};
-				Object.keys(logins).forEach(function(key){
-					loginstest[key.toLowerCase()] = true;
-				});//fill it with lowercased
-				if(loginstest[username.toLowerCase()]){//username in use
-					callback("Username already in use.");
-				} else {//new username
-					logins[username] = {password: password, permissions: 'Guest', muted: false};
-					fs.writeFile('./saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
-						if(!err){
-							fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-								if(!err){
-									fs.mkdir('./characters/'+username, function(err){
-										if(!err || err.code == 'EEXIST'){
-											socket.join('0');
-											setImmediate(function() {Setconnections(socket, username, '0');});
-											addPlayer(username, socket, 'Guest', false, '0'); //no registration on rooms
-											//create new user info
-											callback(userdefaults);
-											var msg = {className: 'OOC log message', username: username, post: "has logged on"};
-											io.to('0').emit('OOCmessage', msg);
-											io.to('0').emit('PlayerList', playerlist['0'], '0');
-											if(serversettings.rules){
-												socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
-											}
-											if(serversettings.motd){
-												socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
-											}
-											toLog(msg, '0');
-										} else {callback(err);}
-									});
-								} else {callback(err);}
-							});
-						} else {callback(err);}
+			if(err){callback(err); return;}
+			logins = JSON.parse(logins);
+			var loginstest = {};
+			Object.keys(logins).forEach(function(key){
+				loginstest[key.toLowerCase()] = true;
+			});//fill it with lowercased
+			if(loginstest[username.toLowerCase()]){callback("Username already in use."); return;}//username in use
+			logins[username] = {password: password, permissions: 'Guest', muted: false};
+			fs.writeFile('./saves/'+username+'.json', JSON.stringify(userdefaults), function(err){
+				if(err){callback(err); return;}
+				fs.writeFile('logins.json', JSON.stringify(logins), function(err){
+					if(err){callback(err); return;}
+					fs.mkdir('./characters/'+username, function(err){
+						if(err && err.code != 'EEXIST'){callback(err); return;}
+						socket.join('0');
+						setImmediate(function() {Setconnections(socket, username, '0');});
+						addPlayer(username, socket, 'Guest', false, '0'); //no registration on rooms
+						//create new user info
+						callback(userdefaults);
+						var msg = {className: 'OOC log message', username: username, post: "has logged on"};
+						io.to('0').emit('OOCmessage', msg);
+						io.to('0').emit('PlayerList', playerlist['0'], '0');
+						if(serversettings.rules){
+							socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Rules</u>:</b><br />'+serversettings.rules+'<br /><br />'});
+						}
+						if(serversettings.motd){
+							socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
+						}
+						toLog(msg, '0');
 					});
-				}
-			}
+				});
+			});
 		});
 	});
 });
