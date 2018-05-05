@@ -21,7 +21,7 @@
 				background-color: black;
 				cursor: default;
 			}
-			
+
 			iframe {
 				height: 100%;
 				width: 100%;
@@ -36,16 +36,16 @@
 				width: 100%;
 				height: 24px;
 			}
-			
+
 			.gutter {
 				background-color: #d3d3d3;
 			}
-			
+
 			.gutter.gutter-horizontal{
 				height: 100%;
 				cursor: ew-resize;
 			}
-			
+
 			.Red{
 				background-color:red;
 				border-color:red;
@@ -63,7 +63,7 @@
 				overflow: auto;
 				background-color: rgb(0,0,0);
 				background-color: rgba(50,50,50,0.8);
-				
+
 				cursor: default;
 				-webkit-user-select: none;
 				-moz-user-select: none;
@@ -78,7 +78,7 @@
 				-ms-user-select: none;
 				user-select: none;
 			}
-			
+
 			iframe {
 				background-color: black;
 				color: white;
@@ -87,7 +87,7 @@
 	</head>
 	<body>
 		<div id="main"></div>
-	
+
 		<script src="/socket.io/socket.io.js"></script>
 		<script src="http://www.myersdaily.org/joseph/javascript/md5.js"></script>
 		<script src="http://nathancahill.github.io/Split.js/split.js"></script>
@@ -96,7 +96,7 @@
 		<script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
 		<script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
 		<script src="https://unpkg.com/babel-core@5.8.38/browser.min.js"></script>
-		
+
 		<script type='text/babel'>
 		var socket = io('/database');
 
@@ -106,19 +106,19 @@
 			document.title = 'Database ('+message+')';
 			title = 'Database ('+message+')';
 		});
-		
+
 		//Properties: socket
 		var OuterArea = React.createClass({
 			getInitialState: function() {
 				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "", contents: {}, order: []}, page: '', openness: {}, showNames: false, loginState: 'Guest'};
 			},
-		
+
 			componentDidMount: function() {
 				var that = this;
 				Split(["#Directory", "#Content"], {minSize: [0, 0]});
 				document.getElementById('Directory').style.width = "calc(20% - 5px)";
 				document.getElementById('Content').style.width = "calc(80% - 5px)";
-				
+
 				//Initialize socket event listeners
 				this.props.socket.on('CloseModal', function() {
 					that.setState({modal: null});
@@ -154,7 +154,7 @@
 					});
 				}
 			},
-			
+
 			GetDirectoryFromPath: function(path) {
 				var ret_val = this.state.directory;
 				for(var i = 0; i < path.length; i++) {
@@ -165,17 +165,17 @@
 				}
 				return ret_val;
 			},
-			
+
 			closeContext: function(e) {
 				this.setState({context: null});
 			},
-			
+
 			AddDirectory: function(e) {
 				var path = this.state.context.path;
 				var modal = <AddDirectoryModal socket={this.props.socket} path={path} outerarea={this} />;
 				this.setState({context: null, modal: modal});
 			},
-			
+
 			AddEntry: function(e) {
 				var path = this.state.context.path;
 				var pathname = 'database/';
@@ -184,13 +184,13 @@
 				var modal = <EditEntryModal socket={this.props.socket} path={path} funcname='add' titletext={'Creating new entry in ' + pathname} outerarea={this} />;
 				this.setState({modal: modal, context: null});
 			},
-			
+
 			DeleteEntry: function(e) {
 				var path = this.state.context.path;
 				var modal = <DeleteEntryModal socket={this.props.socket} path={path} outerarea={this} />;
 				this.setState({context: null, modal: modal});
 			},
-			
+
 			EditEntry: function(e) {
 				var path = this.state.context.path;
 				var pathname = 'database';
@@ -200,7 +200,7 @@
 				var modal = <EditEntryModal socket={this.props.socket} path={path} funcname='edit' titletext={'Editing ' + pathname} outerarea={this} />;
 				this.setState({modal: modal, context: null});
 			},
-			
+
 			OpenEntry: function(e) {
 				var path = this.state.context.path;
 				var pathname = '/database';
@@ -209,32 +209,32 @@
 				window.open(pathname + '.html');
 				this.setState({context: null});
 			},
-			
+
 			MoveEntry: function(e) {
 				var modal = <MoveEntryModal socket={this.props.socket} path={this.state.context.path} outerarea={this} />;
 				this.setState({context: null, modal: modal});
 			},
-			
+
 			RenameDirectory: function(e) {
 				var modal = <RenameDirectoryModal socket={this.props.socket} path={this.state.context.path} outerarea={this} locked={this.state.context.locked} />;
 				this.setState({context: null, modal: modal});
 			},
-			
+
 			LockDirectory: function(e) {
 				var path = this.state.context.path;
 				var modal = <LockDirectoryModal socket={this.props.socket} path={path} outerarea={this} locked={this.state.context.locked} />;
 				this.setState({context: null, modal: modal});
 			},
-			
+
 			OpenSearchModal: function(e) {
 				var modal = <SearchDirectoryModal socket={this.props.socket} outerarea={this} />;
 				this.setState({context: null, modal: modal});
 			},
-			
+
 			ToggleNames: function(e) {
 				this.setState({showNames: !this.state.showNames});
 			},
-			
+
 			AttemptLogin: function(e) {
 				var modal = <LoginModal socket={this.props.socket} outerarea={this} />;
 				this.setState({context: null, modal: modal});
@@ -276,7 +276,7 @@
 				var toPath = JSON.parse(e.target.id);
 				this.props.socket.emit('DragEntry', fromPath, toPath, where);
 			},
-			
+
 			render: function() {
 				var context = null;
 				if(this.state.context) { //context should have keys x, y, path, functions; functions include AddDirectory, AddEntry, Delete, Edit
@@ -324,7 +324,7 @@
 				var openness = this.props.outerarea.state.openness;
 				return {open: path.toString() in openness ? openness[path.toString()] : false};
 			},
-			
+
 			toggleOpen: function(e) {
 				var path = this.props.parents.concat([this.props.name]);
 				var openness = this.props.outerarea.state.openness;
@@ -336,7 +336,7 @@
 					movemodal.setState({clickedDirectory: this});
 				}
 			},
-			
+
 			onContextMenu: function(e) {
 				e.preventDefault();
 				e.stopPropagation();
@@ -362,7 +362,7 @@
 				var context = {x: e.clientX, y: e.clientY, path: path, functions: funcs, locked: this.props.locked};
 				this.props.outerarea.setState({context: context});
 			},
-			
+
 			render: function() {
 				if(this.state.open) {
 					var name = <b><div draggable id={JSON.stringify(this.props.parents.concat([this.props.name]).slice(1))} className="databaseEntry" onDragStart={this.props.outerarea.entryDragStart} onClick={this.toggleOpen} onContextMenu={this.onContextMenu}>{"\xA0".repeat(this.props.parents.length*4)}{this.props.name} [&#8209;]</div></b>
@@ -393,7 +393,7 @@
 				}
 				this.props.outerarea.setState({page: pathname + encodeURIComponent(this.props.name) + ".html"});
 			},
-			
+
 			onContextMenu: function(e) {
 				e.preventDefault();
 				e.stopPropagation();
@@ -413,7 +413,7 @@
 				var context = {x: e.clientX, y: e.clientY, path: path, functions: funcnames};
 				this.props.outerarea.setState({context: context});
 			},
-			
+
 			render: function() {
 			return(<div draggable id={JSON.stringify(this.props.parents.concat([this.props.name]).slice(1))} className="databaseEntry" onDragStart={this.props.outerarea.entryDragStart} onClick={this.navigateTo} onContextMenu={this.onContextMenu}>{"\xA0".repeat(this.props.parents.length*4)}{this.props.name}{this.props.outerarea.state.showNames ? " (By " + this.props.creator + ")" : ""}</div>);
 			}
@@ -485,7 +485,7 @@
 				}
 				return {x: 100, y: 100, width: 300, height: 200, minheight: 110, minwidth: 220};
 			},
-			
+
 			OKButton: function(e) {
 				var path = this.props.path;
 				switch(this.props.funcname) {
@@ -509,7 +509,7 @@
 						break;
 				}
 			},
-			
+
 			CancelButton: function(e) {
 				if(this.refs['textArea'].value && this.refs.Cancel.className != "Red Button"){
 					this.refs.Cancel.className = "Red Button";
@@ -527,7 +527,7 @@
 				myw.document.write(frame);
 				myw.document.close();
 			},
-			
+
 			CleanContent: function() {
 				var content = this.refs.textArea.value;
 				content = content.replace(/\r\n?|\n(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />");
@@ -541,7 +541,7 @@
 					this.refs.textArea.style['outline-color'] = '';
 				}
 			},
-			
+
 			render: function() {
 				if((typeof this.state.defaultText) === "string") {
 					var titlebar = <div key='titlebar' className="mtitle">{this.props.titletext}</div>;
@@ -562,28 +562,28 @@
 					return <div className="modal" style={{display: "none"}}></div>;
 				}
 			},
-			
+
 			startDrag: startDrag,
 
 			drag: drag,
 
 			stopDrag: stopDrag
 		});
-		
+
 		var DeleteEntryModal = React.createClass({
 			getInitialState: function() {
 				return {x: 100, y: 100};
 			},
-			
+
 			YesButton: function(e) {
 				this.props.socket.emit('DeleteEntry',this.props.path);
 				this.props.outerarea.setState({modal: null});
 			},
-			
+
 			NoButton: function(e) {
 				this.props.outerarea.setState({modal: null});
 			},
-			
+
 			render: function() {
 				var filename = this.props.path[this.props.path.length-1];
 				var titlebar = <div key='titlebar' className="mtitle">{'Delete ' + filename}</div>;
@@ -596,30 +596,30 @@
 							{buttonYes}{buttonNo}
 						</div>);
 			},
-			
+
 			startDrag: startDrag,
 
 			drag: drag,
 
 			stopDrag: stopDrag
 		});
-		
+
 		var AddDirectoryModal = React.createClass({
 			getInitialState: function() {
 				return {x: 100, y: 100};
 			},
-			
+
 			OKButton: function(e) {
 				var newname = this.refs.inputName.value;
 				if(newname) {
 					this.props.socket.emit('AddDirectory', this.props.path, newname, this.props.outerarea.state.username, this.refs.checkLocked.checked);
 				}
 			},
-			
+
 			CancelButton: function(e) {
 				this.props.outerarea.setState({modal: null});
 			},
-			
+
 			render: function() {
 				var pathname = 'database/';
 				for(var i = 0; i < this.props.path.length; i++)
@@ -637,23 +637,23 @@
 							{buttonOK}{buttonCancel}
 						</div>);
 			},
-			
+
 			startDrag: startDrag,
 
 			drag: drag,
 
 			stopDrag: stopDrag
 		});
-		
+
 		var MoveEntryModal = React.createClass({
 			getInitialState: function() {
 				return {x: 100, y: 100};
 			},
-			
+
 			componentDidMount: function() {
 				this.props.outerarea.setState({movemodal: this});
 			},
-			
+
 			OKButton: function(e) {
 				var dir = this.state.clickedDirectory;
 				if(dir) {
@@ -664,11 +664,11 @@
 				}
 				this.props.outerarea.setState({movemodal: null});
 			},
-			
+
 			CancelButton: function(e) {
 				this.props.outerarea.setState({modal: null, movemodal: null});
 			},
-			
+
 			render: function() {
 				var dirname = this.props.path[this.props.path.length-1]
 				var titlebar = <div key='titlebar' className="mtitle">{'Move ' + dirname}</div>;
@@ -686,19 +686,19 @@
 							{buttonOK}{buttonCancel}
 						</div>);
 			},
-			
+
 			startDrag: startDrag,
 
 			drag: drag,
 
 			stopDrag: stopDrag
 		});
-		
+
 		var RenameDirectoryModal = React.createClass({
 			getInitialState: function() {
 				return {x: 100, y: 100};
 			},
-			
+
 			OKButton: function(e) {
 				var newname = this.refs.inputName.value;
 				var path = this.props.path;
@@ -709,11 +709,11 @@
 					this.props.socket.emit('LockDirectory', path);
 				}
 			},
-			
+
 			CancelButton: function(e) {
 				this.props.outerarea.setState({modal: null});
 			},
-			
+
 			render: function() {
 				var dirname = this.props.path[this.props.path.length - 1];
 				var titlebar = <div key='titlebar' className="mtitle">{'Rename ' + dirname}</div>;
@@ -729,28 +729,28 @@
 							{buttonOK}{buttonCancel}
 						</div>);
 			},
-			
+
 			startDrag: startDrag,
 
 			drag: drag,
 
 			stopDrag: stopDrag
 		});
-		
+
 		var LockDirectoryModal = React.createClass({
 			getInitialState: function() {
 				return {x: 100, y: 100};
 			},
-			
+
 			YesButton: function(e) {
 				this.props.socket.emit('LockDirectory',this.props.path);
 				this.props.outerarea.setState({modal: null});
 			},
-			
+
 			NoButton: function(e) {
 				this.props.outerarea.setState({modal: null});
 			},
-			
+
 			render: function() {
 				var filename = this.props.path[this.props.path.length-1];
 				var titlebar = <div key='titlebar' className="mtitle">{(this.props.locked ? 'Unlock ' : 'Lock ') + filename}</div>;
@@ -775,15 +775,15 @@
 			getInitialState: function() {
 				return {x: 100, y: 100, searchResults: []};
 			},
-			
+
 			componentDidMount: function() {
 				Split(["#Options", "#Results"], {minSize: [0, 0]});
 			},
-			
+
 			CloseButton: function(e) {
 				this.props.outerarea.setState({modal: null});
 			},
-			
+
 			SearchButton: function(e) {
 				var database_queue = [[["database"], this.props.outerarea.state.directory]];
 				var titleSearchTrie = BuildTrie(this.refs.searchTitleInput.value);
@@ -804,7 +804,7 @@
 					}
 				}
 			},
-			
+
 			SearchBody: function(dirs, bodySearchTrie) {
 				var that = this;
 				var uri = "";
@@ -817,7 +817,7 @@
 					}
 				});
 			},
-			
+
 			render: function() {
 				var titlebar = <div key='titlebar' className="mtitle">Search the Database</div>;
 				var searchTitleLabel = <div key='searchTitleLabel'>Title: </div>;
@@ -826,7 +826,7 @@
 				var searchBodyInput = <input key='searchBodyInput' ref='searchBodyInput' type='text'></input>;
 				var searchButton = <button type='button' onClick={this.SearchButton}>Search</button>;
 				var closeButton = <button type='button' onClick={this.CloseButton}>Close</button>;
-				
+
 				var options = <div key='Options' id='Options'>
 								{searchTitleLabel}{searchTitleInput}<br />
 								{searchBodyLabel}{searchBodyInput}<br />
@@ -838,7 +838,7 @@
 						{options}{results}
 					   </div>;
 			},
-			
+
 			startDrag: startDrag,
 
 			drag: drag,
@@ -851,7 +851,7 @@
 				var pagename = dirs[dirs.length - 1];
 				return <div onClick={this.linkPage}>{pagename}</div>;
 			},
-			
+
 			linkPage: function(e) {
 				var dirs = this.props.dirs;
 				var uri = "";
@@ -896,7 +896,7 @@
 					this.refs.inputName.focus();
 				}
 			},
-			
+
 			enterCheck: function(e){
 				if(e.keyCode == 13){
 					if(e.target.name == 'password'){

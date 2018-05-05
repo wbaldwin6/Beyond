@@ -230,7 +230,7 @@ LoadDatabase: function() {
 			});
 			this.SaveDatabase();
 		}
-		
+
 	} catch(err) {
 		toplevel = new Directory('database', '');
 		entries = {};
