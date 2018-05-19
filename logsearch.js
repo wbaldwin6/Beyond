@@ -29,7 +29,8 @@ function searchLogsByFilename(stringToFind, filename, read) {
 function searchLogs(stringToFind, room) {
     var errorReport = '<body style="background-color:black;color:white;"><b>An error occurred trying to search the logs. Please try again later.</b><br />';
     var read = "/logs/";
-    if(room){read += room+"/";}
+    var intread = "/interactivelogs/";
+    if(room){read += room+"/"; intread += room+"/";}
     fs.readdir("."+read, function(err, files) {
         if(err) {
             process.send(errorReport + err + '</body>'); //An error has occured, so tell the user.
@@ -44,7 +45,7 @@ function searchLogs(stringToFind, room) {
                     success = true;
                     process.send('<b><a href="'+read+result+'" style="color:blue;">' + result.replace(/([0-9]+)_([0-9]+)_([0-9]+).html/, function(match, p1, p2, p3, offset, string) {
                         return monthenum[parseInt(p2)-1] + ' ' + p3 + ', ' + p1; //Convert "YYYY_MM_DD.html" into "Monthname DD, YYYY"
-                    }) + '</b><br />');
+                    }) + '</b> <span style="color:white;">(<a href="'+intread+result+'" style="color:blue;">Interactive</a>)</span><br />');
                 }
             }
             if(!success){

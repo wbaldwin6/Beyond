@@ -140,6 +140,10 @@ app.get('/client.js', function(req, res){
 	res.sendFile(__dirname + '/client.js');
 });
 
+app.get('/interactivelogs.js', function(req, res){
+	res.sendFile(__dirname + '/interactivelogs.js');
+});
+
 app.get('/database', function(req, res){
 	res.sendFile(__dirname + '/database.html');
 });
@@ -174,7 +178,8 @@ app.get('/logs/:name', function(req, res){
 							//Make a div starting here and ending when we hit the next month or the end
 							ret += '<div id='+month+' style="display: none;">';
 						}
-						ret += '<a href="/logs/'+name+'/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a><br><br>';
+						ret += '<a href="/logs/'+name+'/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a>';
+						ret += ' <span style="color:white;">(<a href="/interactivelogs/'+name+'/'+file+'" style="color:blue;">Interactive</a>)</span><br><br>';
 					}
 				});
 				//Code for sending Search requests and receiving the results go here.
@@ -259,7 +264,8 @@ app.get('/logs', function(req, res){
 						//Make a div starting here and ending when we hit the next month or the end
 						ret += '<div id='+month+' style="display: none;">';
 					}
-					ret += '<a href="/logs/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a><br><br>';
+					ret += '<a href="/logs/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a>';
+					ret += ' <span style="color:white;">(<a href="/interactivelogs/'+file+'" style="color:blue;">Interactive</a>)</span><br><br>';
 				}
 			});
 			//Code for sending Search requests and receiving the results go here.
@@ -270,6 +276,51 @@ app.get('/logs', function(req, res){
 		} else {
 			res.send(err);
 		}
+	});
+});
+
+app.get('/interactivelogs/:logfile', function(req, res){
+	fs.readdir('./logs', function(err, files){
+		if(err){res.send(err); return;}
+		//files are already in chronological order, but we need to prune ones that aren't html files.
+		//The files will all be sorted, but we can't guarantee someone didn't name a room with something that puts it before or inside the list.
+		var first = 0;
+		for(var i=files.length-1; i>=0; i--){
+			if(!files[i].endsWith('.html')){
+				files.splice(i, 1);
+				if(first){//if we remove after finding the index, we need to shift accordingly.
+					first--;
+				}
+			} else if(files[i] == req.params.logfile){
+				first = i;
+			}
+		}
+		var ret = '<head><title>Logs ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><body style="background-color:black;margin:0px;">';
+		ret += '<div align="center" id="outerc" data-logfile-start='+first+' data-logfile-list='+files+'></div>';
+		ret += '</body><script src="/interactivelogs.js"></script>';
+		res.send(ret);
+	});
+});
+
+app.get('/interactivelogs/:name/:logfile', function(req, res){
+	var name = req.params.name;
+	fs.readdir('./logs/'+name, function(err, files){
+		if(err){res.send(err); return;}
+		var first = 0;
+		for(var i=files.length-1; i>=0; i--){
+			if(!files[i].endsWith('.html')){
+				files.splice(i, 1);
+				if(first){
+					first--;
+				}
+			} else if(files[i] == req.params.logfile){
+				first = i;
+			}
+		}
+		var ret = '<head><title>Logs ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><body style="background-color:black;margin:0px;">';
+		ret += '<div align="center" id="outerc" data-logfile-start='+first+' data-logfile-list='+files+'></div>';
+		ret += '</body><script src="/interactivelogs.js"></script>';
+		res.send(ret);
 	});
 });
 
@@ -907,7 +958,7 @@ var saveFile = function(filename, data, socket, username){
 
 var adminLog = function(username, command, target){
 	var today = new Date();
-	adminlogs+='['+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+'] '+username+' used the '+command+' command';
+	adminlogs+='['+monthenum[today.getMonth()]+' '+today.getFullYear()+' '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+'] '+username+' used the '+command+' command';
 	if(target){adminlogs+=' on '+target+'.\r\n';} else {adminlogs+='.\r\n';}
 	fs.writeFile('adminlogs.txt', adminlogs, function(err){if(err){console.log(err);} else {}});
 };
@@ -1266,6 +1317,20 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){console.log(err);} else {io.emit('Title', serversettings.title); adminLog(username, 'Edit Title', null);}
 			});
+		}
+	});
+	socket.on('savefavicon', function(favicon, notice){
+		if(CheckUser(username, 'Admin', true, socket)){
+			var favf = favicon.replace(/^data:image\/png;base64,/, "");
+			var notf = favf;
+			if(notice){//we don't send without at least a favicon.
+				var notf = notice.replace(/^data:image\/png;base64,/, "");
+			}
+			fs.writeFile('./faceicons/favicon.png', favf, 'base64', function(err){if(err){console.log(err);} else {
+				fs.writeFile('./faceicons/notice.png', notf, 'base64', function(err){if(err){console.log(err);} else {
+					adminLog(username, 'Edit Favicon', null);
+				}});
+			}});
 		}
 	});
 	socket.on('AdminCommand', function(command, target){
