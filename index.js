@@ -140,6 +140,10 @@ app.get('/client.js', function(req, res){
 	res.sendFile(__dirname + '/client.js');
 });
 
+app.get('/md5.js', function(req, res){
+	res.sendFile(__dirname + '/md5.js');
+});
+
 app.get('/interactivelogs.js', function(req, res){
 	res.sendFile(__dirname + '/interactivelogs.js');
 });
