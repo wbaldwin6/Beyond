@@ -115,7 +115,14 @@
 
 			componentDidMount: function() {
 				var that = this;
-				Split(["#Directory", "#Content"], {minSize: [0, 0]});
+				if(typeof Split !== 'undefined'){
+					Split(["#Directory", "#Content"], {minSize: [0, 0]});
+				} else {
+					var gutter = document.createElement('DIV');
+					gutter.className = "gutter gutter-horizontal";
+					gutter.style.width = '10px';
+					document.getElementById('Content').parentNode.insertBefore(gutter, document.getElementById('Content'));
+				}
 				document.getElementById('Directory').style.width = "calc(20% - 5px)";
 				document.getElementById('Content').style.width = "calc(80% - 5px)";
 
