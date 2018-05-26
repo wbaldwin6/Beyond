@@ -89,8 +89,7 @@
 		<div id="main"></div>
 
 		<script src="/socket.io/socket.io.js"></script>
-		<script src="http://www.myersdaily.org/joseph/javascript/md5.js"></script>
-		<script src="http://nathancahill.github.io/Split.js/split.js"></script>
+		<script src="/md5.js"></script>
 		<script src="https://cdn.rawgit.com/viliusle/Hermite-resize/master/dist/hermite.js"></script>
 		<script src="http://www.lalit.org/wordpress/wp-content/uploads/2008/05/fontdetect.js"></script>
 		<script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
@@ -108,23 +107,27 @@
 		});
 
 		//Properties: socket
+
+		var stopDrag = function(e){
+			e.stopPropagation();
+			e.preventDefault();
+			if(e.touches){
+				document.removeEventListener('touchmove', this.drag);
+				document.removeEventListener('touchend', this.stopDrag);
+			} else {
+				document.removeEventListener('mousemove', this.drag);
+				document.removeEventListener('mouseup', this.stopDrag);
+			}
+			document.getElementById('iFrame').style.pointerEvents = "auto";
+		};
+
 		var OuterArea = React.createClass({
 			getInitialState: function() {
-				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "", contents: {}, order: []}, page: '', openness: {}, showNames: false, loginState: 'Guest'};
+				return {username: '', permissions: 'Guest', directory: {name: "database", creator: "", contents: {}, order: []}, page: '', openness: {}, showNames: false, loginState: 'Guest', posx: 20};
 			},
 
 			componentDidMount: function() {
 				var that = this;
-				if(typeof Split !== 'undefined'){
-					Split(["#Directory", "#Content"], {minSize: [0, 0]});
-				} else {
-					var gutter = document.createElement('DIV');
-					gutter.className = "gutter gutter-horizontal";
-					gutter.style.width = '10px';
-					document.getElementById('Content').parentNode.insertBefore(gutter, document.getElementById('Content'));
-				}
-				document.getElementById('Directory').style.width = "calc(20% - 5px)";
-				document.getElementById('Content').style.width = "calc(80% - 5px)";
 
 				//Initialize socket event listeners
 				this.props.socket.on('CloseModal', function() {
@@ -284,6 +287,33 @@
 				this.props.socket.emit('DragEntry', fromPath, toPath, where);
 			},
 
+			startDrag: function(e){
+				e.stopPropagation();
+				e.preventDefault();
+				if(e.touches){
+					document.addEventListener('touchmove', this.drag);
+					document.addEventListener('touchend', this.stopDrag);
+				} else {
+					document.addEventListener('mousemove', this.drag);
+					document.addEventListener('mouseup', this.stopDrag);
+				}
+				document.getElementById('iFrame').style.pointerEvents = "none";
+			},
+
+			drag: function(e){
+				if(e.touches){
+					e.clientX = e.touches[0].clientX;
+				}
+				e.stopPropagation();
+				e.preventDefault();
+				var wid = e.clientX;
+				//clamp to avoid overflow
+				if(wid > document.body.clientWidth-5){wid = document.body.clientWidth-5;} else if(wid < 5){wid = 5;}
+				this.setState({posx: 100*wid/document.body.clientWidth});
+			},
+
+			stopDrag: stopDrag,
+
 			render: function() {
 				var context = null;
 				if(this.state.context) { //context should have keys x, y, path, functions; functions include AddDirectory, AddEntry, Delete, Edit
@@ -318,9 +348,10 @@
 				var toggleNamesButton = <button key="ToggleNames" onClick={this.ToggleNames} style={{zIndex: "500", position: "fixed", left: "54px", bottom: "0px"}}>Toggle Names</button>
 				var loginButton = <button key="LoginButton" onClick={this.AttemptLogin} disabled={this.state.modal ? true : false} style={{zIndex: "500", position: "fixed", left: "160px", bottom: "0px"}}>Login</button>
 				var status = (<div ref="statusbar" key="LoginStatus" id="LoginStatus" className="mtitle" style={{height: "18px"}}>Login: {this.state.loginState}</div>);
-				var dir = (<div key="Directory" id="Directory" style={{height: "calc(100% - 20px)", overflowY: "auto"}}>{status}<DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} order={this.state.directory.order} parents={[]} /></div>);
-				var content = (<div key="Content" id="Content"><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
-				return(<div onClick={this.closeContext} onContextMenu={this.closeContext}>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{content}{searchButton}{toggleNamesButton}{loginButton}</div>);
+				var dir = (<div key="Directory" id="Directory" style={{height: "calc(100% - 20px)", width: "calc("+this.state.posx+"% - 5px)", overflowY: "auto"}}>{status}<DirectoryList outerarea={this} socket={this.props.socket} name={this.state.directory.name} creator={this.state.directory.creator} contents={this.state.directory.contents} locked={this.state.directory.locked} order={this.state.directory.order} parents={[]} /></div>);
+				var gutter = (<div className="gutter gutter-horizontal" style={{width: '10px'}} onMouseDown={this.startDrag} onTouchStart={this.startDrag}/>)
+				var content = (<div key="Content" id="Content" style={{width: "calc("+(100-this.state.posx)+"% - 5px)"}}><iframe id="iFrame" src={this.state.page}><p>An error occured while displaying {this.state.page}</p></iframe></div>);
+				return(<div onClick={this.closeContext} onContextMenu={this.closeContext}>{context ? context : ""}{this.state.modal ? this.state.modal : ""}{dir}{gutter}{content}{searchButton}{toggleNamesButton}{loginButton}</div>);
 			}
 		});
 		
@@ -432,18 +463,33 @@
 				e.stopPropagation();
 				e.preventDefault();
 				var rect = this.refs['this'].getBoundingClientRect();
+				if(e.touches){
+					e.clientX = e.touches[0].clientX;
+					e.clientY = e.touches[0].clientY;
+					e.nativeEvent.offsetX = e.touches[0].pageX - rect.left;
+					e.nativeEvent.offsetY = e.touches[0].pageY - rect.top;
+				}
 				if(rect.right-e.clientX < 20 && rect.bottom-e.clientY < 20){
 					this.setState({initialposition: {x: e.clientX, y: e.clientY}, resize: true});
 				} else {
 					this.setState({initialposition: {x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY}, resize: false});
 				}
-				document.addEventListener('mousemove', this.drag);
-				document.addEventListener('mouseup', this.stopDrag);
+				if(e.touches){
+					document.addEventListener('touchmove', this.drag);
+					document.addEventListener('touchend', this.stopDrag);
+				} else {
+					document.addEventListener('mousemove', this.drag);
+					document.addEventListener('mouseup', this.stopDrag);
+				}
 				document.getElementById('iFrame').style.pointerEvents = "none";
 			}
 		};
 
 		var drag = function(e){
+			if(e.touches){
+				e.clientX = e.touches[0].clientX;
+				e.clientY = e.touches[0].clientY;
+			}
 			e.stopPropagation();
 			e.preventDefault();
 			var initpos = this.state.initialposition;
@@ -464,14 +510,6 @@
 				if(y+rect.height > document.body.clientHeight){y=document.body.clientHeight-rect.height;}
 				this.setState({x: x, y: y});
 			}
-		};
-
-		var stopDrag = function(e){
-			e.stopPropagation();
-			e.preventDefault();
-			document.removeEventListener('mousemove', this.drag);
-			document.removeEventListener('mouseup', this.stopDrag);
-			document.getElementById('iFrame').style.pointerEvents = "auto";
 		};
 		
 		//Properties: socket, path, funcname, titletext, outerarea
@@ -559,7 +597,7 @@
 					var labelName = <div key='labelName' style={{width: "20%", height: "24px", margin: "4px 0px"}}>Name:</div>;
 					var inputName = <input key='inputName' type="text" ref="inputName" style={{width: "80%", height: "24px", margin: "4px 0px"}} defaultValue={this.props.funcname === 'edit' ? this.props.path[this.props.path.length-1] : ""}></input>;
 					var draghandle = <img src='/faceicons/handle.png' width='20px' height='20px' style={{position: 'absolute', right:0, bottom: 0, pointerEvents:'none'}}/>;
-					return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}}>
+					return (<div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}}>
 								{titlebar}<br />
 								{labelName}{inputName}<br />
 								{textArea}<br />
@@ -597,7 +635,7 @@
 				var labelAreYouSure = <div key='labelAreYouSure' style={{margin: "4 0"}}>{'Are you sure you want to delete ' + filename + '?'}</div>;
 				var buttonYes = <button key='buttonYes' type="button" onClick={this.YesButton}>Yes</button>;
 				var buttonNo = <button key='buttonNo' type="button" onClick={this.NoButton}>No</button>;
-				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelAreYouSure}<br />
 							{buttonYes}{buttonNo}
@@ -637,7 +675,7 @@
 				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
 				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
 				var checkLocked = <div><input key='checkLocked' ref='checkLocked' type="checkbox" style={{color: "white"}}></input>Locked?</div>;
-				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelName}{inputName}<br />
 							{checkLocked}<br />
@@ -687,7 +725,7 @@
 				} else {
 					labelAsk = <div key='labelAsk'>Select a target directory on the left.</div>;
 				}
-				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelAsk}<br />
 							{buttonOK}{buttonCancel}
@@ -729,7 +767,7 @@
 				var buttonOK = <button type="button" onClick={this.OKButton}>OK</button>;
 				var buttonCancel = <button type="button" onClick={this.CancelButton}>Cancel</button>;
 				var checkLocked = <div><input key='checkLocked' ref='checkLocked' type="checkbox" style={{color: "white"}}></input>{this.props.locked ? 'Unlock' : 'Lock'}</div>;
-				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelName}{inputName}<br />
 							{checkLocked}<br />
@@ -764,7 +802,7 @@
 				var labelAreYouSure = <div key='labelAreYouSure' style={{margin: "4 0"}}>{'Are you sure you want to ' + (this.props.locked ? 'unlock ' : 'lock ') + filename + '?'}</div>;
 				var buttonYes = <button key='buttonYes' type="button" onClick={this.YesButton}>Yes</button>;
 				var buttonNo = <button key='buttonNo' type="button" onClick={this.NoButton}>No</button>;
-				return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 							{titlebar}<br />
 							{labelAreYouSure}<br />
 							{buttonYes}{buttonNo}
@@ -840,7 +878,7 @@
 								{searchButton}{closeButton}
 							  </div>;
 				var results = <div key='Results' id='Results' style={{overflowY: 'auto', overflowX: 'auto'}}>{this.state.searchResults}</div>;
-				return <div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
+				return <div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 						{titlebar}<br />
 						{options}{results}
 					   </div>;
@@ -923,7 +961,7 @@
 					var labelPass = <div key='labelPass' style={{width: "50%", height: "24px", margin: "4px 0px"}}>Password:</div>;
 					var inputPass = <input key='inputPass' name="password" type="text" ref="inputPass" style={{width: "50%", height: "24px", margin: "4px 0px"}} defaultValue="" placeholder="Password" onKeyDown={this.enterCheck}></input>;
 					var chkRemember = <input type="checkbox" name="Remember" ref="Remember" defaultChecked={false}/>
-					return (<div ref="this" className="modal" onMouseDown={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
+					return (<div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
 								{titlebar}<br />
 								{labelName}{inputName}<br />
 								{labelPass}{inputPass}<br />
