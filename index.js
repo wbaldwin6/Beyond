@@ -333,7 +333,7 @@ app.use('/faceicons', express.static('./faceicons'));
 var openLog = function (logfile, room){
 	try{
 		fs.accessSync(logfile, fs.R_OK | fs.W_OK);
-		logfiles[room] = {lname: logfile, htm: jsdom.jsdom(fs.readFileSync(logfile, 'utf8'))};
+		logfiles[room] = {lname: logfile, htm: jsdom.jsdom(fs.readFileSync(logfile, 'utf8')), dirty: true};
 	} catch(e){//today's logs don't exist, make them!
 		//this won't change, so just making it a static string (albeit a long one) is more effiicient.
 		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action, div.log, div.narration{font-weight: bold;} div.narration{text-align: center;} div.narration span.timestamp{position: absolute; left: 0;} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} .IC{} .OOC{} .deleted{}</style>';
