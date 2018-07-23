@@ -158,7 +158,7 @@
 				if(document.cookie && document.cookie.match(/[; ^]?username=([^\s;]*)/)){
 					var username = decodeURIComponent(document.cookie.match(/[; ^]?username=([^\s;]*)/)[1]);
 					var password = decodeURIComponent(document.cookie.match(/[; ^]?password=([^\s;]*)/)[1]);
-					this.props.socket.emit('DatabaseLogin', username, md5(password), function (response){
+					this.props.socket.emit('DatabaseLogin', username, password, function (response){
 						console.log(response);
 					});
 				}
@@ -917,7 +917,7 @@
 				var password = this.refs.inputPass.value;
 				if(this.refs.Remember.checked){
 					document.cookie = "username="+encodeURIComponent(username);
-					document.cookie = "password="+encodeURIComponent(password);
+					document.cookie = "password="+encodeURIComponent(md5(password));
 				}
 				var that=this;
 				this.props.socket.emit('DatabaseLogin', username, md5(password), function (response){
@@ -931,14 +931,7 @@
 			},
 
 			componentDidMount: function(){
-				if(document.cookie && document.cookie.match(/[; ^]?username=([^\s;]*)/)){
-					var c = document.cookie;
-					this.refs.inputName.value = decodeURIComponent(c.match(/[; ^]?username=([^\s;]*)/)[1]);
-					this.refs.inputPass.value = decodeURIComponent(c.match(/[; ^]?password=([^\s;]*)/)[1]);
-					this.refs.inputPass.focus();
-				} else {
-					this.refs.inputName.focus();
-				}
+				this.refs.inputName.focus();
 			},
 
 			enterCheck: function(e){
