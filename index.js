@@ -187,7 +187,7 @@ app.get('/logs/:name', function(req, res){
 					}
 				});
 				//Code for sending Search requests and receiving the results go here.
-				ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/'+name+'/search/\' + searchTerm);};</script>';
+				ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/'+name+'/search/\' + encodeURIComponent(searchTerm));};</script>';
 				ret += '<form onsubmit=\'searchLogs()\'><span style="color:white;">Search Logs:</span><input type=\'text\' id=\'txtSearch\'></form><br /><button type=\'button\' onclick=\'searchLogs()\'>Search</button>';
 				ret += '</body>';
 				res.send(ret);
@@ -273,7 +273,7 @@ app.get('/logs', function(req, res){
 				}
 			});
 			//Code for sending Search requests and receiving the results go here.
-			ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/search/\' + searchTerm);};</script>';
+			ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/search/\' + encodeURIComponent(searchTerm));};</script>';
 			ret += '<form onsubmit=\'searchLogs()\'><span style="color:white;">Search Logs:</span><input type=\'text\' id=\'txtSearch\'></form><br /><button type=\'button\' onclick=\'searchLogs()\'>Search</button>';
 			ret += '</body>';
 			res.send(ret);

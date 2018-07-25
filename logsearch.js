@@ -5,6 +5,10 @@ var parser = new DomParser(); //Also used in log searching
 
 var monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+function escapeRegExp(str) { //Borrowed directly from Stack Overflow, just replaces every special character in a string with the escaped equivalent for use as a regex
+  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
 //This function returns a "Promise", which will "resolve" when it is done
 //When the promise resolves, the searchLogs function will know to send its information to the client
 function searchLogsByFilename(stringToFind, filename, read) {
@@ -28,6 +32,7 @@ function searchLogsByFilename(stringToFind, filename, read) {
 //Search all the log files, then send the list of good results back to the response
 function searchLogs(stringToFind, room) {
     var errorReport = '<body style="background-color:black;color:white;"><b>An error occurred trying to search the logs. Please try again later.</b><br />';
+	stringToFind = new RegExp(escapeRegExp(decodeURIComponent(stringToFind)), 'i'); //In case we want non-standard characters in our search term; convert to regex for case-insensitive search.
     var read = "/logs/";
     var intread = "/interactivelogs/";
     if(room){read += room+"/"; intread += room+"/";}
