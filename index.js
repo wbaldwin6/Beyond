@@ -162,6 +162,53 @@ app.get('/database/*', function(req, res){
 	}
 });
 
+var setuplogs = function (files, name){
+	var ret = '<head><title>Logs ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
+	var years = {};
+	var months = {};
+	var currentyear = (new Date()).getFullYear();
+	files.forEach(function(file, index){
+		if(file.endsWith('.html')){//make a separate header for each month, THEN worry about collapsibility
+			var month = file.substring(0, 7);
+			var year = month.split('_')[0];
+			if(!months[month]){
+				months[month] = true;
+				ret += '</div>';//close previous month if applicable
+				if(!years[year]){
+					years[year] = true;
+					ret += '</div>';//close previous year if applicable
+					ret += '<h1 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+year+'\')">'+year+'</h1>';
+					if(year == currentyear){
+						ret += '<div id='+year+' style="display: block;">';
+					} else {
+						ret += '<div id='+year+' style="display: none;">';
+					}
+				}
+				var monthname = monthenum[month.split('_')[1]-1]+' '+month.split('_')[0];
+				ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+month+'\')">'+monthname+'</h2>';
+				//Make a div starting here and ending when we hit the next month or the end
+				ret += '<div id='+month+' style="display: none;">';
+			}
+			if(name){
+				ret += '<a href="/logs/'+name+'/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a>';
+				ret += ' <span style="color:white;">(<a href="/interactivelogs/'+name+'/'+file+'" style="color:blue;">Interactive</a>)</span><br><br>';
+			} else {
+				ret += '<a href="/logs/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a>';
+				ret += ' <span style="color:white;">(<a href="/interactivelogs/'+file+'" style="color:blue;">Interactive</a>)</span><br><br>';
+			}
+		}
+	});
+	//Code for sending Search requests and receiving the results go here.
+	if(name){
+		ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/'+name+'/search/\' + encodeURIComponent(searchTerm));};</script>';
+	} else {
+		ret += '</div></div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/search/\' + encodeURIComponent(searchTerm));};</script>';
+	}
+	ret += '<form onsubmit=\'searchLogs()\'><span style="color:white;">Search Logs:</span><input type=\'text\' id=\'txtSearch\'></form><br /><button type=\'button\' onclick=\'searchLogs()\'>Search</button>';
+	ret += '</body>';
+	return ret;
+};
+
 app.get('/logs/:name', function(req, res){
 	var name = req.params.name;
 	if(name.endsWith('.html')){
@@ -169,27 +216,7 @@ app.get('/logs/:name', function(req, res){
 	} else {
 		fs.readdir('./logs/'+name, function(err, files){
 			if(!err){
-				var ret = '<head><title>Logs ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
-				var months = {};
-				files.forEach(function(file, index){
-					if(file.endsWith('.html')){//make a separate header for each month, THEN worry about collapsibility
-						var month = file.substring(0, 7);
-						if(!months[month]){
-							months[month] = true;
-							ret += '</div>';
-							var monthname = monthenum[month.split('_')[1]-1]+' '+month.split('_')[0];
-							ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+month+'\')">'+monthname+'</h2>';
-							//Make a div starting here and ending when we hit the next month or the end
-							ret += '<div id='+month+' style="display: none;">';
-						}
-						ret += '<a href="/logs/'+name+'/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a>';
-						ret += ' <span style="color:white;">(<a href="/interactivelogs/'+name+'/'+file+'" style="color:blue;">Interactive</a>)</span><br><br>';
-					}
-				});
-				//Code for sending Search requests and receiving the results go here.
-				ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/'+name+'/search/\' + encodeURIComponent(searchTerm));};</script>';
-				ret += '<form onsubmit=\'searchLogs()\'><span style="color:white;">Search Logs:</span><input type=\'text\' id=\'txtSearch\'></form><br /><button type=\'button\' onclick=\'searchLogs()\'>Search</button>';
-				ret += '</body>';
+				var ret = setuplogs(files, name);
 				res.send(ret);
 			} else {
 				res.send(err);
@@ -255,27 +282,7 @@ var monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
 app.get('/logs', function(req, res){
 	fs.readdir('./logs', function(err, files){
 		if(!err){
-			var ret = '<head><title>Logs ('+(serversettings.title || 'Beyond')+')</title><link rel="icon" href="/faceicons/favicon.png"></head><script type="text/javascript">var togglevis = function(id){var e = document.getElementById(id); e.style.display = e.style.display=="none" ? "block" : "none";};</script><body style="background-color:black;">';
-			var months = {};
-			files.forEach(function(file, index){
-				if(file.endsWith('.html')){//make a separate header for each month, THEN worry about collapsibility
-					var month = file.substring(0, 7);
-					if(!months[month]){
-						months[month] = true;
-						ret += '</div>';
-						var monthname = monthenum[month.split('_')[1]-1]+' '+month.split('_')[0];
-						ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+month+'\')">'+monthname+'</h2>';
-						//Make a div starting here and ending when we hit the next month or the end
-						ret += '<div id='+month+' style="display: none;">';
-					}
-					ret += '<a href="/logs/'+file+'" style="color:blue;">'+file.split('.')[0]+'</a>';
-					ret += ' <span style="color:white;">(<a href="/interactivelogs/'+file+'" style="color:blue;">Interactive</a>)</span><br><br>';
-				}
-			});
-			//Code for sending Search requests and receiving the results go here.
-			ret += '</div><script>var searchLogs = function() {var searchTerm = document.getElementById(\'txtSearch\').value; window.open(\'/logs/search/\' + encodeURIComponent(searchTerm));};</script>';
-			ret += '<form onsubmit=\'searchLogs()\'><span style="color:white;">Search Logs:</span><input type=\'text\' id=\'txtSearch\'></form><br /><button type=\'button\' onclick=\'searchLogs()\'>Search</button>';
-			ret += '</body>';
+			var ret = setuplogs(files, null);
 			res.send(ret);
 		} else {
 			res.send(err);
