@@ -62,7 +62,7 @@ try{
 	serversettings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
 	if(serversettings.pub){setImmediate(function() {SendToHub();});}
 } catch(e) {
-	var profile = '<style>body{background-color:black}</style><font style="font-size:16px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i><br><br><b>Age:</b> <i>In years, typically.</i><br><br><b>Gender:</b> <i>____</i><br><br><b>Species:</b> <i> </i><br><br><b>Height:</b> <i> </i><br><br><b>History:</b> <i>Any other relevant information can be have fields added.</i>';
+	var profile = '<style>body{background-color:black}</style><font style="font-size:16px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i><br><br><b>Age:</b> <i>In years, typically.</i><br><br><b>Gender:</b> <i>____</i><br><br><b>Species:</b> <i> </i><br><br><b>Height:</b> <i> </i><br><br><b>History:</b> <i>Any other relevant information can have fields added.</i>';
 	serversettings = {motd: '', rules: 'Rule 0: Be respectful.', profile: profile, title: 'Beyond'};
 	fs.writeFileSync('settings.json', JSON.stringify(serversettings));
 }
