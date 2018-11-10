@@ -256,6 +256,7 @@ app.get('/characters', function(req, res){
 					files.forEach(function(file, index){
 						if(!file.endsWith('.json')){
 							var f = fs.readdirSync('./characters/'+file);
+							f = f.sort(function (a, b){return a.slice(0, -5)-b.slice(0, -5);});
 							if(f.length !== 0){
 								ret += '<h2 style="color: white; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;" onclick="togglevis(\''+file.replace(/'/g, "\\'")+'\')">'+file+' ('+f.length+')</h2>';
 								ret += '<div id="'+file+'" style="display: none;">';
