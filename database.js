@@ -1,5 +1,24 @@
 fs = require('fs');
 
+Array.prototype.equals = function(a) { //implementing a per-item comparison for arrays because Javascript uses pointer comparison for ==
+	if(!(a instanceof Array)) { //Arrays are equal to arrays
+		return false;
+	}
+	if(this.length != a.length) { //Make sure lengths are equal
+		return false;
+	}
+	for(var i = 0; i < this.length; i++) { //Make sure all items are equal
+		if(this[i] instanceof Array && a[i] instanceof Array) { //Recurse in arrays of arrays
+			if(!this[i].equals(a[i])) {
+				return false;
+			}
+		} else if(this[i] != a[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 function Directory(name, creator, locked) {
 	this.name = name;
 	this.creator = creator;
@@ -141,21 +160,20 @@ MoveEntry: function(oldpath, newpath) {
 },
 
 DragEntry: function(oldpath, newpath, after) {
-	console.log("DragEntry:\noldpath: " + oldpath + "\nnewpath: " + newpath + "\nafter: " + after);
-	if(oldpath.length === 0) {
+	if(oldpath.length === 0 || oldpath.equals(newpath.slice(0, -1))) { //Trying to drag root OR dragging entry into itself
 		return false;
 	}
-	var dirname = oldpath[oldpath.length-1];
-	var targetname = newpath[newpath.length-1];
-	var olddir = this.GetDirectoryFromPath(oldpath.slice(0, -1));
-	if(!("contents" in olddir) || !(dirname in olddir.contents)) {
+	var dirname = oldpath[oldpath.length-1]; //The name of the item being moved
+	var targetname = newpath[newpath.length-1]; //The name of the item being moved onto
+	var olddir = this.GetDirectoryFromPath(oldpath.slice(0, -1)); //Get the container of the item being moved
+	if(!("contents" in olddir) || !(dirname in olddir.contents)) { //Item does not exist in container
 		return false;
 	}
 	if(newpath.length === 0) { //Dragging into the toplevel
-		if(olddir === toplevel) {
+		if(olddir === toplevel) { //Dragging from toplevel to the top of toplevel
 			olddir.order.splice(olddir.order.indexOf(dirname), 1);
 			toplevel.order.splice(0, 0, dirname);
-		} else {
+		} else { //Moving item from anywhere but top level into top level
 			this.UpdateMovedEntries(olddir.contents[dirname], this.GetPathnameFromPath(oldpath.slice(0, -1)), this.GetPathnameFromPath(newpath.slice(0, -1)));
 			toplevel.contents[dirname] = olddir.contents[dirname];
 			olddir.order.splice(olddir.order.indexOf(dirname), 1);
@@ -165,23 +183,26 @@ DragEntry: function(oldpath, newpath, after) {
 		return true;
 	}
 	var newdir = this.GetDirectoryFromPath(newpath.slice(0, -1));
-	if(!("contents" in newdir) || (newdir !== olddir && (dirname in newdir.contents))) {
+	if(!("contents" in newdir) || (newdir !== olddir && (dirname in newdir.contents))) { //Target directory is not a directory OR conflicting names
 		return false;
 	}
-	if(newdir !== olddir) {
+	if(newdir !== olddir) { //Moving item from one directory to another
 		this.UpdateMovedEntries(olddir.contents[dirname], this.GetPathnameFromPath(oldpath.slice(0, -1)), this.GetPathnameFromPath(newpath.slice(0, -1)));
 		newdir.contents[dirname] = olddir.contents[dirname];
 		olddir.order.splice(olddir.order.indexOf(dirname), 1);
 		newdir.order.splice((after ? newdir.order.indexOf(targetname) + 1 : newdir.order.indexOf(targetname)), 0, dirname);
 		delete olddir.contents[dirname];
-	} else {
+	} else { //Moving item within a directory
 		olddir.order.splice(olddir.order.indexOf(dirname), 1);
 		newdir.order.splice((after ? newdir.order.indexOf(targetname) + 1 : newdir.order.indexOf(targetname)), 0, dirname);
 	}
-	return true;
+	return true; //Returns true on success
 },
 
 UpdateMovedEntries: function(dir, oldpathname, newpathname) {
+	if(oldpathname === newpathname) {
+		return;
+	}
 	var oldpath = oldpathname + "/" + encodeURIComponent(dir.name) + ".html";
 	var newpath = newpathname + "/" + encodeURIComponent(dir.name) + ".html";
 	if(oldpath in entries) {

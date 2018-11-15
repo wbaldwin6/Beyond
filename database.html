@@ -277,13 +277,14 @@
 			},
 
 			entryDrop: function(e) {
-				console.log("Fired Drop event.");
 				e.preventDefault();
 				var rect = e.target.getBoundingClientRect();
 				var where = (e.clientY - rect.top) * 2 > (rect.bottom - rect.top); //If true, it's below, else it's above.
 				var fromPath = JSON.parse(this.state.draggedElem.id);
 				var toPath = JSON.parse(e.target.id);
-				this.props.socket.emit('DragEntry', fromPath, toPath, where);
+				if (fromPath.length !== 0 && !fromPath.equals(toPath.slice(0, -1))) { //Not root and not moving entry into itself
+					this.props.socket.emit('DragEntry', fromPath, toPath, where);
+				}
 			},
 
 			startDrag: function(e){
@@ -1040,6 +1041,25 @@
 				count++;
 			}
 			return numwords == count;
+		}
+		
+		Array.prototype.equals = function(a) { //implementing a per-item comparison for arrays because Javascript uses pointer comparison for ==
+			if(!(a instanceof Array)) { //Arrays are equal to arrays
+				return false;
+			}
+			if(this.length != a.length) { //Make sure lengths are equal
+				return false;
+			}
+			for(var i = 0; i < this.length; i++) { //Make sure all items are equal
+				if(this[i] instanceof Array && a[i] instanceof Array) { //Recurse in arrays of arrays
+					if(!this[i].equals(a[i])) {
+						return false;
+					}
+				} else if(this[i] != a[i]) {
+					return false;
+				}
+			}
+			return true;
 		}
 		
 		ReactDOM.render(<OuterArea socket={socket} />, document.getElementById("main"));
