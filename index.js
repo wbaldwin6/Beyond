@@ -118,10 +118,13 @@ var idlist = {};
 app.get('/', function(req, res){
 	res.sendFile(__dirname + '/index.html');
 });
-
+//can't include * ? > < | : as they're invalid for folders.
+//need to get the url as question mark doesn't show up in roomname.
 app.get('/rooms/:roomname', function(req, res){
 	var name = req.params.roomname;
-	if(!name || name == '0'){
+	var nname = req.originalUrl.split('/');
+	nname = decodeURIComponent(nname[nname.length-1]);
+	if(!name || name == '0' || nname.match(/[\*\?<>:\|]/g)){
 		res.send('Invalid room name.');
 	} else {
 		res.sendFile(__dirname + '/index.html');
