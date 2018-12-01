@@ -84,18 +84,18 @@ try{
 
 var postnum = 1;
 if(!fs.existsSync('./logs')){fs.mkdirSync('./logs');}
-if(!fs.existsSync('./logs/postid.txt')){fs.writeFile('./logs/postid.txt', 1, function(err){if(err){console.log(err);}});} else {fs.readFile('./logs/postid.txt','utf8',function(err,num){postnum=+num;});}
+if(!fs.existsSync('./logs/postid.txt')){fs.writeFile('./logs/postid.txt', 1, function(err){if(err){consoleLog(err);}});} else {fs.readFile('./logs/postid.txt','utf8',function(err,num){postnum=+num;});}
 
 var iconnum = 0;
 if(!fs.existsSync('./faceicons')){fs.mkdirSync('./faceicons');}
 
-if(!fs.existsSync('./faceicons/num.txt')){fs.writeFile('./faceicons/num.txt', 0, function(err){if(err){console.log(err);}});} else {fs.readFile('./faceicons/num.txt','utf8',function(err,num){iconnum=+num;});}
-if(!fs.existsSync('./faceicons/img_trans.gif')){fs.writeFile('./faceicons/img_trans.gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64', function(err){if(err){console.log(err);}});}
-if(!fs.existsSync('./faceicons/img_trans.png')){fs.writeFile('./faceicons/img_trans.png', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64', function(err){if(err){console.log(err);}});}
-if(!fs.existsSync('./faceicons/favicon.png')){fs.writeFile('./faceicons/favicon.png', 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4gQBDzgSNR5bAgAAAA9QTFRF////AAAAz7E34sE8/9VD2dvC6gAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAAmklEQVQoz22S0Q2FMAhFGcHWCQQXMHYBk+4/0ytQoCXvfp5Q5NwIJQKS+nKQUybonCC19Z0MoBuEHAw+XSbkWQATascCoOLbvw1Q6/sED0C9HZw8MB76UhkY4LKPyMAAOA+jrqejhUqyvSDZGgjbYsBtZx+LbYFku/UhFzwJ/O/jzn2ELWofYUuzD7NF68PjfZh+6oOayuXf4QciHi6tIdMmKQAAAABJRU5ErkJggg==', 'base64', function(err){if(err){console.log(err);}});}
-if(!fs.existsSync('./faceicons/notice.png')){fs.writeFile('./faceicons/notice.png', 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB+IEARACC2OmyfYAAAAPUExURf///wAAAM83O+I8QP9DTK3GnwYAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAJpJREFUKM9tktENhTAIRRnB1gkEFzB2AZPuP9MrUKAl736eUOTcCCUCkvpykFMm6JwgtfWdDKAbhBwMPl0m5FkAE2rHAqDi278NUOv7BA9AvR2cPDAe+lIZGOCyj8jAADgPo66no4VKsr0g2RoI22LAbWcfi22BZLv1IRc8Cfzv4859hC1qH2FLsw+zRevD432YfuqDmsrl3+EHIh4urSHTJikAAAAASUVORK5CYII=', 'base64', function(err){if(err){console.log(err);}});}
-if(!fs.existsSync('./faceicons/box.png')){fs.writeFile('./faceicons/box.png', 'iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAADXUAAA11AFeZeUIAAABA0lEQVRoge2asYoCMRRFz4i4EUR2FiwUG9n//5SttdVWS1enmy2SgThMkWIhF7kHwp3p7uGle2nuhJ43YJ7yF3iMjjIBWOY5iDyAG3BNeatSr5xP4CvLNhe5AhfgnFKZLbBL2TAxkTNwBE5V6pVzADqgJ16tdixyAU4rup86/cq4E56kSRCvVjerW+n/sIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImoMe/ZAfA6xBQ5pj63MN7AHNsAaWAwiS+LifUd8UdBUqVfOnleRMDWRPv0rs8nO5ESa7FuZ9ei8TKTNsqtSr5wFseuQH3+zPCfjk5ftQQAAAABJRU5ErkJggg==', 'base64', function(err){if(err){console.log(err);}});}
-if(!fs.existsSync('./faceicons/handle.png')){fs.writeFile('./faceicons/handle.png', 'iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAADXUAAA11AFeZeUIAAAAB3RJTUUH4QIUDyUsZQAKFgAAAMpJREFUOMvt1DtrAlEQxfE/+/28IgbiVNaCsIZAHoVv10JFSUifLgckWMwntBlhsVlfjeDpLgw/zp1i4JFHKuNS5lLn8M5uYO6An5uALu2AGjC4GnRpC9SBQTIrrgJd+geawCiZFS59XwwG1ghs6tIG6F4ExjePsRxYng0G1gTmgS0DWyWz97NAl/5KO+sH9hrYW3k2O3Fnz8Akmq0DWxywaF8NRrMGMEtm48B6wFcy+4iZX+CpEnRpAbQCG7qUl7CXEtYGPu/nWOwBIGxhMKJusmIAAAAASUVORK5CYII=', 'base64', function(err){if(err){console.log(err);}});}
+if(!fs.existsSync('./faceicons/num.txt')){fs.writeFile('./faceicons/num.txt', 0, function(err){if(err){consoleLog(err);}});} else {fs.readFile('./faceicons/num.txt','utf8',function(err,num){iconnum=+num;});}
+if(!fs.existsSync('./faceicons/img_trans.gif')){fs.writeFile('./faceicons/img_trans.gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64', function(err){if(err){consoleLog(err);}});}
+if(!fs.existsSync('./faceicons/img_trans.png')){fs.writeFile('./faceicons/img_trans.png', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64', function(err){if(err){consoleLog(err);}});}
+if(!fs.existsSync('./faceicons/favicon.png')){fs.writeFile('./faceicons/favicon.png', 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4gQBDzgSNR5bAgAAAA9QTFRF////AAAAz7E34sE8/9VD2dvC6gAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAAmklEQVQoz22S0Q2FMAhFGcHWCQQXMHYBk+4/0ytQoCXvfp5Q5NwIJQKS+nKQUybonCC19Z0MoBuEHAw+XSbkWQATascCoOLbvw1Q6/sED0C9HZw8MB76UhkY4LKPyMAAOA+jrqejhUqyvSDZGgjbYsBtZx+LbYFku/UhFzwJ/O/jzn2ELWofYUuzD7NF68PjfZh+6oOayuXf4QciHi6tIdMmKQAAAABJRU5ErkJggg==', 'base64', function(err){if(err){consoleLog(err);}});}
+if(!fs.existsSync('./faceicons/notice.png')){fs.writeFile('./faceicons/notice.png', 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB+IEARACC2OmyfYAAAAPUExURf///wAAAM83O+I8QP9DTK3GnwYAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAJpJREFUKM9tktENhTAIRRnB1gkEFzB2AZPuP9MrUKAl736eUOTcCCUCkvpykFMm6JwgtfWdDKAbhBwMPl0m5FkAE2rHAqDi278NUOv7BA9AvR2cPDAe+lIZGOCyj8jAADgPo66no4VKsr0g2RoI22LAbWcfi22BZLv1IRc8Cfzv4859hC1qH2FLsw+zRevD432YfuqDmsrl3+EHIh4urSHTJikAAAAASUVORK5CYII=', 'base64', function(err){if(err){consoleLog(err);}});}
+if(!fs.existsSync('./faceicons/box.png')){fs.writeFile('./faceicons/box.png', 'iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAADXUAAA11AFeZeUIAAABA0lEQVRoge2asYoCMRRFz4i4EUR2FiwUG9n//5SttdVWS1enmy2SgThMkWIhF7kHwp3p7uGle2nuhJ43YJ7yF3iMjjIBWOY5iDyAG3BNeatSr5xP4CvLNhe5AhfgnFKZLbBL2TAxkTNwBE5V6pVzADqgJ16tdixyAU4rup86/cq4E56kSRCvVjerW+n/sIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImpYRA2LqGERNSyihkXUsIgaFlHDImoMe/ZAfA6xBQ5pj63MN7AHNsAaWAwiS+LifUd8UdBUqVfOnleRMDWRPv0rs8nO5ESa7FuZ9ei8TKTNsqtSr5wFseuQH3+zPCfjk5ftQQAAAABJRU5ErkJggg==', 'base64', function(err){if(err){consoleLog(err);}});}
+if(!fs.existsSync('./faceicons/handle.png')){fs.writeFile('./faceicons/handle.png', 'iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAADXUAAA11AFeZeUIAAAAB3RJTUUH4QIUDyUsZQAKFgAAAMpJREFUOMvt1DtrAlEQxfE/+/28IgbiVNaCsIZAHoVv10JFSUifLgckWMwntBlhsVlfjeDpLgw/zp1i4JFHKuNS5lLn8M5uYO6An5uALu2AGjC4GnRpC9SBQTIrrgJd+geawCiZFS59XwwG1ghs6tIG6F4ExjePsRxYng0G1gTmgS0DWyWz97NAl/5KO+sH9hrYW3k2O3Fnz8Akmq0DWxywaF8NRrMGMEtm48B6wFcy+4iZX+CpEnRpAbQCG7qUl7CXEtYGPu/nWOwBIGxhMKJusmIAAAAASUVORK5CYII=', 'base64', function(err){if(err){consoleLog(err);}});}
 
 try{//make the saves folder if it doesn't exist BEFORE proceeding.
 	fs.mkdirSync('./saves');
@@ -105,7 +105,7 @@ try{//make the saves folder if it doesn't exist BEFORE proceeding.
 
 try{
 	fs.mkdirSync('./characters');
-	fs.writeFile('./characters/charindex.json', JSON.stringify({}), function(err){if(err){console.log(err);}});
+	fs.writeFile('./characters/charindex.json', JSON.stringify({}), function(err){if(err){consoleLog(err);}});
 } catch(e){
 	if(e.code != 'EEXIST'){throw e;}
 }
@@ -399,7 +399,7 @@ var toLog = function (message, room){
 	} else if(logday(today, room) != logfiles[room].lname){//file from yesterday
 		if(!logfiles[room].dirty){//room has had no dirtying posts
 			fs.unlink(logfiles[room].lname, function(err){
-				if(err){console.log(err);}
+				if(err){consoleLog(err);}
 			});//no real harm if it fails at this point as we'll no longer write to it.
 		}
 		openLog(logday(today, room), room);
@@ -441,7 +441,7 @@ var toLog = function (message, room){
 	br.className = message.className.split(" ")[0];
 	htm.body.appendChild(br);
 	fs.writeFile(logfiles[room].lname, htm.documentElement.outerHTML, function(error){
-		if(error){console.log(error);}
+		if(error){consoleLog(error);}
 	});
 };
 
@@ -501,7 +501,7 @@ var editLog = function(message, room){
 			htm.body.insertBefore(logmsg, e);
 		}
 		fs.writeFile(logfiles[room].lname, htm.documentElement.outerHTML, function(error){
-			if(error){console.log(error);}
+			if(error){consoleLog(error);}
 		});
 	}
 };
@@ -525,7 +525,7 @@ var deleteLog = function(id, room){
 			target.nextElementSibling.children[0].textContent += '[Deleted at '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+']';
 		}
 		fs.writeFile(logfiles[room].lname, htm.documentElement.outerHTML, function(error){
-			if(error){console.log(error);}
+			if(error){consoleLog(error);}
 		});
 	}
 };
@@ -640,7 +640,7 @@ var processHTML = function(message){
 };
 
 var addPlayer = function(username, socket, permissions, muted, socketroom){
-	if(!users[username]){users[username]={}; playercheck[username] = {permissions: permissions, muted: muted}; console.log(username+' has logged in.');}
+	if(!users[username]){users[username]={}; playercheck[username] = {permissions: permissions, muted: muted}; consoleLog(username+' has logged in.');}
 	users[username][socketroom] = socket;
 	if(!playerlist[socketroom]){playerlist[socketroom]={};}
 	playerlist[socketroom][username] = {permissions: permissions};
@@ -652,7 +652,7 @@ var removePlayer = function(username, socketroom){
 	if (Object.getOwnPropertyNames(users[username]).length == 0){
 		delete users[username];
 		delete playercheck[username];
-		console.log(username+' has disconnected.');
+		consoleLog(username+' has disconnected.');
 	}
 	if(socketroom != '0' && users[username] && users[username]['0'] && users[username]['0'].rooms[socketroom]){//don't remove from playerlist if main room is connected.
 		return;
@@ -661,10 +661,10 @@ var removePlayer = function(username, socketroom){
 		if(playerlist[socketroom][username]){
 			delete playerlist[socketroom][username];
 		} else {
-			console.log(username+' not found in room '+socketroom+' when expected for removal.');
+			consoleLog(username+' not found in room '+socketroom+' when expected for removal.');
 		}
 	} else {
-		console.log('Room '+socketroom+' not found when expected for player removal.');
+		consoleLog('Room '+socketroom+' not found when expected for player removal.');
 	}
 };
 process.stdin.setEncoding('utf8');
@@ -678,7 +678,7 @@ process.stdin.on('readable', function() {//support for console commands.
 		} else if(['Admin', 'Player', 'Guest'].indexOf(command) > -1) {
 			commands['Set'](res.join(' '), command);
 		} else {
-			console.log('Command '+command+' is not recognized.');
+			consoleLog('Command '+command+' is not recognized.');
 		}
 	}
 });
@@ -703,7 +703,7 @@ var commands = {//console command list, formatted this way for convenience.
 	"Remove": function(names){//deletes user logins and saves outright.
 		var all = names.split(';');
 		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){console.log(err)} else {
+			if(err){consoleLog(err)} else {
 				var out = "Deleted files for ";
 				logins = JSON.parse(logins);
 				all.forEach(function(name, index){
@@ -712,22 +712,22 @@ var commands = {//console command list, formatted this way for convenience.
 						delete logins[name];
 						out += name+' ';
 						fs.unlink('./saves/'+name+'.json', function(err){
-							if(err){console.log(err);}
+							if(err){consoleLog(err);}
 						});
 						fs.unlink('./characters/'+name, function(err){
-							if(err){console.log(err);}
+							if(err){consoleLog(err);}
 						});
 					}//'shouldn't' need to catch if they have a login.
 				});
 				fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-					if(err){console.log(err);} else {console.log(out);}
+					if(err){consoleLog(err);} else {consoleLog(out);}
 				});
 			}
 		});
 	},
 	"Mute": function(name){//just set their tag to true
 		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){console.log(err);} else {
+			if(err){consoleLog(err);} else {
 				logins = JSON.parse(logins);
 				if(logins[name]){
 					logins[name].muted = true;
@@ -735,7 +735,7 @@ var commands = {//console command list, formatted this way for convenience.
 						playercheck[name].muted = true;
 					}
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-						if(err){console.log(err);} else {console.log(name+' has been muted.');}
+						if(err){consoleLog(err);} else {consoleLog(name+' has been muted.');}
 					});
 				}
 			}
@@ -743,7 +743,7 @@ var commands = {//console command list, formatted this way for convenience.
 	},
 	"Unmute": function(name){//just set their tag to true
 		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){console.log(err);} else {
+			if(err){consoleLog(err);} else {
 				logins = JSON.parse(logins);
 				if(logins[name]){
 					logins[name].muted = false;
@@ -751,7 +751,7 @@ var commands = {//console command list, formatted this way for convenience.
 						playercheck[name].muted = false;
 					}
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-						if(err){console.log(err);} else {console.log(name+' has been unmuted.');}
+						if(err){consoleLog(err);} else {consoleLog(name+' has been unmuted.');}
 					});
 				}
 			}
@@ -759,7 +759,7 @@ var commands = {//console command list, formatted this way for convenience.
 	},
 	"Ban": function(name){//prevents subsequent logins.
 		fs.readFile('bans.json', 'utf8', function(err, bans){
-			if(err){console.log(err);} else {
+			if(err){consoleLog(err);} else {
 				bans = JSON.parse(bans);
 				if(users[name]){
 					var ip = disconnectall(users[name]);
@@ -773,17 +773,17 @@ var commands = {//console command list, formatted this way for convenience.
 					bans.users[name] = true; banlist.users[name] = true;
 				}
 				fs.writeFile('bans.json', JSON.stringify(bans), function(err){
-					if(err){console.log(err);} else {console.log(name+' has been banned.');}
+					if(err){consoleLog(err);} else {consoleLog(name+' has been banned.');}
 				});
 			}
 		});
 	},
 	"Unban": function(name){
 		if(!banlist.users[name] && (banlist.ips.indexOf(name) < 0)){
-			console.log(name + ' not found on banlist.');
+			consoleLog(name + ' not found on banlist.');
 		} else {
 			fs.readFile('bans.json', 'utf8', function(err, bans){
-				if(err){console.log(err);} else {
+				if(err){consoleLog(err);} else {
 					bans = JSON.parse(bans);
 					if(name.startsWith(':')){
 						bans.ips.splice(bans.ips.indexOf(name), 1);
@@ -798,14 +798,14 @@ var commands = {//console command list, formatted this way for convenience.
 						}
 					}
 					fs.writeFile('bans.json', JSON.stringify(bans), function(err){
-						if(err){console.log(err);} else {console.log(name+' has been unbanned.');}
+						if(err){consoleLog(err);} else {consoleLog(name+' has been unbanned.');}
 					});
 				}
 			});
 		}
 	},
 	"ListBans": function(){
-		console.log(banlist);
+		consoleLog(banlist);
 	},
 	"Boot": function(name){//Just logs them out.
 		if(users[name]){
@@ -818,26 +818,26 @@ var commands = {//console command list, formatted this way for convenience.
 					delete playerlist[room][name];
 				}
 			}//this is the best we can do without any socket info, but it gets them off the playerlist.
-			console.log(name+' is not logged in.');
+			consoleLog(name+' is not logged in.');
 		}
 	},
 	"ListPlayers": function(){//Currently active players and their permissions.
-		console.log(playerlist);
+		consoleLog(playerlist);
 	},
 	"ListAccounts": function(){//All registered users
 		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){console.log(err);} else {
+			if(err){consoleLog(err);} else {
 				logins = JSON.parse(logins);
 				Object.keys(logins).forEach(function(key){
 					delete logins[key].password;
 				})
-				console.log(logins);
+				consoleLog(logins);
 			}
 		});
 	},
 	"Set": function(name, level){//Change to Guest, Player, or Admin.
 		fs.readFile('logins.json', 'utf8', function(err, logins){
-			if(err){console.log(err);} else {
+			if(err){consoleLog(err);} else {
 				logins = JSON.parse(logins);
 				if(logins[name]){
 					logins[name].permissions = level;
@@ -852,8 +852,8 @@ var commands = {//console command list, formatted this way for convenience.
 						playercheck[name].permissions = level;
 					}
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
-						if(err){console.log(err);} else {
-							console.log(name+' is now a(n) '+level+'.');
+						if(err){consoleLog(err);} else {
+							consoleLog(name+' is now a(n) '+level+'.');
 							if(users[name] && users[name]['0']){
 								var msg = {className: 'OOC system message', post: '<font color="red">You are now a(n) '+level+'.</font>'};
 								//It should be sufficient to send this to the default room most of the time.
@@ -862,14 +862,14 @@ var commands = {//console command list, formatted this way for convenience.
 						}
 					});
 				} else {
-					console.log('Username '+name+' not found.');
+					consoleLog('Username '+name+' not found.');
 				}
 			}
 		});
 	},
 	"SetPublic": function(yn){
 		var res = false;
-		console.log(yn);
+		consoleLog(yn);
 		if(yn == 'true'){res = true;}
 		if(!isNaN(yn)){res = +yn;}
 		serversettings.pub = res;
@@ -877,18 +877,18 @@ var commands = {//console command list, formatted this way for convenience.
 		if(res){pubset='public';}
 		var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">The server has been set '+pubset+'.</font>'};
 		fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-			if(err){console.log(err);} else {io.emit('OOCmessage', msg); setImmediate(function() {SendToHub();});}
+			if(err){consoleLog(err);} else {io.emit('OOCmessage', msg); setImmediate(function() {SendToHub();});}
 		});
 	},
 	"Shutdown": function(name){//Self-explanatory.
 		Object.keys(logfiles).forEach(function(room){
 			if(!logfiles[room].dirty){//room has had no dirtying posts
 				fs.unlink(logfiles[room].lname, function(err){
-					if(err){console.log(err);}
+					if(err){consoleLog(err);}
 				});//no real harm if it fails at this point as we'll no longer write to it.
 			}
 		});
-		console.log("Shutting down now.");
+		consoleLog("Shutting down now.");
 		process.exit();
 	},
 	"CleanLogs": function(kbsize){//goes through log files and deletes any that are below a given size.
@@ -898,7 +898,7 @@ var commands = {//console command list, formatted this way for convenience.
 					if(file.endsWith('.html')){//file
 						var stat = fs.statSync('./logs/'+file);
 						if(stat.size/1000 < kbsize){
-							fs.unlink('./logs/'+file, function(err){if(err) console.log(err);});
+							fs.unlink('./logs/'+file, function(err){if(err) consoleLog(err);});
 						}
 					} else if(!file.endsWith('.txt')) {//folder
 						fs.readdir('./logs/'+file, function(err, files){
@@ -907,15 +907,15 @@ var commands = {//console command list, formatted this way for convenience.
 									if(filename.endsWith('.html')){
 										var stat = fs.statSync('./logs/'+file+'/'+filename);
 										if(stat.size/1000 < kbsize){
-											fs.unlink('./logs/'+file+'/'+filename, function(err){if(err) console.log(err);});
+											fs.unlink('./logs/'+file+'/'+filename, function(err){if(err) consoleLog(err);});
 										}
 									}
 								});
-							} else {console.log(err);}
+							} else {consoleLog(err);}
 						});
 					}
 				});
-			} else {console.log(err);}
+			} else {consoleLog(err);}
 		});
 	},
 };
@@ -948,8 +948,8 @@ var SendToHub = function(){
 
 		req.on('error', function(e) {
 			hubfailures++;
-			console.log('problem with request: ' + e.message);
-			console.log(hubfailures);
+			consoleLog('problem with request: ' + e.message);
+			consoleLog(hubfailures);
 		});
 		req.write(data);
 		req.end();
@@ -963,7 +963,7 @@ var saveFile = function(filename, data, socket, username){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;">Data for '+username+' successfully saved.</font>'};
 			socket.emit('OOCmessage', msg);
 		} else if(err) {
-			console.log(err);
+			consoleLog(err);
 			if(err.code == "UNKNOWN"){
 				setTimeout(function() {saveFile(filename, data, socket);}, 100);
 			}
@@ -973,9 +973,20 @@ var saveFile = function(filename, data, socket, username){
 
 var adminLog = function(username, command, target){
 	var today = new Date();
-	adminlogs+='['+monthenum[today.getMonth()]+' '+today.getFullYear()+' '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+'] '+username+' used the '+command+' command';
+	adminlogs+='['+monthenum[today.getMonth()]+' '+today.getDate()+' '+today.getFullYear()+' '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+'] '+username+' used the '+command+' command';
 	if(target){adminlogs+=' on '+target+'.\r\n';} else {adminlogs+='.\r\n';}
-	fs.writeFile('adminlogs.txt', adminlogs, function(err){if(err){console.log(err);} else {}});
+	fs.writeFile('adminlogs.txt', adminlogs, function(err){if(err){consoleLog(err);} else {}});
+};
+
+var consoleLog = function(message){
+	var today = new Date();
+	var timestamp = '['+monthenum[today.getMonth()]+' '+today.getDate()+' '+today.getFullYear()+' '+today.toLocaleString('en-us', {hour:'2-digit',minute:'2-digit',second:'2-digit'})+'] ';
+	if(typeof message == "object"){
+		console.log(timestamp);
+		console.log(message);
+	} else {
+		console.log(timestamp+message);
+	}
 };
 
 var CheckUser = function(username, minimumPermission, muteusable, socket){
@@ -984,7 +995,7 @@ var CheckUser = function(username, minimumPermission, muteusable, socket){
 		if(playercheck[username].permissions == 'Admin'){
 			return true;
 		} else {
-			console.log(username+' attempted to use an admin command.');
+			consoleLog(username+' attempted to use an admin command.');
 			return false;
 		}
 	}
@@ -1013,10 +1024,10 @@ var Roomer = function(socket, user, room, permissions, join){
 					socket.leave(room);
 				}
 			} else {
-				console.log(user+' not found in room '+room+' when expected for removal.');
+				consoleLog(user+' not found in room '+room+' when expected for removal.');
 			}
 		} else {
-			console.log('Room '+room+' not found when expected for player removal.');
+			consoleLog('Room '+room+' not found when expected for player removal.');
 		}
 	}
 };
@@ -1051,7 +1062,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			var msg = {className: 'IC narration message', username: username, post: message, color: color, room: sendroom};
 			msg.id = postnum++;
 			addid(msg.id, username);
-			fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
+			fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){consoleLog(err);}});
 			io.to(sendroom).emit('ICmessage', msg);
 			toLog(msg, sendroom);
 		}
@@ -1123,7 +1134,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 				addid(msg.id, username);
 				className = 'IC ' + className;
 				call = 'ICmessage';
-				fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){console.log(err);}});
+				fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){consoleLog(err);}});
 			}
 			msg.className = className;
 			if(type.startsWith('Test')){
@@ -1138,7 +1149,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	});
 	socket.on('ICedit', function(message, postid){
 		if(idlist[postid] != username){
-			console.log(username + ' tried to edit a post by '+(idlist[postid] || ''));
+			consoleLog(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
 		}
 		if(CheckUser(username, 'Player', false, socket)){
@@ -1151,7 +1162,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	});
 	socket.on('Cedit', function(message, character, type, postid){
 		if(idlist[postid] != username){
-			console.log(username + ' tried to edit a post by '+(idlist[postid] || ''));
+			consoleLog(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
 		}
 		if(CheckUser(username, 'Player', false, socket)){
@@ -1176,7 +1187,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	});
 	socket.on('Delete Post', function(id){
 		if(idlist[id] != username){
-			console.log(username + ' tried to delete a post by '+(idlist[id] || ''));
+			consoleLog(username + ' tried to delete a post by '+(idlist[id] || ''));
 			return;
 		}
 		if(CheckUser(username, 'Player', false, socket)){
@@ -1197,9 +1208,9 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			if(icons == 'data:,'){//no image
 				callback(null, username);
 			} else {//If this breaks something (makes icons load weird, etc), switch it back to sync.
-				fs.writeFile('./faceicons/'+iconnum+'.png', data, 'base64', function(err){if(err){console.log(err);}});
+				fs.writeFile('./faceicons/'+iconnum+'.png', data, 'base64', function(err){if(err){consoleLog(err);}});
 				var ids = iconnum++;
-				fs.writeFile('./faceicons/num.txt', iconnum, function(err){if(err){console.log(err);}});//update this
+				fs.writeFile('./faceicons/num.txt', iconnum, function(err){if(err){consoleLog(err);}});//update this
 				callback(ids, username);
 			}
 		}
@@ -1254,6 +1265,17 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			}
 		});
 	});
+	socket.on('List Accounts', function(callback){
+		fs.readFile('logins.json', 'utf8', function(err, logins){
+			if(err){consoleLog(err);} else {
+				logins = JSON.parse(logins);
+				Object.keys(logins).forEach(function(key){
+					delete logins[key].password;
+				})
+				callback(Object.keys(logins));
+			}
+		});		
+	});
 	socket.on('List Bans', function(callback){
 		var msg = {className: 'OOC system message', post: '<font style="color:red;">'+JSON.stringify(banlist)+'<br /></font>'};
 		socket.emit('OOCmessage', msg);
@@ -1268,7 +1290,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			var dir = './characters/'+n+'/'+d+'.html';
 			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dirmessage+'" target="_blank">here.</a>'+'</font>'};
 			fs.writeFile(dir, profile.replace(lineBreakHelper, "<br />"), function(err){
-				if(err){console.log(err);} else {socket.emit('OOCmessage', msg);}
+				if(err){consoleLog(err);} else {socket.emit('OOCmessage', msg);}
 			});
 			if(username != n && playercheck[username].permissions == 'Admin'){
 				adminLog(username, 'Set Profile', id);
@@ -1283,7 +1305,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		if(username && (username == n || (playercheck[username].permissions == 'Admin' && fs.readdirSync('./characters').indexOf(n) > -1))){
 			var dir = './characters/'+n+'/'+d+'.html';
 			fs.unlink(dir, function(err){
-				if(err && err.code != 'ENOENT'){console.log(err);} else {
+				if(err && err.code != 'ENOENT'){consoleLog(err);} else {
 					if(username != n && playercheck[username].permissions == 'Admin'){
 						adminLog(username, 'Delete Profile', id);
 					}
@@ -1296,7 +1318,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			serversettings.rules = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the rules.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Rules', null);}
+				if(err){consoleLog(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Rules', null);}
 			});
 		}
 	});
@@ -1305,7 +1327,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			serversettings.motd = processHTML(message);
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the MOTD.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit MOTD', null);}
+				if(err){consoleLog(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit MOTD', null);}
 			});
 		}
 	});
@@ -1314,7 +1336,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			serversettings.profile = message.replace(lineBreakHelper, "<br />");//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Default Profile', null);}
+				if(err){consoleLog(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Default Profile', null);}
 			});
 		}
 	});
@@ -1322,7 +1344,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		if(CheckUser(username, 'Admin', true, socket)){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
 			fs.writeFile('worldinfo.html', message.replace(lineBreakHelper, "<br />"), function(err){
-				if(err){console.log(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit World Info', null);}
+				if(err){consoleLog(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit World Info', null);}
 			});
 		}
 	});
@@ -1330,7 +1352,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		if(CheckUser(username, 'Admin', true, socket)){
 			serversettings.title = sanitizeHtml(message, {allowedTags: [], allowedAttributes: []}); //allow no html here.
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
-				if(err){console.log(err);} else {io.emit('Title', serversettings.title); adminLog(username, 'Edit Title', null);}
+				if(err){consoleLog(err);} else {io.emit('Title', serversettings.title); adminLog(username, 'Edit Title', null);}
 			});
 		}
 	});
@@ -1341,8 +1363,8 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			if(notice){//we don't send without at least a favicon.
 				var notf = notice.replace(/^data:image\/png;base64,/, "");
 			}
-			fs.writeFile('./faceicons/favicon.png', favf, 'base64', function(err){if(err){console.log(err);} else {
-				fs.writeFile('./faceicons/notice.png', notf, 'base64', function(err){if(err){console.log(err);} else {
+			fs.writeFile('./faceicons/favicon.png', favf, 'base64', function(err){if(err){consoleLog(err);} else {
+				fs.writeFile('./faceicons/notice.png', notf, 'base64', function(err){if(err){consoleLog(err);} else {
 					adminLog(username, 'Edit Favicon', null);
 				}});
 			}});
@@ -1537,11 +1559,11 @@ io.on('connection', function(socket){
 
 if(process.argv[2]){
 	http.listen(process.argv[2], function(){
-	  console.log('listening on *:'+process.argv[2]);
+	  consoleLog('listening on *:'+process.argv[2]);
 	});
 } else {
 	var prt = process.env.PORT || 0;
 	http.listen(prt, function(){
-	  console.log('listening on *:'+http.address().port);
+	  consoleLog('listening on *:'+http.address().port);
 	});
 }
