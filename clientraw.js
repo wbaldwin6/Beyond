@@ -751,7 +751,11 @@ var ModalHandler = React.createClass({
 						//TODO: Figure out how not to need to send settings.
 						return(<CharacterModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal} selectModal={that.props.selectModal} isSelected={that.props.selected === index}/>);
 					case 'group'://group creation/edit modal.
-						return(<GroupModal key={index} id={index} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal} selectModal={that.props.selectModal} isSelected={that.props.selected === index}/>);
+						if(modal.accounts){ //admin modal
+							return(<GroupModal key={index} id={index} socket={that.props.socket} modal={modal} closeModal={that.props.closeModal} selectModal={that.props.selectModal} isSelected={that.props.selected === index}/>);
+						} else {
+							return(<GroupModal key={index} id={index} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal} selectModal={that.props.selectModal} isSelected={that.props.selected === index}/>);
+						}
 					case 'delete'://'are you sure?'
 						return(<DeleteModal key={index} id={index} socket={that.props.socket} modal={modal} characters={that.props.characters} settings={that.props.settings} verifyID={that.verifyID} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal} selectModal={that.props.selectModal} isSelected={that.props.selected === index}/>);
 					case 'action':
@@ -1289,7 +1293,7 @@ var FaviconModal = React.createClass({
 
 var GroupModal = React.createClass({
 	getInitialState: function(){
-		return {x: '25%', y: '25%'};
+		return {x: '25%', y: '25%', height: document.body.clientHeight/3, minheight: 90, selected: null};
 	},
 
 	startDrag: startDrag,
@@ -1329,22 +1333,63 @@ var GroupModal = React.createClass({
 		}
 	},
 
+	acommand: function(e){
+		if(this.state.selected){
+			this.props.socket.emit('AdminCommand', this.props.modal.name, this.state.selected.textContent);
+			this.props.closeModal(this.props.id);
+		}
+	},
+
+	entrySelect: function(e){
+		e.target.style.fontWeight = (e.target.style.fontWeight=='bold') ? 'normal' : 'bold';
+	},
+
+	entrySwitch: function(e){// only allow one selection
+		e.target.style.fontWeight = 'bold';
+		if(this.state.selected){
+			this.state.selected.style.fontWeight = 'normal';
+			if(e.target.textContent == this.state.selected.textContent){//unselect
+				this.setState({selected: null});
+				return;
+			}
+		}
+		this.setState({selected: e.target});
+	},
+
 	render: function(){
 		var modal = this.props.modal;
-		var chars = this.props.characters[0].map(function(ch, index){
-			return(<div key={'c'+index} style={{float: 'none'}} className='Command' onClick={function(e){e.target.style.fontWeight=(e.target.style.fontWeight=='bold')? 'normal' : 'bold';}}>{ch[0].name}</div>);
-		});//go through the ungrouped characters.
+		var fun = this.groupEdit;
+		var prompt = 'Add characters to the group?';
+		var placeholder = 'Group Name';
+		var that = this;
+		if(!this.props.characters){
+			var filtername = this.refs['name'] ? this.refs['name'].value : '';
+			fun = this.acommand;
+			prompt = 'Select who to '+modal.name+'.';
+			placeholder = 'Filter';
+			var chars = modal.accounts.map(function(ch, index){
+				if(!filtername || ch.toLowerCase().startsWith(filtername.toLowerCase())){
+					return(<div key={'c'+index} style={{float: 'none', fontWeight: (that.state.selected&&that.state.selected.textContent==ch)?'bold':'normal'}} className='Command' onClick={that.entrySwitch}>{ch}</div>);
+				} else {
+					return null;
+				}
+			})
+		} else {
+			var chars = this.props.characters[0].map(function(ch, index){
+				return(<div key={'c'+index} style={{float: 'none'}} className='Command' onClick={that.entrySelect}>{ch[0].name}</div>);
+			});//go through the ungrouped characters.
+		}
 		var def = '';
 		var name = modal.name;
 		if(modal.id[0] > 0){def = this.props.characters[modal.id[0]][0]; name += ' - '+def;}
 		var cname = this.props.isSelected ? "modal selectedmodal" : "modal";
-		return(<div ref="this" className={cname} style={{left: this.state.x, top: this.state.y}} onMouseDown={this.startDrag} onTouchStart={this.startDrag} onClick={this.props.selectModal.bind(null, this.props.id)}><span className="mtitle">{name}</span><br/>
-			<input type='text' ref={'name'} placeholder='Group Name' defaultValue={def} style={{width:'100%'}}/><br/>
-			Add characters to the group?<br/>
-			<form ref={"chars"}>
+		return(<div ref="this" className={cname} style={{left: this.state.x, top: this.state.y, height: this.state.height}} onMouseDown={this.startDrag} onTouchStart={this.startDrag} onClick={this.props.selectModal.bind(null, this.props.id)}><span className="mtitle">{name}</span><br/>
+			<input type='text' ref={'name'} placeholder={placeholder} defaultValue={def} style={{width:'100%'}}/><br/>
+			{prompt}<br/>
+			<form ref={"chars"} style={{overflowY: 'scroll', height: this.state.height-90}}>
 			{chars}
 			</form>
-			<button type="submit" id="save" onClick={this.groupEdit}>Save</button>
+			<button type="submit" id="save" onClick={fun}>Save</button>
 				<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button>
 			</div>);
 	}
@@ -1522,16 +1567,14 @@ var ActionModal = React.createClass({
 				return;
 			} else if(['Edit Rules', 'Edit MOTD', 'Edit Default Profile', 'Edit World Info', 'Edit Title'].indexOf(modata.name) > -1){
 				this.props.socket.emit(modata.name, post);
-			} else if(['Ban', 'Mute', 'Unban', 'Unmute', 'CleanLogs'].indexOf(modata.name) > -1){
-				if(modata.name == 'CleanLogs'){
-					if(Number.isNaN(post)){
-						return;
-					} else if(post > 8 && this.refs.Send.className != "Red Button"){//safety check: a quick 'are you sure' to prevent people from accidentally deleting everything by mistyping a huge number.
-						this.refs.Send.className = "Red Button";
-						this.refs.text.style['border-color'] = 'red';
-						this.refs.text.style['outline-color'] = 'red';
-						return;
-					}
+			} else if(modata.name == 'CleanLogs'){
+				if(Number.isNaN(post)){
+					return;
+				} else if(post > 8 && this.refs.Send.className != "Red Button"){//safety check: a quick 'are you sure' to prevent people from accidentally deleting everything by mistyping a huge number.
+					this.refs.Send.className = "Red Button";
+					this.refs.text.style['border-color'] = 'red';
+					this.refs.text.style['outline-color'] = 'red';
+					return;
 				}
 				this.props.socket.emit('AdminCommand', modata.name, post);
 			} else if(modata.name == 'Set Profile'){
@@ -2030,7 +2073,7 @@ var ChartabHandler = React.createClass({
 		var that = this;
 		if(name == "Clean Logs"){
 			this.props.modalpush({id: [], name: 'CleanLogs', type: 'action'});
-		} else if(['Rules', 'MOTD', 'Profile', 'Info', 'Logs'].indexOf(type) > -1){
+		} else if(['Rules', 'MOTD', 'Profile', 'Info', 'Logs'].indexOf(type) > -1){//acquire the setting from the server so it can be edited
 			var res = function(response){
 				if(response){response = sanitize(response);}
 				that.props.modalpush({id: [], name: name, type: 'action', post: response});
@@ -2040,6 +2083,11 @@ var ChartabHandler = React.createClass({
 			} else {
 				this.props.socket.emit('Show '+type, res);
 			}
+		} else if(['Mute', 'Unmute', 'Ban', 'Unban', 'Player', 'Admin', 'Guest'].indexOf(type) > -1){//use a groupmodal for the playerlist.
+			var res = function(response){
+				if(response){that.props.modalpush({id: [], name: name, type: 'group', accounts: response});;}
+			};
+			this.props.socket.emit('List Accounts', res);
 		} else if(type == 'Notifications' || type == 'Rooms'){
 			this.props.modalpush({id: [], name: name, type: 'notifications'});
 		} else if(type == 'Public'){
@@ -2266,7 +2314,7 @@ var ChartabHandler = React.createClass({
 					</div>);
 				break;
 			case 'admin'://case for the administrative commands tab
-				currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.genmodal}>Edit Favicon</div>, <div key='6' className='Command' onClick={this.genmodal}>Set Public</div>, <div key='7' className='Command' onClick={this.setpriv}>Set Private</div>, <div key='8' className='Command' onClick={this.genmodal}>Mute</div>, <div key='9' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='10' className='Command' onClick={this.show}>List Bans</div>, <div key='11' className='Command' onClick={this.genmodal}>Ban</div>, <div key='12' className='Command' onClick={this.genmodal}>Unban</div>, <div key='13' className='Command' onClick={this.genmodal}>Clean Logs</div>, <div key='14' className='Command' onClick={this.genmodal}>Show Admin Logs</div>, <div key='15' className='Command' onClick={this.refresh}>Open Lists</div>];
+				currenttab = [<div key='0' className='Command' onClick={this.genmodal}>Edit Rules</div>, <div key='1' className='Command' onClick={this.genmodal}>Edit MOTD</div>, <div key='2' className='Command' onClick={this.genmodal}>Edit Default Profile</div>, <div key='3' className='Command' onClick={this.genmodal}>Edit World Info</div>, <div key='4' className='Command' onClick={this.genmodal}>Edit Title</div>, <div key='5' className='Command' onClick={this.genmodal}>Edit Favicon</div>, <div key='6' className='Command' onClick={this.genmodal}>Set Public</div>, <div key='7' className='Command' onClick={this.setpriv}>Set Private</div>, <div key='8' className='Command' onClick={this.genmodal}>Mute</div>, <div key='9' className='Command' onClick={this.genmodal}>Unmute</div>, <div key='10' className='Command' onClick={this.show}>List Bans</div>, <div key='11' className='Command' onClick={this.genmodal}>Ban</div>, <div key='12' className='Command' onClick={this.genmodal}>Unban</div>, <div key='13' className='Command' onClick={this.genmodal}>Make Player</div>, <div key='14' className='Command' onClick={this.genmodal}>Make Admin</div>, <div key='15' className='Command' onClick={this.genmodal}>Make Guest</div>, <div key='16' className='Command' onClick={this.genmodal}>Clean Logs</div>, <div key='17' className='Command' onClick={this.genmodal}>Show Admin Logs</div>, <div key='18' className='Command' onClick={this.refresh}>Open Lists</div>];
 				if(this.state.charindex){
 					var characters = this.state.charindex;
 					var charlist = characters.map(function(player, i){//players loop
