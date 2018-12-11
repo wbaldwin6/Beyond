@@ -1045,6 +1045,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		result.forEach(function(element){
 			Roomer(socket, username, element, playercheck[username].permissions, false);
 		});
+		socket.roomlist = rooms; //replace the roomlist with the new room arrangement.
 	});
 	socket.on('OOCmessage', function(message, color){
 		message = processHTML(message);
@@ -1382,11 +1383,13 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		}
 	});
 	socket.on('disconnect', function(){
-		if(socketroom == '0'){//remove from all the rooms we're in.
-			for (var room in playerlist){
-				if (!playerlist.hasOwnProperty(room) || room == '0') continue;
-				if(playerlist[room][username]){//any room where the user is connected
-					Roomer(null, username, room, playercheck[username].permissions, false);
+		if(socketroom == '0' && users[username]['0'].roomlist){//remove from all the rooms we're in.
+			var i;
+			for (i = 0; i < users[username]['0'].roomlist.length; i++){
+				if(playerlist[users[username]['0'].roomlist[i]][username]){//any room where the user is connected
+					if(!users[username][users[username]['0'].roomlist[i]]){//skip rooms we have a separate socket in
+						Roomer(null, username, users[username]['0'].roomlist[i], playercheck[username].permissions, false);
+					}
 				}
 			}
 		}
@@ -1502,6 +1505,7 @@ io.on('connection', function(socket){
 							Roomer(socket, username, room, logins[username].permissions, true);
 						}
 					});
+					socket.roomlist = Object.keys(info.settings.rooms);
 				}
 				var msg = {className: 'OOC log message', username: username, post: "has logged on", room: roomname};
 				io.to(roomname).emit('OOCmessage', msg);
