@@ -2476,7 +2476,20 @@ var IChandler = React.createClass({
 			}
 			var newm = that.state.messages.slice();
 			var ids = that.state.ids;
-			ids[message.id] = newm.length;//index this post to its id
+			var target = newm[ids[message.id]];
+			if(target){//a message with this id already exists
+				var msg = target.props.message;
+				msg.post = message.post;//we know it is a full post already in this case
+				if(typeof message.unnamed === "boolean"){
+					msg.unnamed = message.unnamed;
+				}
+				msg.character = message.character;
+				msg.className = message.className;
+				newm[ids[message.id]] = React.cloneElement(target, msg);
+			} else {
+				ids[message.id] = newm.length;//index this post to its id
+				newm.push(<Message key={newm.length} message={message} highlight={highlight} socketroom={that.props.socketroom}/>);
+			}
 			var highlight = false;
 			if(that.props.notify){
 				if(that.props.notify[message.username] && that.props.notify[message.username].IC){
@@ -2493,7 +2506,6 @@ var IChandler = React.createClass({
 					}
 				}
 			}
-			newm.push(<Message key={newm.length} message={message} highlight={highlight} socketroom={that.props.socketroom}/>);
 			that.setState({messages: newm, ids: ids});
 		});
 
