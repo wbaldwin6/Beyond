@@ -377,6 +377,7 @@ var today = new Date();
 var logfile = logday(today, '0');
 var logfiles = {};
 openLog(logfile, '0');
+var loginmsg = [];
 
 var userdefaults = {
 	settings: {
@@ -392,6 +393,12 @@ var userdefaults = {
 };
 
 var toLog = function (message, room){
+	if(message.className.startsWith('IC') && room == '0'){//add to the loginmsg queue
+		if(loginmsg.length == 10){//start removing older messages when we hit 10
+			loginmsg.shift();
+		}
+		loginmsg.push(message);
+	}
 	var today = new Date();
 	//only use logfiles[room].htm after this check
 	if(!logfiles[room]){//file unopened
@@ -446,6 +453,21 @@ var toLog = function (message, room){
 };
 
 var editLog = function(message, room){
+	if(room == '0'){//see if one of the messages needs to be replaced
+		for (var i = 0, len = loginmsg.length; i < len; i++) {
+			if(loginmsg[i].id == message.id){//matching post
+				loginmsg[i].post = message.post;
+				if(message.className){//full edit
+					loginmsg[i].className = message.className;
+					loginmsg[i].unnamed = message.unnamed;
+					if(message.character){//full edit with new character
+						loginmsg[i].character = message.character;
+					}
+				}
+				break; //there will only be one match unless something has gone very wrong.
+			}
+		}
+	}
 	var today = new Date();
 	if(!logfiles[room]){return;}//safety abort.
 	var htm = logfiles[room].htm;
@@ -514,6 +536,14 @@ var addid = function(id, username){
 };
 
 var deleteLog = function(id, room){
+	if(room == '0'){//see if one of the messages needs to be removed
+		for (var i = 0, len = loginmsg.length; i < len; i++) {
+			if(loginmsg[i].id == id){//matching post
+				loginmsg.splice(i, 1);
+				break; //there will only be one match unless something has gone very wrong.
+			}
+		}
+	}
 	var today = new Date();
 	if(!logfiles[room]){return;}//safety abort.
 	var htm = logfiles[room].htm;
@@ -1516,6 +1546,11 @@ io.on('connection', function(socket){
 					}
 					if(serversettings.motd){
 						socket.emit('OOCmessage', {className: 'OOC system message', post: '<b><u>Message of the Day</u>:</b><br />'+serversettings.motd+'<br /><br />'});
+					}
+					var logurl = logday(new Date(), '0').substr(7);
+					socket.emit('ICmessage', {className: 'IC narration message', username: 'sys', post: '<a href="./interactivelogs/'+logurl+'" target="_blank">See more logs here.</a>', color:'#FFFFFF'});
+					for (var i = 0, len = loginmsg.length; i < len; i++) {
+						socket.emit('ICmessage', loginmsg[i]);
 					}
 				}
 				toLog(msg, roomname);

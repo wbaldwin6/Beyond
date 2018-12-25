@@ -15,6 +15,7 @@ function refresh(){
     var month = logfilelist[currententry].substring(0, 7);
     var monthname = monthenum[month.split('_')[1]-1]+' '+logfilelist[currententry].substring(8, 10)+', '+month.split('_')[0];
     document.getElementById('currentfile').textContent = monthname;
+    window.history.pushState("object or string", "Title", '/interactivelogs/'+room+logfilelist[currententry]);
 
     if(currententry == 0){
         var last = document.getElementById('last');
