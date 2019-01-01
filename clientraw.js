@@ -2480,33 +2480,40 @@ var IChandler = React.createClass({
 			if(target){//a message with this id already exists
 				var msg = target.props.message;
 				msg.post = message.post;//we know it is a full post already in this case
-				if(typeof message.unnamed === "boolean"){
+				if(typeof message.unnamed === "boolean"){//if it is not defined, don't touch it.
 					msg.unnamed = message.unnamed;
 				}
-				msg.character = message.character;
-				msg.className = message.className;
+				if(message.character){
+					msg.character = message.character;
+				}
+				if(message.className){
+					msg.className = message.className;
+				}
 				newm[ids[message.id]] = React.cloneElement(target, msg);
-			} else {
+			} else {//this is a new message, check if we should notify for it
 				ids[message.id] = newm.length;//index this post to its id
-				newm.push(<Message key={newm.length} message={message} highlight={highlight} socketroom={that.props.socketroom}/>);
-			}
-			var highlight = false;
-			if(that.props.notify){
-				if(that.props.notify[message.username] && that.props.notify[message.username].IC){
-					highlight = true;
-					if(document.visibilityState != 'visible'){//don't do this if they're in window
-						document.title = "Post from "+message.username+"!";
-						document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
-					}
-				} else if(message.character && ((that.props.notify[message.character.name] && that.props.notify[message.character.name].IC) || (that.props.notify[message.character.id] && that.props.notify[message.character.id].IC))){
-					highlight = true;
-					if(document.visibilityState != 'visible'){//don't do this if they're in window
-						document.title = "Post from "+message.character.name+"!";
-						document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+				var highlight = false;
+				if(that.props.notify){
+					if(that.props.notify[message.username] && that.props.notify[message.username].IC){
+						highlight = true;
+						if(document.visibilityState != 'visible'){//don't do this if they're in window
+							document.title = "Post from "+message.username+"!";
+							document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+						}
+					} else if(message.character && ((that.props.notify[message.character.name] && that.props.notify[message.character.name].IC) || (that.props.notify[message.character.id] && that.props.notify[message.character.id].IC))){
+						highlight = true;
+						if(document.visibilityState != 'visible'){//don't do this if they're in window
+							document.title = "Post from "+message.character.name+"!";
+							document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+						}
 					}
 				}
+				newm.push(<Message key={newm.length} message={message} highlight={highlight} socketroom={that.props.socketroom}/>);
 			}
 			that.setState({messages: newm, ids: ids});
+			if(target){
+				that.forceUpdate();//do this just in case or it may not register the edit.
+			}
 		});
 
 		this.props.socket.on('ICedit', function(message){
