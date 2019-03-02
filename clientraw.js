@@ -481,6 +481,9 @@ var Outercontainer = React.createClass({
 				newmodal.type = 'delete';
 				break;
 			case 'Delete Post':
+				var room = this.state.context.target.getAttribute('data-room');
+				if(room){room = room.slice(1, -1);}
+				newmodal.room = room;
 				newmodal.type = 'delete';
 				break;
 			case 'Private Roll':
@@ -506,6 +509,9 @@ var Outercontainer = React.createClass({
 				break;
 			case 'Edit':
 				var children = this.state.context.target.children;
+				var room = this.state.context.target.getAttribute('data-room');
+				if(room){room = room.slice(1, -1);}
+				newmodal.room = room;
 				newmodal.post = children[children.length-1].innerHTML;
 				if(this.state.context.target.className.split(' ')[1] === 'say'){
 					newmodal.post = newmodal.post.slice(1, -1);
@@ -545,6 +551,9 @@ var Outercontainer = React.createClass({
 				break;
 			case 'Full Edit':
 				newmodal.charid = this.state.context.target.getAttribute('data');
+				var room = this.state.context.target.getAttribute('data-room');
+				if(room){room = room.slice(1, -1);}
+				newmodal.room = room;
 				var t = this.state.context.target.className.split(' ')[1];
 				newmodal.pt = t.charAt(0).toUpperCase() + t.slice(1);
 				var children = this.state.context.target.children;
@@ -1438,7 +1447,7 @@ var DeleteModal = React.createClass({
 	},
 
 	postDelete: function(e){
-		this.props.socket.emit('Delete Post', this.props.modal.id);
+		this.props.socket.emit('Delete Post', this.props.modal.id, this.props.modal.room);
 		this.props.closeModal(this.props.id);
 	},
 
@@ -1544,7 +1553,7 @@ var ActionModal = React.createClass({
 			}
 			if(modata.name == 'Edit'){
 				if(modata.post != post){
-					this.props.socket.emit('ICedit', post, modata.id);
+					this.props.socket.emit('ICedit', post, modata.id, modata.room);
 				}
 			} else if(modata.name == 'Whisper'){
 				this.props.socket.emit('Whisper', post, modata.id, modata.data);
@@ -1652,7 +1661,7 @@ var ActionModal = React.createClass({
 
 var ActiveModal = React.createClass({
 	getInitialState: function(){
-		return {x: '25%', y: '25%', width: 217, minwidth: 217, height: 'auto', scrollheight: 100, scroll: false, wait: false, min: false, post: this.props.modal.post, pt: this.props.modal.pt || 'Action', win: 'IC'};
+		return {x: '25%', y: '25%', width: 217, minwidth: 217, height: 'auto', scrollheight: 100, scroll: false, wait: false, min: false, post: this.props.modal.post, pt: this.props.modal.pt || 'Action', win: 'IC', rooml: 'None'};
 	},
 
 	startDrag: startDrag,
@@ -1709,7 +1718,7 @@ var ActiveModal = React.createClass({
 			}//if it's undefined the character doesn't exist.
 		}
 		if(post && modata.name == 'Full Edit'){//if there IS a trueid we have it by this point, else it should default to previous.
-			this.props.socket.emit('Cedit', post, deriv, name, modata.id);
+			this.props.socket.emit('Cedit', post, deriv, name, modata.id, modata.room);
 			this.props.closeModal(this.props.id);
 		}
 	},
@@ -1823,7 +1832,8 @@ var ActiveModal = React.createClass({
 
 	minimize: function(){
 		if(!this.state.min){
-			this.setState({min: !this.state.min, post: this.refs['text'].value, pt: this.refs['type'].textContent, win: this.refs['win'].textContent});
+			var room = this.refs['roomlist'] ? this.refs['roomlist'].value : 'None';
+			this.setState({min: !this.state.min, post: this.refs['text'].value, pt: this.refs['type'].textContent, win: this.refs['win'].textContent, rooml: room});
 		} else {
 			this.setState({min: false});
 		}
@@ -1894,7 +1904,7 @@ var ActiveModal = React.createClass({
 				options.push(<option key={ind}>{roomname}</option>);
 				ind++;
 			});
-			dropdown = (<select className="room" ref={'roomlist'} style={{whiteSpace: 'nowrap', right: 18}} onClick={null}>{options}</select>);
+			dropdown = (<select className="room" defaultValue={this.state.rooml} ref={'roomlist'} style={{whiteSpace: 'nowrap', right: 18}} onClick={null}>{options}</select>);
 		}
 		return(
 			<div ref="this" className={cname} style={{left: this.state.x, top: this.state.y, width: this.state.width, height: this.state.height}} onMouseDown={this.startDrag} onTouchStart={this.startDrag} onClick={this.focus}><span className="mtitle">{name}</span>{dropdown}<span onClick={this.minimize} style={{position: 'absolute', right:0, top: 0, cursor: "default"}}>[-]</span><br/>
@@ -2433,7 +2443,7 @@ var Message = React.createClass({
 				var edit = [];
 				if(message.id){edit.push(character.id);}//worst case message.id is undefined
 				//if(!message.className.startsWith('O') && !message.className.startsWith('T')){edit.push('Narrate');}//IC post
-				return(<div id={message.id} data={edit} className={message.className} style={{fontFamily: character.fontStyle}}><a href={'/characters/'+charid+'/'+d+'.html'} target="_blank"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/></a>{room} <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
+				return(<div id={message.id} data={edit} data-room={room} className={message.className} style={{fontFamily: character.fontStyle}}><a href={'/characters/'+charid+'/'+d+'.html'} target="_blank"><img src='/faceicons/img_trans.gif' height='50px' width='50px' style={{cursor: 'pointer', backgroundImage: 'url(/faceicons/'+character.icon+'.png)', backgroundPosition: '-'+character.icpos.left+'px -'+character.icpos.top+'px'}}/></a>{room} <span ref='name' style={{fontWeight: 'bold', color: character.nameColor}}></span><span ref="post" style={{color: character.color}}></span>{'\r'}</div>);
 		}
 	}
 });

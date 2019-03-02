@@ -1181,7 +1181,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			}
 		}
 	});
-	socket.on('ICedit', function(message, postid){
+	socket.on('ICedit', function(message, postid, room){
 		if(idlist[postid] != username){
 			consoleLog(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
@@ -1191,7 +1191,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			var msg = {id: postid, post: message+'*'};
 			io.emit('ICedit', msg);
 			msg.username = username;
-			editLog(msg, socketroom);
+			editLog(msg, socketroom=='0'&&room ? room : socketroom);
 		}
 	});
 	socket.on('Cedit', function(message, character, type, postid){
@@ -1216,16 +1216,16 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			}
 			io.emit('ICedit', msg);
 			msg.username = username;
-			editLog(msg, socketroom);
+			editLog(msg, socketroom=='0'&&room ? room : socketroom);
 		}
 	});
-	socket.on('Delete Post', function(id){
+	socket.on('Delete Post', function(id, room){
 		if(idlist[id] != username){
 			consoleLog(username + ' tried to delete a post by '+(idlist[id] || ''));
 			return;
 		}
 		if(CheckUser(username, 'Player', false, socket)){
-			deleteLog(id, socketroom);
+			deleteLog(id, socketroom=='0'&&room ? room : socketroom);
 			io.emit('ICdel', id);
 		}
 	});
