@@ -1194,7 +1194,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			editLog(msg, socketroom=='0'&&room ? room : socketroom);
 		}
 	});
-	socket.on('Cedit', function(message, character, type, postid){
+	socket.on('Cedit', function(message, character, type, postid, room){
 		if(idlist[postid] != username){
 			consoleLog(username + ' tried to edit a post by '+(idlist[postid] || ''));
 			return;
