@@ -1,38 +1,34 @@
 var fs = require('fs');
 
-var DomParser = require('dom-parser'); //Used in log searching
-var parser = new DomParser(); //Also used in log searching
-
 var monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function escapeRegExp(str) { //Borrowed directly from Stack Overflow, just replaces every special character in a string with the escaped equivalent for use as a regex
   return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
 }
 
-//This function returns a "Promise", which will "resolve" when it is done
-//When the promise resolves, the searchLogs function will know to send its information to the client
+//stringToFind contains the regex to search for in the file filename
+//read contains the directory to search
 function searchLogsByFilename(stringToFind, filename, read) {
-    if(!filename.endsWith('.html')) { //Not a log file
-        return '';
-    } else {
-        var data = fs.readFileSync("."+read+filename, 'utf8');
-        if(data){
-            var logfile = parser.parseFromString(data); //Convert the file into a DOM object
-            var bodyOfFile = logfile.getElementsByTagName("body")[0]; //Grab the body of the DOM
-            if(bodyOfFile.textContent.search(stringToFind) !== -1) { //If the string to find is in the body's textContent
-                return filename; //We say we found it
-            } else {
-                return ''; //The empty string works as a "Not Found" value
-            }            
-        }
-    }
+	if(!filename.endsWith('.html')) { //Not a log file
+		return '';
+	} else {
+		var data = fs.readFileSync("."+read+filename, 'utf8');
+		if(data.search(stringToFind) !== -1) {
+			return filename; //Filename serves as "True" result
+		} else {
+			return ''; //EMpty string serves as "Not Found" value
+		}
+	}
 }
  
 //This function takes a string and an HTTP Response object
 //Search all the log files, then send the list of good results back to the response
 function searchLogs(stringToFind, room) {
     var errorReport = '<body style="background-color:black;color:white;"><b>An error occurred trying to search the logs. Please try again later.</b><br />';
-	stringToFind = new RegExp(escapeRegExp(decodeURIComponent(stringToFind)), 'i'); //In case we want non-standard characters in our search term; convert to regex for case-insensitive search.
+	/*Decode and escape characters in string to allow for search of special characters.
+	  Additional tags around ensure search is confined to body, without searching inside tags
+	  Conversion to RegExp for case-insensitive search*/
+	stringToFind = new RegExp("<body.*>[^<]*" + escapeRegExp(decodeURIComponent(stringToFind)) + ".*<.*/body>", 'i');
     var read = "/logs/";
     var intread = "/interactivelogs/";
     if(room){read += room+"/"; intread += room+"/";}
@@ -44,7 +40,7 @@ function searchLogs(stringToFind, room) {
         if(files.length){
             process.send('<body style="background-color:black;color:white;">');
             var success = false;
-            for(var i = 0; i < files.length; i++){
+            for(var i = files.length-1; i >= 0; i--){
                 var result = searchLogsByFilename(stringToFind, files[i], read);
                 if(result){
                     success = true;
@@ -53,6 +49,7 @@ function searchLogs(stringToFind, room) {
                     }) + '</b> <span style="color:white;">(<a href="'+intread+result+'" style="color:blue;">Interactive</a>)</span><br />');
                 }
             }
+			process.send('<b>End of Search Results</b><br />');
             if(!success){
                 process.send('<b>No results found!</b>');
             }
