@@ -373,6 +373,7 @@ var Outercontainer = React.createClass({
 					case 'IC say message':
 						//fallthrough
 					case 'IC action message':
+						options.push('View Character Profile');
 						//check username in data, add edit if needed
 						var charid = target.getAttribute('data').split('-');
 						charid.pop(); charid = charid.join('-');//catches names with - in them
@@ -596,6 +597,13 @@ var Outercontainer = React.createClass({
 				//fallthrough
 			case 'Make Guest':
 				this.props.socket.emit('AdminCommand', name, id.join(','));
+				break;
+			case 'View Character Profile':
+				var charid = this.state.context.target.getAttribute('data');
+				charid = charid.split('-');
+				var charnum = charid.pop();
+				charid = charid.join('-');//Catch usernames with '-' in them.
+				window.open('/characters/' + charid + '/' + charnum + '.html');
 				break;
 			default:
 				console.log('Unrecognized context command.');
@@ -2057,6 +2065,12 @@ var ChartabHandler = React.createClass({
 		settings.buttons = !settings.buttons;//works even if completely unset.
 		this.props.handleSettings(settings, this.props.characters);
 	},
+	
+	toggleHideIcons: function(e) {
+		var settings = this.props.settings;
+		settings.hideIcons = !settings.hideIcons;//works even if completely unset
+		this.props.handleSettings(settings, this.props.characters);
+	},
 
 	togglesetting: function(e){
 		var settings = this.props.settings;
@@ -2070,6 +2084,8 @@ var ChartabHandler = React.createClass({
 			setting = 'compchar';
 		} else if(cmd.startsWith('Listed Icons')){
 			setting = 'showfi';
+		} else if(cmd.startsWith('IC/OOC Icons')) {
+			setting = 'hideIcons';
 		}
 		if(setting){
 			settings[setting] = !settings[setting];//works even if completely unset.
@@ -2313,11 +2329,11 @@ var ChartabHandler = React.createClass({
 					</div>);
 				break;
 			case 'commands'://case for player commands tab
-				currenttab=[<div key='0' className='Command' onClick={this.togglesetting}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglesetting}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.togglesetting}>{'Compact Characters '+(this.props.settings.compchar ? 'ON' : 'OFF')}</div>, <div key='3' className='Command' onClick={this.togglesetting}>{'Listed Icons '+(this.props.settings.showfi ? 'ON' : 'OFF')}</div>, <div key='4' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='5' className='Command' onClick={function(e){window.open(that.props.socketroom ? '/logs/'+that.props.socketroom : '/logs');}}>Open Logs</div>, <div key='6' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='7' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='8' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='9' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='11' className='Command' onClick={this.show}>Show Rules</div>, <div key='12' className='Command' onClick={this.show}>Show MOTD</div>, <div key='13' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='14' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='15' className='Command' onClick={this.charstats}>Show Charlist Stats</div>, <div key='16' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
-				if(!this.props.socketroom){currenttab.splice(10, 0, (<div key='10' className='Command' onClick={this.genmodal}>Set Rooms</div>));}
+				currenttab=[<div key='0' className='Command' onClick={this.togglesetting}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglesetting}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.togglesetting}>{'Compact Characters '+(this.props.settings.compchar ? 'ON' : 'OFF')}</div>, <div key='3' className='Command' onClick={this.togglesetting}>{'Listed Icons '+(this.props.settings.showfi ? 'ON' : 'OFF')}</div>, <div key='4' className='Command' onClick={this.togglesetting}>{'IC/OOC Icons '+(this.props.settings.hideIcons ? 'OFF' : 'ON')}</div>, <div key='5' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='6' className='Command' onClick={function(e){window.open(that.props.socketroom ? '/logs/'+that.props.socketroom : '/logs');}}>Open Logs</div>, <div key='7' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='8' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='9' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='10' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='12' className='Command' onClick={this.show}>Show Rules</div>, <div key='13' className='Command' onClick={this.show}>Show MOTD</div>, <div key='14' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='15' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='16' className='Command' onClick={this.charstats}>Show Charlist Stats</div>, <div key='17' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+				if(!this.props.socketroom){currenttab.splice(11, 0, (<div key='11' className='Command' onClick={this.genmodal}>Set Rooms</div>));}
 				var that = this;
 				this.props.settings.dice.forEach(function(dice, index){
-					currenttab.push(<div key={17+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
+					currenttab.push(<div key={18+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
 				});
 				currenttab = (<div className="playlist">
 					{currenttab}
@@ -2349,6 +2365,9 @@ var ChartabHandler = React.createClass({
 		var admin = this.props.permissions=='Admin'? <li><div className="tablink" id="admin" onClick={this.shiftTab}>Admin Commands</div></li> : null;
 		return (
 			<div className="options">
+				<style>
+					{'div#OI img {display:'+(this.props.settings.hideIcons?'none':'inline')+'}'}
+				</style>
 				<ul className="tab" style={{listStyleType:'none'}}>
 					<li><div className="tablink" id="characters" onClick={this.shiftTab}>Characters</div></li>
 					<li><div className="tablink" id="players" onClick={this.shiftTab}>Players Online</div></li>

@@ -347,12 +347,12 @@ var openLog = function (logfile, room){
 		logfiles[room] = {lname: logfile, htm: jsdom.jsdom(fs.readFileSync(logfile, 'utf8')), dirty: true};
 	} catch(e){//today's logs don't exist, make them!
 		//this won't change, so just making it a static string (albeit a long one) is more effiicient.
-		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action, div.log, div.narration{font-weight: bold;} div.narration{text-align: center;} div.narration span.timestamp{position: absolute; left: 0;} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} .IC{} .OOC{} .deleted{}</style>';
+		var style = '<style>body{background-color: black; margin: 0 0 0 0; color: white;} div{display: block; float: left; height: auto; width: 100%;} div.action, div.log, div.narration{font-weight: bold;} div.narration{text-align: center;} div.narration span.timestamp{position: absolute; left: 0;} span.timestamp {font-weight: normal; font-family: monospace; color:#d3d3d3} .IC{} .OOC{} .deleted{} img{}</style>';
 		var toggleedit = 'function toggleedit(id){var e=document.getElementById(id); var edit=e.nextElementSibling; if(e.style.display=="none"){e.style.display=null; edit.style.display="none";} else {edit.style.display=null; e.style.display="none";}}';
 		var tog = 'function tog(i,o){var x=document.getElementsByTagName("style")[0].sheet.cssRules; x[6].style.display=i?"initial":"none"; x[7].style.display=o?"initial":"none";}';
 		var toggledis = 'function te(e,y){if(e.innerHTML.startsWith("Hide")){e.innerHTML=e.innerHTML.replace("Hide","Show");}else{e.innerHTML=e.innerHTML.replace("Show","Hide");} var x=document.getElementsByTagName("style")[0].sheet.cssRules; x[y].style.display=x[y].style.display==="none"?"initial":"none";}';
 		var script = '<script>'+toggleedit+' '+tog+' '+toggledis+'</script>';
-		var body = '<body><div class="buttons" style="width: auto; position:fixed; bottom: 0; right: 0;"><button onclick="te(this,5)">Hide Timestamps</button><button onclick="te(this,8)">Hide Deletes</button><button onclick="tog(0,1)">OOC Only</button><button onclick="tog(1,0)">IC Only</button><button onclick="tog(1,1)">Both</button></div>'+script+'</body>';
+		var body = '<body><div class="buttons" style="width: auto; position:fixed; bottom: 0; right: 0;"><button onclick="te(this,9)">Hide Face Icons</button><button onclick="te(this,5)">Hide Timestamps</button><button onclick="te(this,8)">Hide Deletes</button><button onclick="tog(0,1)">OOC Only</button><button onclick="tog(1,0)">IC Only</button><button onclick="tog(1,1)">Both</button></div>'+script+'</body>';
 		var initialhtml = '<html><head><title>Logs for '+new Date().toLocaleString('en-us', {month: "long", day:"2-digit"})+
 		'</title>'+style+'<link rel="icon" href="/faceicons/favicon.png"></head>'+body+'</html>';
 		if(room != '0'){

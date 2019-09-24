@@ -124,12 +124,12 @@ var tsbutton = lastbutton.cloneNode(true);
 tsbutton.id = 'ts';
 tsbutton.textContent = 'Hide Timestamps';
 tsbutton.style.fontSize = 'smaller';
-tsbutton.style.width = 'calc(15%)';
+tsbutton.style.width = 'calc(10%)';
 tsbutton.style.whiteSpace = 'nowrap';
 tsbutton.style.height = '20px';
 tsbutton.style.lineHeight = '20px';
 tsbutton.style.borderRadius = '3px';
-tsbutton.style.marginRight = 'calc(2.5%)';
+tsbutton.style.marginRight = 'calc(1.5%)';
 tsbutton.onclick = function(){toggledisplay(this,5);};
 container.appendChild(tsbutton);
 
@@ -138,6 +138,13 @@ delbutton.id = 'del';
 delbutton.textContent = 'Hide Deletes';
 delbutton.onclick = function(){toggledisplay(this,8);};
 container.appendChild(delbutton);
+
+//create the Hide Face Icons button
+var fibutton = delbutton.cloneNode(true);
+fibutton.id = 'fi';
+fibutton.textContent = 'Hide Face Icons';
+fibutton.onclick = function(){toggledisplay(this,9);};
+container.appendChild(fibutton);
 
 //create the 'navigate to next' button
 var nextbutton = lastbutton.cloneNode(true);
