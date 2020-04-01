@@ -211,7 +211,7 @@ var Outercontainer = React.createClass({
 			modals.push({type: 'warning'});
 		}
 		var room = document.URL.split('/');
-		if(room.indexOf('rooms') >= -1){room = decodeURIComponent(room[room.length-1]);} else {room = '';}
+		if(room.indexOf('rooms') >= 0){room = decodeURIComponent(room[room.length-1]);} else {room = '';}
 		return {settings: {}, characters: [], modal: modals, selected: null, permissions: 'Guest', username: '', pass: '', players: {}, socketroom: room, posx: 25, posy: 50};
 	},
 
