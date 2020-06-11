@@ -767,6 +767,9 @@ var commands = {//console command list, formatted this way for convenience.
 					if(playercheck[name]){
 						playercheck[name].muted = true;
 					}
+					var msg = {className: 'OOC system message', post: '<font color="red">You have been muted.</font>'};
+					//It should be sufficient to send this to the default room most of the time.
+					users[name]['0'].emit('OOCmessage', msg);
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
 						if(err){consoleLog(err);} else {consoleLog(name+' has been muted.');}
 					});
@@ -783,6 +786,9 @@ var commands = {//console command list, formatted this way for convenience.
 					if(playercheck[name]){
 						playercheck[name].muted = false;
 					}
+					var msg = {className: 'OOC system message', post: '<font color="red">You have been unmuted.</font>'};
+					//It should be sufficient to send this to the default room most of the time.
+					users[name]['0'].emit('OOCmessage', msg);
 					fs.writeFile('logins.json', JSON.stringify(logins), function(err){
 						if(err){consoleLog(err);} else {consoleLog(name+' has been unmuted.');}
 					});
@@ -1089,7 +1095,8 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		}
 	});
 	socket.on('Narrate', function(message, color, room, callback){
-		if(callback){callback();}
+		//Tell the player they are muted or a Guest who cannot narrate and let them keep their text
+		if(callback){callback(playercheck[username].muted || (['Player', 'Admin'].indexOf(playercheck[username].permissions) < 0));}
 		var sendroom = room || socketroom;
 		if(CheckUser(username, 'Player', false, socket)){
 			message = processHTML(message);
@@ -1135,7 +1142,8 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		}
 	});
 	socket.on('characterPost', function(message, character, type, room, callback){
-		if(callback){callback();}
+		//Tell the player that either they are muted or cannot post IC as a guest and let them keep their message
+		if(callback){callback(playercheck[username].muted || (type.indexOf('Omit') < 0 && type.indexOf('Test') < 0 && ['Player', 'Admin'].indexOf(playercheck[username].permissions) < 0));}
 		var sendroom = room || socketroom;
 		if(CheckUser(username, 'Guest', false, socket) && character){//We do not check for Player status here, only if it's IC.
 			if(character.customHTML){

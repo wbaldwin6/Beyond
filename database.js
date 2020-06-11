@@ -252,7 +252,7 @@ LoadDatabase: function() {
 			this.SaveDatabase();
 		}
 
-	} catch(err) {
+	} catch(err) { //This will happen when readFileSync() fails, and so we want to create a Database from scratch.
 		toplevel = new Directory('database', '');
 		entries = {};
 		fs.mkdirSync('./database', function(er) {

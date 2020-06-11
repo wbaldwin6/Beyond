@@ -1568,16 +1568,20 @@ var ActionModal = React.createClass({
 			} else if(modata.name == 'Narrate'){
 				var that = this;
 				var to = setTimeout(this.unWait, 1000);
-				this.props.socket.emit('Narrate', post, this.props.settings.textcolor, room, function(){
-					clearTimeout(to);
-					that.props.closeModal(that.props.id);
+				this.props.socket.emit('Narrate', post, this.props.settings.textcolor, room, function(muted){
+					if(!muted) {
+						clearTimeout(to);
+						that.props.closeModal(that.props.id);
+					}
 				});
 				this.setState({wait: true});
 				return;
 			} else if(modata.name == 'Persistent Narrate'){
 				var that = this;
-				this.props.socket.emit('Narrate', post, this.props.settings.textcolor, room, function(){
-					that.refs['text'].value = '';
+				this.props.socket.emit('Narrate', post, this.props.settings.textcolor, room, function(muted){
+					if(!muted) {
+						that.refs['text'].value = '';
+					}
 				});
 				this.setState({wait: true});
 				setTimeout(this.unWait, 1000);
@@ -1605,9 +1609,11 @@ var ActionModal = React.createClass({
 					var deriv = this.props.characters[trueid[0]][trueid[1]][trueid[2]];
 					var that = this;
 					var to = setTimeout(this.unWait, 1000);
-					this.props.socket.emit('characterPost', post, deriv, modata.name, room, function(){
-						clearTimeout(to);
-						that.props.closeModal(that.props.id);
+					this.props.socket.emit('characterPost', post, deriv, modata.name, room, function(muted){
+						if(!muted) {
+							clearTimeout(to);
+							that.props.closeModal(that.props.id);
+						}
 					});
 					this.setState({wait: true});
 					return;
@@ -1715,8 +1721,8 @@ var ActiveModal = React.createClass({
 				deriv = this.props.characters[trueid[0]][trueid[1]][did];
 				if(modata.name != 'Full Edit'){
 					var that = this;
-					this.props.socket.emit('characterPost', post, deriv, name, room, function(){
-						if(win != 'Test'){
+					this.props.socket.emit('characterPost', post, deriv, name, room, function(muted){
+						if(win != 'Test' && !muted){
 							that.refs['text'].value = ''; //just empty it.
 						}
 					});
