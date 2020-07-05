@@ -523,10 +523,10 @@
 					pathname = pathname + '.html';
 					var that = this;
 					this.props.socket.emit('RequestEntry', pathname, function(page) {
-						that.setState({defaultText: page.replace(/<br \/>/g, "\n")});
+						that.setState({defaultText: page.replace(/(?<!(<table>.*(?!(<\/table>))))<br( ?\/)?>/gs, "\n")});
 					});
 				} else {
-					return {defaultText: '<html><body style="color:white;background-color:black;">\nYour Message Here\n</body></html>', x: 100, y: 100, width: 300, height: 200, minheight: 110, minwidth: 220};
+					return {defaultText: '<html><body style="color:white;background-color:black;white-space:break-spaces">\nYour Message Here\n</body></html>', x: 100, y: 100, width: 300, height: 200, minheight: 110, minwidth: 220};
 				}
 				return {x: 100, y: 100, width: 300, height: 200, minheight: 110, minwidth: 220};
 			},
@@ -536,13 +536,13 @@
 				switch(this.props.funcname) {
 					case 'add':
 						if(this.refs.inputName.value) {
-							this.props.socket.emit('AddEntry', path, this.refs.inputName.value, this.props.outerarea.state.username, this.CleanContent());
+							this.props.socket.emit('AddEntry', path, this.refs.inputName.value, this.props.outerarea.state.username, this.refs.textArea.value);
 						}
 						break;
 					case 'edit':
 						var name = this.refs.inputName.value;
 						var oldname = this.props.path[this.props.path.length - 1];
-						var content = this.CleanContent();
+						var content = this.refs.textArea.value;
 						if(content === this.state.defaultText) {
 							content = null;
 						}
@@ -566,17 +566,11 @@
 			},
 
 			PreviewButton: function(){
-				var frame = "<body style='margin: 0'><iframe width='100%' height='100%' src='data:text/html," + encodeURIComponent(this.CleanContent()).replace(/'/g,"%27") + "'></iframe></body>";
+				var frame = "<body style='margin: 0'><iframe width='100%' height='100%' src='data:text/html," + encodeURIComponent(this.refs.textArea.value).replace(/'/g,"%27") + "'></iframe></body>";
 				var myw = window.open();
 				myw.document.open();
 				myw.document.write(frame);
 				myw.document.close();
-			},
-
-			CleanContent: function() {
-				var content = this.refs.textArea.value;
-				content = content.replace(/\r\n?|\n(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />");
-				return content;
 			},
 
 			TypeCheck: function(){

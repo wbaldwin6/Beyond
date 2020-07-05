@@ -9,8 +9,6 @@ var sanitizeHtml = require('sanitize-html');
 var database = require('./database');
 var cp = require('child_process');
 
-const lineBreakHelper = /\r\n?|\n(?!([^<]+)?(<\/style>|<\/script>))/g;
-
 //Set up the search request for the logs
 app.get('/logs/search/:search', function(req, res) {
 	var stringToFind = req.params.search;
@@ -62,7 +60,7 @@ try{
 	serversettings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
 	if(serversettings.pub){setImmediate(function() {SendToHub();});}
 } catch(e) {
-	var profile = '<style>body{background-color:black}</style><font style="font-size:16px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i><br><br><b>Age:</b> <i>In years, typically.</i><br><br><b>Gender:</b> <i>____</i><br><br><b>Species:</b> <i> </i><br><br><b>Height:</b> <i> </i><br><br><b>History:</b> <i>Any other relevant information can have fields added.</i>';
+	var profile = '<style>body{background-color:black;white-space:break-spaces}</style><font style="font-size:16px;font-family:calibri;color:white;"><img src=""><br><b>Name:</b> <i>Your character\'s name.</i>\n\n<b>Age:</b> <i>In years, typically.</i>\n\n<b>Gender:</b> <i>____</i>\n\n<b>Species:</b> <i> </i>\n\n<b>Height:</b> <i> </i>\n\n<b>History:</b> <i>Any other relevant information can have fields added.</i>';
 	serversettings = {motd: '', rules: 'Rule 0: Be respectful.', profile: profile, title: 'Beyond'};
 	fs.writeFileSync('settings.json', JSON.stringify(serversettings));
 }
@@ -655,7 +653,6 @@ var generatePost = function (message, username, post, character, say, omit, unna
 var processHTML = function(message){
 	var test = /<|>/.test(message);
 	message = message.replace(/(\s|^)(https?:\/\/\S+)/ig, "$1<a href=\"$2\" target=\"_blank\">$2</a>");
-	message = message.replace(/\r\n?|\n(?!([^<]+)?>)/g, "<br />");
 	if(test){//we skip it if we don't even find any tags (prior to potentially adding them ourselves)
 		message = sanitizeHtml(message, {allowedTags: ['a', 'b', 'br', 'em', 'font', 'hr', 'i', 'rb', 'rbc', 'rp', 'rt', 'rtc', 'ruby', 's', 'span', 'strong', 'sup', 'sub', 'u'],
 		allowedAttributes: {
@@ -663,9 +660,9 @@ var processHTML = function(message){
 			'span': ['style'],
 			'font': ['color', 'style']
 		}});
-		message = message.replace(/<(.*?)>/g, function(match, p1, offset, string) {
-			return "<" + p1.replace(/style\s*=\s*"(.*?)"/g, function(match, p1, offset, string) {
-				return 'style="' + p1.replace(/(^|;)((?!(text-decoration|text-shadow|font-.*|outline-.*|color))[-A-Za-z])*:.+?\b/g, "") + '"'
+		message = message.replace(/<(.*?)>/gs, function(match, p1, offset, string) {
+			return "<" + p1.replace(/style\s*=\s*"(.*?)"/gs, function(match, p1, offset, string) {
+				return 'style="' + p1.replace(/(^|;)((?!(text-decoration|text-shadow|font-.*|outline-.*|color))[-A-Za-z])*:.+?\b/gs, "") + '"'
 			}) + ">";
 		});
 	}
@@ -1331,7 +1328,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			var dirmessage = '/characters/'+encodeURIComponent(n)+'/'+d+'.html';
 			var dir = './characters/'+n+'/'+d+'.html';
 			var msg = {className: 'OOC system message', post: '<font style="color:red;">Profile set. View it '+'<a href="'+dirmessage+'" target="_blank">here.</a>'+'</font>'};
-			fs.writeFile(dir, profile.replace(lineBreakHelper, "<br />"), function(err){
+			fs.writeFile(dir, profile, function(err){
 				if(err){consoleLog(err);} else {socket.emit('OOCmessage', msg);}
 			});
 			if(username != n && playercheck[username].permissions == 'Admin'){
@@ -1375,7 +1372,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	});
 	socket.on('Edit Default Profile', function(message){
 		if(CheckUser(username, 'Admin', true, socket)){
-			serversettings.profile = message.replace(lineBreakHelper, "<br />");//no HTML checking here
+			serversettings.profile = message;//no HTML checking here
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the default character profile.</font>'};
 			fs.writeFile('settings.json', JSON.stringify(serversettings), function(err){
 				if(err){consoleLog(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit Default Profile', null);}
@@ -1385,7 +1382,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	socket.on('Edit World Info', function(message){
 		if(CheckUser(username, 'Admin', true, socket)){
 			var msg = {className: 'OOC system message', post: '<font style="color:red;font-weight:bold">'+username+' has edited the world info.</font>'};
-			fs.writeFile('worldinfo.html', message.replace(lineBreakHelper, "<br />"), function(err){
+			fs.writeFile('worldinfo.html', message, function(err){
 				if(err){consoleLog(err);} else {io.emit('OOCmessage', msg); adminLog(username, 'Edit World Info', null);}
 			});
 		}

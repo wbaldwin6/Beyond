@@ -165,7 +165,7 @@ var rectimer;
 var reconnected = false;
 
 var sanitize = function(string){
-	string = string.replace(/<br( \/)?>/g, '\n');
+	string = string.replace(/(?<!(<table>.*(?!(<\/table>))))<br( ?\/)?>/gs, '\n');
 	return string;
 };
 
@@ -1542,7 +1542,7 @@ var ActionModal = React.createClass({
 	},
 
 	preview: function(){
-		var frame = "<body style='margin: 0'><iframe width='100%' height='100%' src='data:text/html," + encodeURIComponent(this.refs['text'].value.replace(/\r\n?|\n(?!([^<]+)?(<\/style>|<\/script>))/g, "<br />")).replace(/'/g,"%27") + "'></iframe></body>";
+		var frame = "<body style='margin: 0'><iframe width='100%' height='100%' src='data:text/html," + encodeURIComponent(this.refs['text'].value).replace(/'/g,"%27") + "'></iframe></body>";
 		var myw = window.open();
 		myw.document.open();
 		myw.document.write(frame);
