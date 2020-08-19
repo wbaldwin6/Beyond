@@ -877,6 +877,7 @@ var commands = {//console command list, formatted this way for convenience.
 				logins = JSON.parse(logins);
 				if(logins[name]){
 					logins[name].permissions = level;
+					database.UpdatePermissions(name, level);
 					for (var room in playerlist){
 						if (!playerlist.hasOwnProperty(room)) continue;
 						if(playerlist[room][name]){//any room where the user is connected

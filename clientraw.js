@@ -164,11 +164,6 @@ var rectimer;
 
 var reconnected = false;
 
-var sanitize = function(string){
-	string = string.replace(/(?<!(<table>.*(?!(<\/table>))))<br( ?\/)?>/gs, '\n');
-	return string;
-};
-
 var roll = function(dice){
 	var result = [];
 	if(dice[1].indexOf('!') > 0){//we don't know how many characters long dice[1] is.
@@ -520,7 +515,6 @@ var Outercontainer = React.createClass({
 				if(newmodal.post.endsWith("*")){
 					newmodal.post = newmodal.post.slice(0, -1);
 				}
-				newmodal.post = sanitize(newmodal.post);
 				//fallthrough
 			case 'Whisper':
 				newmodal.id = id.join(',');//doesn't harm edit as long as you make modata.id[0] into modata.id there, it should only be one number
@@ -565,7 +559,6 @@ var Outercontainer = React.createClass({
 				if(newmodal.post.endsWith("*")){
 					newmodal.post = newmodal.post.slice(0, -1);
 				}
-				newmodal.post = sanitize(newmodal.post);
 				//fallthrough
 			case 'Set Active Character':
 				newmodal.type = 'active';//two part charid already in place
@@ -574,7 +567,7 @@ var Outercontainer = React.createClass({
 				if(!newmodal.charid){newmodal.charid = newmodal.id.join(','); newmodal.charname = this.state.context.target.textContent;}
 				var that=this;
 				this.props.socket.emit('Show Profile', newmodal.charid, function(response){
-					newmodal.post = sanitize(response);
+					newmodal.post = response;
 					newmodal.type = 'action';
 					that.modalpush(newmodal);//async is just fine thanks to this function.
 				});
@@ -2107,7 +2100,7 @@ var ChartabHandler = React.createClass({
 			this.props.modalpush({id: [], name: 'CleanLogs', type: 'action'});
 		} else if(['Rules', 'MOTD', 'Profile', 'Info', 'Logs'].indexOf(type) > -1){//acquire the setting from the server so it can be edited
 			var res = function(response){
-				if(response){response = sanitize(response);}
+				if(response){response = response;}
 				that.props.modalpush({id: [], name: name, type: 'action', post: response});
 			};
 			if(type == 'Profile'){

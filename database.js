@@ -303,6 +303,16 @@ SaveDatabase: function() {
 	}
 },
 
+UpdatePermissions: function(username, permissions) {
+	for(var i in databaseSockets) {
+		user = databaseSockets[i];
+		if(user[1] == username) { //Find the right person
+			user[2] = permissions;
+			user[0].emit('SetPermissions', permissions);
+		}
+	} //Keep looping in case they opened the database multiple times
+},
+
 InitializeDatabaseSocket: function(socket) {
 	var that = this;
 	var user = [socket, '', 'Guest'];

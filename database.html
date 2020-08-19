@@ -523,7 +523,7 @@
 					pathname = pathname + '.html';
 					var that = this;
 					this.props.socket.emit('RequestEntry', pathname, function(page) {
-						that.setState({defaultText: page.replace(/(?<!(<table>.*(?!(<\/table>))))<br( ?\/)?>/gs, "\n")});
+						that.setState({defaultText: page});
 					});
 				} else {
 					return {defaultText: '<html><body style="color:white;background-color:black;white-space:break-spaces">\nYour Message Here\n</body></html>', x: 100, y: 100, width: 300, height: 200, minheight: 110, minwidth: 220};
