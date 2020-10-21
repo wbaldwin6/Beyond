@@ -1523,7 +1523,14 @@ var ActionModal = React.createClass({
 	enterCheck: function(e){
 		if(e.keyCode == 13 && !e.shiftKey && !this.refs.toggle.checked){//hit enter without shift or toggle check.
 			this.post(e);
-		} else if(this.refs.Cancel.className == "Red Button"){//no need to test this if we're about to close it.
+		} else {
+			var calltime = new Date();
+			if(!this.state.lasttime || calltime - this.state.lasttime > 1000){
+				this.props.socket.emit('Typing');
+				this.setState({lasttime: calltime});
+			} //only let this emit once every second at most, doesn't need to be every keypress
+		}
+		if(this.refs.Cancel.className == "Red Button"){//no need to test this if we're about to close it.
 			this.refs.Cancel.className = "";
 			this.refs.text.style['border-color'] = '';
 			this.refs.text.style['outline-color'] = '';
@@ -1685,6 +1692,12 @@ var ActiveModal = React.createClass({
 		}
 		if(e.keyCode == 13 && !e.shiftKey && !this.refs.toggle.checked){//hit enter
 			this.post(e);
+		} else {
+			var calltime = new Date();
+			if(!this.state.lasttime || calltime - this.state.lasttime > 1000){
+				this.props.socket.emit('Typing');
+				this.setState({lasttime: calltime});
+			} //only let this emit once every second at most, doesn't need to be every keypress
 		}
 	},
 
@@ -2309,7 +2322,7 @@ var ChartabHandler = React.createClass({
 			case 'players'://case for the players online tab
 				var players = this.props.players;
 				currenttab = Object.keys(players).map(function(player, index){
-					return (<div id={player} key={index} className='PLentry'>{players[player].afk ? '(AFK) ' : ''}{player + ' - ' + players[player].permissions}{menu}</div>);
+					return (<div id={player} key={index} className='PLentry'>{players[player].status ? '('+players[player].status+') ' : ''}{player + ' - ' + players[player].permissions}{menu}</div>);
 				});
 				var ind = currenttab.length;
 				if(this.props.roomplayers){
@@ -2318,7 +2331,7 @@ var ChartabHandler = React.createClass({
 						if(that.props.settings.rooms && that.props.settings.rooms[room] && Object.keys(roomplayers[room]).length){//don't list empty rooms or rooms we've left.
 							currenttab.push(<h3 key={ind++} style={{pointerEvents:'none', textAlign:'center'}}>-<br/>{room}<br/>-</h3>);
 							Object.keys(roomplayers[room]).forEach(function(player){
-								currenttab.push(<div id={player} data={room} key={ind++} className='PLentry'>{roomplayers[room][player].afk ? '(AFK) ' : ''}{player + ' - ' + roomplayers[room][player].permissions}{menu}</div>);
+								currenttab.push(<div id={player} data={room} key={ind++} className='PLentry'>{roomplayers[room][player].status ? '('+roomplayers[room][player].status+') ' : ''}{player + ' - ' + roomplayers[room][player].permissions}{menu}</div>);
 							});
 						}
 					});

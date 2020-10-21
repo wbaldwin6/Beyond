@@ -1117,9 +1117,25 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		}//no logging, OBVIOUSLY. What's an admin window?
 	});
 	socket.on('AFK', function(on){
-		if(playerlist[socketroom] && playerlist[socketroom][username] && on != playerlist[socketroom][username].afk){
-			playerlist[socketroom][username].afk = on;
-			io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);
+		if(playerlist[socketroom] && playerlist[socketroom][username]){
+			if(on && playerlist[socketroom][username].status != 'AFK'){
+				playerlist[socketroom][username].status = 'AFK';
+				io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);
+			} else if(!on && playerlist[socketroom][username].status == 'AFK'){
+				playerlist[socketroom][username].status = '';
+				io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);
+			} //else no change needed, don't overwrite for FALSE on other statuses
+		}
+	});
+	socket.on('Typing', function(){
+		if(playerlist[socketroom] && playerlist[socketroom][username]){
+			playerlist[socketroom][username].status = 'Typing...';
+			if(socket.typingtimeout){
+				clearTimeout(socket.typingtimeout);
+			} else { //only need to emit if it's changed.
+				io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);
+			}
+			socket.typingtimeout = setTimeout(function() {playerlist[socketroom][username].status = ''; io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom); socket.typingtimeout = null;}, 5000);
 		}
 	});
 	socket.on('Dice', function(dice, result, color, priv){
