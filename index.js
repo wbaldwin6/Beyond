@@ -1135,7 +1135,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			} else { //only need to emit if it's changed.
 				io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);
 			}
-			socket.typingtimeout = setTimeout(function() {playerlist[socketroom][username].status = ''; io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom); socket.typingtimeout = null;}, 5000);
+			socket.typingtimeout = setTimeout(function() {if(playerlist[socketroom] && playerlist[socketroom][username]){playerlist[socketroom][username].status = ''; io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);} socket.typingtimeout = null;}, 5000);
 		}
 	});
 	socket.on('Dice', function(dice, result, color, priv){
@@ -1505,7 +1505,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 };
 
 io.of('/database').on('connection', function(socket) {
-	database.InitializeDatabaseSocket(socket);
+	database.InitializeDatabaseSocket(socket, adminLog);
 	if(serversettings.title){
 		socket.emit('Title', serversettings.title);
 	}

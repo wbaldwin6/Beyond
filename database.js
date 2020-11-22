@@ -45,6 +45,7 @@ function BuildOrder(dir) {
 var toplevel;
 var entries;
 var databaseSockets = [];
+var backups;
 
 module.exports = {
 AddDirectory: function(path, name, creator, locked) {
@@ -65,6 +66,32 @@ AddEntry: function(path, name, creator, content) {
 	dir.order.push(name);
 	entries[pathname] = content;
 	return dir.contents[name];
+},
+
+BackupDatabase: function() {
+	var key = new Date();
+	backups[key] = {}; //Create a new object at the key and clone the toplevel and entries into it.
+	backups[key].toplevel = Object.assign({}, toplevel);
+	backups[key].entries = Object.assign({}, entries);
+	fs.writeFile('./databasebackups.json', JSON.stringify(backups), 'utf8', function(err) {
+		if(err) {
+			console.log('Backup Failed.');
+			console.log(err.stack);
+			delete backups[key];
+			socket.emit('UpdateError', 'Backup Failed\n' + err.stack);
+		}
+	}
+},
+
+LoadBackup: function(key) { //Key should be a Date
+	if(key in backups) {
+		toplevel = backups[key].toplevel;
+		entries = backups[key].entries;
+		return 1;
+	} else {
+		socket.emit('UpdateError', 'Could not find a backup with that date.');
+		return 0;
+	}
 },
 
 DeleteEntry: function(path) {
@@ -239,7 +266,7 @@ RenameDirectory: function(path, newname, togglelock) {
 },
 
 LoadDatabase: function() {
-	try {
+	try { //First we need to load the database itself
 		toplevel = JSON.parse(fs.readFileSync('./database/database.json', 'utf8'));
 		BuildOrder(toplevel);
 		entries = JSON.parse(fs.readFileSync('./database/entries.json', 'utf8'));
@@ -259,6 +286,23 @@ LoadDatabase: function() {
 			if(er && er.code !== 'EEXIST') {throw er;}
 		});
 		this.SaveDatabase();
+	}
+	
+	//Now we need to load the backups
+	fs,access('./databasebackups.json', fs.constants.F_OK, function (e) {
+		if(e) { //File does not exist, i.e. there are no backups
+			backups = {};
+		}
+		else {
+			try { 
+				backups = JSON.parse(fs.readFileSync('./databasebackups.json', 'utf8'));
+				if(typeof backups !== 'object') {
+					backups = {};
+				}
+			} catch(err) {
+				backups = {};
+			}
+		}
 	}
 },
 
@@ -313,7 +357,7 @@ UpdatePermissions: function(username, permissions) {
 	} //Keep looping in case they opened the database multiple times
 },
 
-InitializeDatabaseSocket: function(socket) {
+InitializeDatabaseSocket: function(socket, adminLog) {
 	var that = this;
 	var user = [socket, '', 'Guest'];
 	databaseSockets.push(user);
@@ -363,6 +407,7 @@ InitializeDatabaseSocket: function(socket) {
 			console.log('Attempt to delete entry by '+user[1]+' in path '+path);
 			return;
 		}
+		adminLog(user[1], 'DeleteEntry', path);
 		var success = that.DeleteEntry(path);
 		if(success) {
 			that.SaveDatabase();
@@ -397,6 +442,9 @@ InitializeDatabaseSocket: function(socket) {
 		}
 		if(success) {
 			that.SaveDatabase();
+			if(user[1] !== dir.creator) { //Entry was editted by someone other than its creator
+				adminLog(user[1], 'EditEntry', path);
+			}
 			for(var i = 0; i < databaseSockets.length; i++) {
 				databaseSockets[i][0].emit('UpdateDatabase', toplevel);
 			}
@@ -495,6 +543,28 @@ InitializeDatabaseSocket: function(socket) {
 				if(callback){callback("That username was not in our list.");}
 			}
 		});
+	});
+	socket.on('BackupDatabase', function() {
+		if(user[2] !== 'Admin') {
+			console.log('Attempt to backup database by ' + user[1]);
+		} else {
+			that.BackupDatabase();
+			adminLog(user[1], 'BackupDatabase');
+		}
+	});
+	socket.on('LoadBackup', function(date) {
+		if(user[2] !== 'Admin') {
+			console.log('Attempt to load backup from ' + date + ' by ' + user[1]);
+		} else {
+			if(!that.LoadBackup(date)) {
+				console.log('Failure to load backup from ' + date + ' by ' + user[1]);
+			} else {
+				adminLog(user[1], 'LoadBackup', 'the backup for ' + date);
+			}
+		}
+	});
+	socket.on('GetDatabaseBackupList', function(callback) { //Intended purpose is to pass a function which performs an assignment
+		callback(JSON.parse(JSON.stringify(backups.keys))); //Deep copy the array so that nobody can mess with the keys with this, JUST IN CASE
 	});
 }
 };
