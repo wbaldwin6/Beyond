@@ -289,7 +289,7 @@ LoadDatabase: function() {
 	}
 	
 	//Now we need to load the backups
-	fs,access('./databasebackups.json', fs.constants.F_OK, function (e) {
+	fs.access('./databasebackups.json', fs.constants.F_OK, function (e) {
 		if(e) { //File does not exist, i.e. there are no backups
 			backups = {};
 		}
@@ -303,7 +303,7 @@ LoadDatabase: function() {
 				backups = {};
 			}
 		}
-	}
+	});
 },
 
 ToggleDirectoryLock: function(dir) {
