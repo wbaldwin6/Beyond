@@ -80,7 +80,7 @@ BackupDatabase: function() {
 			delete backups[key];
 			socket.emit('UpdateError', 'Backup Failed\n' + err.stack);
 		}
-	}
+	});
 },
 
 LoadBackup: function(key) { //Key should be a Date
