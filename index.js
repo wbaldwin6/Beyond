@@ -1101,7 +1101,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			var msg = {className: 'IC narration message', username: username, post: message, color: color, room: sendroom};
 			msg.id = postnum++;
 			addid(msg.id, username);
-			fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){consoleLog(err);}});
+			fs.writeFile('./logs/postid.txt', postnum.toString(), function(err){if(err){consoleLog(err);}});
 			io.to(sendroom).emit('ICmessage', msg);
 			toLog(msg, sendroom);
 		}
