@@ -1099,7 +1099,10 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 		if(CheckUser(username, 'Player', false, socket)){
 			message = processHTML(message);
 			var msg = {className: 'IC narration message', username: username, post: message, color: color, room: sendroom};
-			msg.id = postnum++;
+			if(isNaN(postnum++)){
+				postnum = 1;
+			}
+			msg.id = postnum;
 			addid(msg.id, username);
 			fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){consoleLog(err);}});
 			io.to(sendroom).emit('ICmessage', msg);
@@ -1186,7 +1189,10 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 				className = 'OOC ' + className;
 				call = 'OOCmessage';
 			} else if(['Player', 'Admin'].indexOf(playercheck[username].permissions) > -1) {//IC say or action
-				msg.id = postnum++;
+				if(isNaN(postnum++)){
+					postnum = 1;
+				}
+				msg.id = postnum;
 				addid(msg.id, username);
 				className = 'IC ' + className;
 				call = 'ICmessage';
