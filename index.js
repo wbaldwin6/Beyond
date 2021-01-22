@@ -82,12 +82,12 @@ try{
 
 var postnum = 1;
 if(!fs.existsSync('./logs')){fs.mkdirSync('./logs');}
-if(!fs.existsSync('./logs/postid.txt')){fs.writeFile('./logs/postid.txt', 1, function(err){if(err){consoleLog(err);}});} else {fs.readFile('./logs/postid.txt','utf8',function(err,num){postnum=+num;});}
+if(!fs.existsSync('./logs/postid.txt')){fs.writeFile('./logs/postid.txt', '1', function(err){if(err){consoleLog(err);}});} else {fs.readFile('./logs/postid.txt','utf8',function(err,num){postnum=+num;});}
 
 var iconnum = 0;
 if(!fs.existsSync('./faceicons')){fs.mkdirSync('./faceicons');}
 
-if(!fs.existsSync('./faceicons/num.txt')){fs.writeFile('./faceicons/num.txt', 0, function(err){if(err){consoleLog(err);}});} else {fs.readFile('./faceicons/num.txt','utf8',function(err,num){iconnum=+num;});}
+if(!fs.existsSync('./faceicons/num.txt')){fs.writeFile('./faceicons/num.txt', '0', function(err){if(err){consoleLog(err);}});} else {fs.readFile('./faceicons/num.txt','utf8',function(err,num){iconnum=+num;});}
 if(!fs.existsSync('./faceicons/img_trans.gif')){fs.writeFile('./faceicons/img_trans.gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64', function(err){if(err){consoleLog(err);}});}
 if(!fs.existsSync('./faceicons/img_trans.png')){fs.writeFile('./faceicons/img_trans.png', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64', function(err){if(err){consoleLog(err);}});}
 if(!fs.existsSync('./faceicons/favicon.png')){fs.writeFile('./faceicons/favicon.png', 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4gQBDzgSNR5bAgAAAA9QTFRF////AAAAz7E34sE8/9VD2dvC6gAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAAmklEQVQoz22S0Q2FMAhFGcHWCQQXMHYBk+4/0ytQoCXvfp5Q5NwIJQKS+nKQUybonCC19Z0MoBuEHAw+XSbkWQATascCoOLbvw1Q6/sED0C9HZw8MB76UhkY4LKPyMAAOA+jrqejhUqyvSDZGgjbYsBtZx+LbYFku/UhFzwJ/O/jzn2ELWofYUuzD7NF68PjfZh+6oOayuXf4QciHi6tIdMmKQAAAABJRU5ErkJggg==', 'base64', function(err){if(err){consoleLog(err);}});}
@@ -1104,7 +1104,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			}
 			msg.id = postnum;
 			addid(msg.id, username);
-			fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){consoleLog(err);}});
+			fs.writeFile('./logs/postid.txt', postnum.toString(), function(err){if(err){consoleLog(err);}});
 			io.to(sendroom).emit('ICmessage', msg);
 			toLog(msg, sendroom);
 		}
@@ -1138,7 +1138,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			} else { //only need to emit if it's changed.
 				io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);
 			}
-			socket.typingtimeout = setTimeout(function() {playerlist[socketroom][username].status = ''; io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom); socket.typingtimeout = null;}, 5000);
+			socket.typingtimeout = setTimeout(function() {if(playerlist[socketroom] && playerlist[socketroom][username]){playerlist[socketroom][username].status = ''; io.to(socketroom).emit('PlayerList', playerlist[socketroom], socketroom);} socket.typingtimeout = null;}, 5000);
 		}
 	});
 	socket.on('Dice', function(dice, result, color, priv){
@@ -1196,7 +1196,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 				addid(msg.id, username);
 				className = 'IC ' + className;
 				call = 'ICmessage';
-				fs.writeFile('./logs/postid.txt', postnum, function(err){if(err){consoleLog(err);}});
+				fs.writeFile('./logs/postid.txt', postnum.toString(), function(err){if(err){consoleLog(err);}});
 			}
 			msg.className = className;
 			if(type.startsWith('Test')){
@@ -1272,7 +1272,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 			} else {//If this breaks something (makes icons load weird, etc), switch it back to sync.
 				fs.writeFile('./faceicons/'+iconnum+'.png', data, 'base64', function(err){if(err){consoleLog(err);}});
 				var ids = iconnum++;
-				fs.writeFile('./faceicons/num.txt', iconnum, function(err){if(err){consoleLog(err);}});//update this
+				fs.writeFile('./faceicons/num.txt', iconnum.toString(), function(err){if(err){consoleLog(err);}});//update this
 				callback(ids, username);
 			}
 		}
@@ -1511,7 +1511,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 };
 
 io.of('/database').on('connection', function(socket) {
-	database.InitializeDatabaseSocket(socket);
+	database.InitializeDatabaseSocket(socket, adminLog);
 	if(serversettings.title){
 		socket.emit('Title', serversettings.title);
 	}

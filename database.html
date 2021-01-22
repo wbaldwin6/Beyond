@@ -963,6 +963,34 @@
 
 			stopDrag: stopDrag
 		});
+		
+		//A modal to load the database backup
+		var LoadDatabaseModal = React.createClass({
+			getInitialState: function() {
+				return {x: 100, y: 100, title: "Select the backup to load"};
+			},
+			
+			componentDidMount: function() {
+				var that = this;
+				//Need to get the list of backups from the server
+				this.props.socket.emit('GetDatabaseBackupList', function(dates) {
+					that.state.dates = dates;
+				});
+			},
+			
+			LoadButton: function(e) {
+			},
+			
+			CancelButton: function(e) {
+				this.props.outerarea.setState({modal: undefined});
+			},
+			
+			render: function() {
+				return (<div ref="this" className="modal" onMouseDown={this.startDrag} onTouchStart={this.startDrag} style={{left: this.state.x, top: this.state.y}}>
+							
+						</div>);
+			}
+		});
 
 		//Functions for searching the Database, using a trie
 		function TrieNode(value) {
