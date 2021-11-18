@@ -1,6 +1,7 @@
 var fs = require('fs');
 
-var monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const monthenum = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const errorReport = '<body style="background-color:black;color:white;"><b>An error occurred trying to search the logs. Please try again later.</b><br />';
 
 function escapeRegExp(str) { //Borrowed directly from Stack Overflow, just replaces every special character in a string with the escaped equivalent for use as a regex
   return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
@@ -13,10 +14,12 @@ function searchLogsByFilename(stringToFind, filename, read) {
 		return '';
 	} else {
 		var data = fs.readFileSync("."+read+filename, 'utf8');
+		data = data.substr(data.search(/<\w*body[^>]*>/is)); //Trim to the body tag
+		data = data.substr(data.search('>') + 1); //Remove the body tag
 		if(data.search(stringToFind) !== -1) {
 			return filename; //Filename serves as "True" result
 		} else {
-			return ''; //EMpty string serves as "Not Found" value
+			return ''; //Empty string serves as "Not Found" value
 		}
 	}
 }
@@ -24,11 +27,10 @@ function searchLogsByFilename(stringToFind, filename, read) {
 //This function takes a string and an HTTP Response object
 //Search all the log files, then send the list of good results back to the response
 function searchLogs(stringToFind, room) {
-    var errorReport = '<body style="background-color:black;color:white;"><b>An error occurred trying to search the logs. Please try again later.</b><br />';
 	/*Decode and escape characters in string to allow for search of special characters.
 	  Additional tags around ensure search is confined to body, without searching inside tags
 	  Conversion to RegExp for case-insensitive search*/
-	stringToFind = new RegExp("<body.*>[^<]*" + escapeRegExp(decodeURIComponent(stringToFind)) + ".*<.*/body>", 'i');
+	stringToFind = new RegExp("\\b" + escapeRegExp(decodeURIComponent(stringToFind)) + "\\b", 'is');
     var read = "/logs/";
     var intread = "/interactivelogs/";
     if(room){read += room+"/"; intread += room+"/";}
