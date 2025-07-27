@@ -264,8 +264,9 @@ app.get('/characters', function(req, res){
 								f.forEach(function(chr){
 									var id=file+'-'+chr.slice(0, -5);
 									var name = charindex[id].name;
+									var icpos = {left: (charindex[id].icpos && charindex[id].icpos.left) || 0, top: (charindex[id].icpos && charindex[id].icpos.top) || 0}; //If the position is undefined, we assume 0,0
 									ret += '<a href="/characters/'+encodeURIComponent(file)+'/'+chr+'" style="color:blue;">'+
-									'<img src="/faceicons/img_trans.gif" height="50px" width="50px" style="background-image:url(/faceicons/'+charindex[id].icon+'.png);">'+name+'</a><br><br>';
+									'<img src="/faceicons/img_trans.gif" height="50px" width="50px" style="background-image:url(/faceicons/'+charindex[id].icon+'.png);background-position:-'+icpos.left+'px -'+icpos.top+'px;">'+name+'</a><br><br>';
 								});
 								ret += '</div>';
 							}
@@ -1260,7 +1261,7 @@ var Setconnections = function(socket, user, sroom){//username will definitely be
 	socket.on('Update Character', function(character){
 		fs.readFile('./characters/charindex.json', 'utf8', function(err, index){
 			index = JSON.parse(index);
-			index[character.id] = {name: character.name, icon: character.icon};
+			index[character.id] = {name: character.name, icon: character.icon, icpos: {left: (character.icpos && character.icpos.left) || 0, top: (character.icpos && character.icpos.top) || 0}};
 			fs.writeFileSync('./characters/charindex.json', JSON.stringify(index));
 		});
 	});

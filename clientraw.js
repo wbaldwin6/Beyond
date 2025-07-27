@@ -154,6 +154,7 @@ var back = function(e){
 	if(!idleInterval){socket.emit('AFK', false); timersetup();}
 	document.title = title;
 	document.getElementsByTagName('link')[0].href = "/faceicons/favicon.png";
+    notifs = [];
 };
 
 window.onfocus = back;
@@ -598,6 +599,9 @@ var Outercontainer = React.createClass({
 				charid = charid.join('-');//Catch usernames with '-' in them.
 				window.open('/characters/' + charid + '/' + charnum + '.html');
 				break;
+			case 'Set Notification Sound':
+				newmodal.type = 'setnotifsound'
+				break;
 			default:
 				console.log('Unrecognized context command.');
 		}
@@ -684,11 +688,11 @@ var Outercontainer = React.createClass({
 				<div className="gutter gutter-horizontal" style={{width: '10px'}} onMouseDown={this.startDrag} onTouchStart={this.startDrag}/>
 				<div id="OI" ref="OI" style={{width:"calc("+(100-this.state.posx)+"% - 5px)"}}>
 					<div id="IC" onClick={click} style={{height:"calc("+this.state.posy+"% - 5px)"}}>
-						<IChandler ref="ICbox" socket={this.props.socket} notify={this.state.settings.notify} rooms={this.state.settings.rooms} socketroom={this.state.socketroom ? true : false}/>
+						<IChandler ref="ICbox" socket={this.props.socket} notify={this.state.settings.notify} rooms={this.state.settings.rooms} notifSound={this.state.settings.notifSound} socketroom={this.state.socketroom ? true : false}/>
 					</div>
 					<div className="gutter gutter-vertical" style={{height: '10px'}} onMouseDown={this.startDrag} onTouchStart={this.startDrag}/>
 					<div id="OOC" onClick={click} style={{height:"calc("+(100-this.state.posy)+"% - 5px)"}}>
-						<OOChandler ref="OOCbox" socket={this.props.socket} notify={this.state.settings.notify} rooms={this.state.settings.rooms} socketroom={this.state.socketroom ? true : false}/>
+						<OOChandler ref="OOCbox" socket={this.props.socket} notify={this.state.settings.notify} rooms={this.state.settings.rooms} notifSound={this.state.settings.notifSound} socketroom={this.state.socketroom ? true : false}/>
 					</div>
 				</div>
 				<input className="OOCbar" type="text" ref="OOCbar" placeholder="Input an OOC message" onKeyPress={this.handleEnter}/>
@@ -778,6 +782,8 @@ var ModalHandler = React.createClass({
 						return(<WarningModal key={index} id={index} closeModal={that.props.closeModal}/>);
 					case 'favicon':
 						return(<FaviconModal key={index} id={index} socket={that.props.socket} modal={modal} closeModal={that.props.closeModal} selectModal={that.props.selectModal} isSelected={that.props.selected === index}/>);
+					case 'setnotifsound':
+						return(<NotifSoundModal key={index} id={index} socket={that.props.socket} modal={modal} closeModal={that.props.closeModal} selectModal={that.props.selectModal} isSelected={that.props.selected === index}/>);
 					case 'narrate':
 						return(<NarrateModal key={index} id={index} socket={that.props.socket} modal={modal} settings={that.props.settings} handleSettings={that.props.handleSettings} closeModal={that.props.closeModal} selectModal={that.props.selectModal} isSelected={that.props.selected === index}/>);
 				}
@@ -1122,6 +1128,7 @@ var CharacterModal = React.createClass({
 			}
 			this.deselectAll();
 			this.props.handleSettings(this.props.settings, characters);
+			this.props.socket.emit('Update Character', characters[trueid[0]][trueid[1]][0]); //Adding this to update the display icon for the character database after deletion
 			this.refs.delsel.className = "";
 		} else {
 			this.refs.delsel.className = "Red Button";
@@ -1295,7 +1302,7 @@ var FaviconModal = React.createClass({
 			<input type='file' ref={'FIs'} style={{width:'100%',marginBottom:'1px'}} multiple onChange={this.handleFavicons}/>
 			<span ref={'previews'}>{newicons}</span><br/>
 			<button type="submit" id="save" onClick={this.saveFavicons}>Save</button>
-				<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button>
+			<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button>
 			</div>
 		);
 	}
@@ -2132,6 +2139,8 @@ var ChartabHandler = React.createClass({
 			this.props.modalpush({id: [], name: 'Input full Discord ID#', type: 'action'});
 		} else if(name == "Edit Favicon"){
 			this.props.modalpush({id: [], name: 'Edit Favicon', type: 'favicon'});
+		} else if(name == "Set Notification Sound") {
+			this.props.modalpush({id: [], name: "Set Notification Sound", type: 'setnotifsound'});
 		} else if(['Player', 'Admin'].indexOf(this.props.permissions) > -1){//Narrate
 			this.props.modalpush({id: [], name: name, type: 'action'});
 		}
@@ -2211,6 +2220,7 @@ var ChartabHandler = React.createClass({
 					if(where){id2[2]++;}
 					this.props.characters[id1[0]][id1[1]].splice(id2[2], 0, el);
 				}
+				this.props.socket.emit('Update Character', this.props.characters[id1[0]][id1[1]][0]); //Make the new first derivative the display derivative
 				break;
 			case 'characterclosed':
 			case 'character':
@@ -2341,11 +2351,11 @@ var ChartabHandler = React.createClass({
 					</div>);
 				break;
 			case 'commands'://case for player commands tab
-				currenttab=[<div key='0' className='Command' onClick={this.togglesetting}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglesetting}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.togglesetting}>{'Compact Characters '+(this.props.settings.compchar ? 'ON' : 'OFF')}</div>, <div key='3' className='Command' onClick={this.togglesetting}>{'Listed Icons '+(this.props.settings.showfi ? 'ON' : 'OFF')}</div>, <div key='4' className='Command' onClick={this.togglesetting}>{'IC/OOC Icons '+(this.props.settings.hideIcons ? 'OFF' : 'ON')}</div>, <div key='5' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='6' className='Command' onClick={function(e){window.open(that.props.socketroom ? '/logs/'+that.props.socketroom : '/logs');}}>Open Logs</div>, <div key='7' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='8' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='9' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='10' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='12' className='Command' onClick={this.show}>Show Rules</div>, <div key='13' className='Command' onClick={this.show}>Show MOTD</div>, <div key='14' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='15' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='16' className='Command' onClick={this.charstats}>Show Charlist Stats</div>, <div key='17' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
+				currenttab=[<div key='0' className='Command' onClick={this.togglesetting}>{'Enter Checkbox '+(this.props.settings.echeck ? 'ON' : 'OFF')}</div>, <div key='1' className='Command' onClick={this.togglesetting}>{'Menu Buttons '+(this.props.settings.buttons ? 'ON' : 'OFF')}</div>, <div key='2' className='Command' onClick={this.togglesetting}>{'Compact Characters '+(this.props.settings.compchar ? 'ON' : 'OFF')}</div>, <div key='3' className='Command' onClick={this.togglesetting}>{'Listed Icons '+(this.props.settings.showfi ? 'ON' : 'OFF')}</div>, <div key='4' className='Command' onClick={this.togglesetting}>{'IC/OOC Icons '+(this.props.settings.hideIcons ? 'OFF' : 'ON')}</div>, <div key='5' className='Command'><span>Set Text Color</span><input type="color" ref="OOCcolor" style={{backgroundColor:'black'}} onChange={this.setColor} defaultValue={this.props.settings.textcolor}/></div>, <div key='6' className='Command' onClick={function(e){window.open(that.props.socketroom ? '/logs/'+that.props.socketroom : '/logs');}}>Open Logs</div>, <div key='7' className='Command' onClick={function(e){window.open('/database');}}>Open Database</div>, <div key='8' className='Command' onClick={function(e){window.open('/characters');}}>Open Character Database</div>, <div key='9' className='Command' onClick={this.genmodal}>Narrate</div>, <div key='10' className='Command' onClick={this.genmodal}>Set Notifications</div>, <div key='12' className='Command' onClick={this.genmodal}>Set Notification Sound</div>, <div key='13' className='Command' onClick={function(e){cacheNotifSound(null);}}>Clear Notification Sound</div>, <div key='14' className='Command' onClick={this.show}>Show Rules</div>, <div key='15' className='Command' onClick={this.show}>Show MOTD</div>, <div key='16' className='Command' onClick={function(e){window.open('/worldinfo');}}>Show World Info</div>, <div key='17' className='Command' onClick={this.genmodal}>Show Default Profile</div>, <div key='18' className='Command' onClick={this.charstats}>Show Charlist Stats</div>, <div key='19' className='Diceee'><span onClick={this.gendice} className='Command'>Create Dice</span> <input type="number" ref='Nd' min="1" style={{width:'10%', textAlign:'center'}}/>d<input type="number" ref='dN' min="1" style={{width:'10%', textAlign:'center'}}/><input type='checkbox' ref='exploding'/>!</div>];
 				if(!this.props.socketroom){currenttab.splice(11, 0, (<div key='11' className='Command' onClick={this.genmodal}>Set Rooms</div>));}
 				var that = this;
 				this.props.settings.dice.forEach(function(dice, index){
-					currenttab.push(<div key={18+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
+					currenttab.push(<div key={20+index} id={'Dice'+index} className='Dice Command' data={dice} onClick={that.roll}>{dice}{menu}</div>);
 				});
 				currenttab = (<div className="playlist">
 					{currenttab}
@@ -2538,14 +2548,12 @@ var IChandler = React.createClass({
 					if(that.props.notify[message.username] && that.props.notify[message.username].IC){
 						highlight = true;
 						if(document.visibilityState != 'visible'){//don't do this if they're in window
-							document.title = "Post from "+message.username+"!";
-							document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+                            addNotification(message.username);
 						}
 					} else if(message.character && ((that.props.notify[message.character.name] && that.props.notify[message.character.name].IC) || (that.props.notify[message.character.id] && that.props.notify[message.character.id].IC))){
 						highlight = true;
 						if(document.visibilityState != 'visible'){//don't do this if they're in window
-							document.title = "Post from "+message.character.name+"!";
-							document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+                            addNotification(message.character.name);
 						}
 					}
 				}
@@ -2646,8 +2654,7 @@ var OOChandler = React.createClass({
 			if((message.className.split(" ")[1] == 'whisper' && message.username) || (message.character && that.props.notify && ((that.props.notify[message.username] && that.props.notify[message.username].OOC) || (message.character && that.props.notify[message.character.name] && that.props.notify[message.character.name].OOC)))){
 				highlight = true;
 				if(document.visibilityState != 'visible'){
-					document.title = "Post from "+message.username+"!";
-					document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+                    addNotification(message.username);
 				}
 			}
 			newm.push(<Message key={newm.length} message={message} highlight={highlight} socketroom={that.props.socketroom}/>);
@@ -2668,6 +2675,118 @@ var OOChandler = React.createClass({
 		);
 	}
 });
+
+//Sk8 adding this to handle notification sounds as an opt-in feature, used FaviconModal as reference
+var NotifSoundModal = React.createClass({
+	getInitialState: function() {
+		return {x: '25%', y: '25%'};
+	},
+	
+	startDrag: startDrag,
+	drag: drag,
+	stopDrag: stopDrag,
+	
+	handleNotifSound: function(e) {
+		if(e.target.files[0].type.match(/audio/g)) {
+			this.setState({snd: e.target.files[0]});
+		} else {
+			delete this.state.snd;
+		}
+	},
+	
+	saveNotifSound: function() {
+		cacheNotifSound(this.state.snd);
+	},
+	
+	render: function() {
+		var modal = this.props.modal;
+		var cname = this.props.isSelected ? "modal selectedmodal" : "modal";
+		return(
+			<div className={cname} ref="this" style={{left: this.state.x, top: this.state.y, width: '200px'}} onMouseDown={this.startDrag} onTouchStart={this.startDrag} onClick={this.props.selectModal.bind(null, this.props.id)}><span className="mtitle">{modal.name}</span><br/>
+			<input type="file" accept="audio/*" ref="notifSoundFile" style={{width:'100%',marginBottom:'1px'}} onChange={this.handleNotifSound}/>
+			<button type="submit" id="save" onClick={this.saveNotifSound}>Save</button>
+			<button type="submit" id="cancel" onClick={this.props.closeModal.bind(null, this.props.id)}>Cancel</button>
+			</div>
+		);
+	}
+});
+
+var reloadNotifSound = true;
+var canPlaySound = false;
+
+//This function will handle playing the notification sound
+function playNotifSound() {
+	var soundElem = document.getElementById("notifSoundPlayer");
+	if(reloadNotifSound) {
+		reloadNotifSound = false;
+		caches.match('/notifSound').then((res) => {
+			if(res && res.ok) {
+				if(canPlaySound) {
+					window.URL.revokeObjectURL(soundElem.src);
+					canPlaySound = false;
+				}
+				res.blob().then((snd) => { //Fetch the saved notif sound and if we get something, play that music!
+					var url = window.URL.createObjectURL(snd);
+					soundElem.src = url;
+					canPlaySound = true;
+					soundElem.load();
+					soundElem.play();
+					setTimeout(() => {soundElem.pause(); soundElem.currentTime = 0;}, 3000);
+				});
+			}
+		});
+	} else if(canPlaySound) {
+		soundElem.play();
+		if(3 < soundElem.duration) {
+			setTimeout(() => {soundElem.pause(); soundElem.currentTime = 0;}, 3000);
+		}
+	}
+}
+
+function cacheNotifSound(snd) {
+	caches.open("notifSound").then(
+		(cache) => {
+			if(snd) {
+				reloadNotifSound = true;
+				return cache.put('/notifSound', new Response(snd));
+			} else {
+				var soundElem = document.getElementById("notifSoundPlayer");
+				soundElem.pause();
+				if(canPlaySound) {
+					window.URL.revokeObjectURL(soundElem.src);
+					canPlaySound = false;
+				}
+				return cache.delete('/notifSound');
+			}
+		}
+	);
+}
+
+var notifs = [];
+var notifUpdater;
+
+function addNotification(sender) {
+    if(notifs.push(sender) == 1) {
+        notifUpdater = setInterval(displayNotifs, 1000);
+    }
+    playNotifSound()
+}
+
+function displayNotifs() {
+    if(notifs.length == 0) {
+        if(notifUpdater) {
+            clearInterval(notifUpdater);
+            notifUpdater = null;
+        }
+        return;
+    }
+    if(notifs.length == 1) {
+        document.title = "Post from "+notifs[0]+"!";
+    } else {
+        document.title = notifs.length+" unread posts!";
+    }
+    document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+}
 
 ReactDOM.render(
 	<Outercontainer socket={socket}/>,
