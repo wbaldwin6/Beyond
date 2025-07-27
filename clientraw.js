@@ -2769,7 +2769,8 @@ function addNotification(sender) {
     if(notifs.push(sender) == 1) {
         notifUpdater = setInterval(displayNotifs, 1000);
     }
-    playNotifSound()
+    displayNotifs();
+    playNotifSound();
 }
 
 function displayNotifs() {
@@ -2785,7 +2786,7 @@ function displayNotifs() {
     } else {
         document.title = notifs.length+" unread posts!";
     }
-    document.getElementsByTagName('link')[0].href = "/faceicons/notice.png";
+    document.getElementById('favicon').href = "/faceicons/notice.png";
 }
 
 ReactDOM.render(
