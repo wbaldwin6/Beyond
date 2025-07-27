@@ -153,7 +153,7 @@ var timersetup = function(){idleInterval = new Worker("/idle.js"); idleInterval.
 var back = function(e){
 	if(!idleInterval){socket.emit('AFK', false); timersetup();}
 	document.title = title;
-	document.getElementsByTagName('link')[0].href = "/faceicons/favicon.png";
+	document.getElementById('favicon').href = "/faceicons/favicon.png";
     notifs = [];
 };
 
