@@ -2713,53 +2713,80 @@ var NotifSoundModal = React.createClass({
 
 var reloadNotifSound = true;
 var canPlaySound = false;
+//Set up storage for Notif Sound
+let notifSoundDB;
+
+function initializeNotifSounds() {
+    //Open the Notif Sound DB to be used
+    const openRequest = window.indexedDB.open("beyond_notif_sounds_db", 1);
+    openRequest.addEventListener("error", () => {
+        console.error("Notif Sounds database failed to open.");
+    });
+    //Initialize the formatting of the DB
+    openRequest.addEventListener("upgradeneeded", (e) => {
+        notifSoundDB = e.target.result;
+        const objectStore = notifSoundDB.createObjectStore("beyond_notif_sounds_os", {
+            keyPath: "url",
+            autoIncrement: false
+        });
+        
+        objectStore.createIndex("soundFile", "soundFile", {unique: false});
+    });
+    openRequest.addEventListener("success", () => {
+        notifSoundDB = openRequest.result;
+    });
+}
 
 //This function will handle playing the notification sound
 function playNotifSound() {
 	var soundElem = document.getElementById("notifSoundPlayer");
-	if(reloadNotifSound) {
-		reloadNotifSound = false;
-		caches.match('/notifSound').then((res) => {
-			if(res && res.ok) {
-				if(canPlaySound) {
-					window.URL.revokeObjectURL(soundElem.src);
-					canPlaySound = false;
-				}
-				res.blob().then((snd) => { //Fetch the saved notif sound and if we get something, play that music!
-					var url = window.URL.createObjectURL(snd);
-					soundElem.src = url;
-					canPlaySound = true;
-					soundElem.load();
-					soundElem.play();
-					setTimeout(() => {soundElem.pause(); soundElem.currentTime = 0;}, 3000);
-				});
-			}
-		});
-	} else if(canPlaySound) {
+    if(reloadNotifSound) {
+        var transaction = notifSoundDB.transaction(["beyond_notif_sounds_os"],"readonly");
+        var objectStore = transaction.objectStore("beyond_notif_sounds_os");
+        var req = objectStore.get(document.URL);
+        req.onsuccess = (e) => {
+            reloadNotifSound = false;
+            setNotifSound(req.result.soundFile);
+            soundElem.play(); //Have to include the play up here or else it won't play on first load
+            if(3 < soundElem.duration) {
+                setTimeout(stopNotifSound, 3000);
+            }
+        }
+    } else if(canPlaySound) { //May as well make this an else
 		soundElem.play();
 		if(3 < soundElem.duration) {
-			setTimeout(() => {soundElem.pause(); soundElem.currentTime = 0;}, 3000);
+			setTimeout(stopNotifSound, 3000);
 		}
 	}
 }
 
+function stopNotifSound() {
+    var soundElem = document.getElementById("notifSoundPlayer");
+    soundElem.pause();
+    soundElem.currentTime = 0;
+}
+
+function setNotifSound(snd) {
+    var soundElem = document.getElementById("notifSoundPlayer");
+    
+    if(canPlaySound) {
+        window.URL.revokeObjectURL(soundElem.src);
+        canPlaySound = false;
+    }
+    if(snd) {
+        var url = window.URL.createObjectURL(snd);
+        soundElem.src = url;
+        canPlaySound = true;
+        soundElem.load();
+        stopNotifSound();
+    }
+}
+
 function cacheNotifSound(snd) {
-	caches.open("notifSound").then(
-		(cache) => {
-			if(snd) {
-				reloadNotifSound = true;
-				return cache.put('/notifSound', new Response(snd));
-			} else {
-				var soundElem = document.getElementById("notifSoundPlayer");
-				soundElem.pause();
-				if(canPlaySound) {
-					window.URL.revokeObjectURL(soundElem.src);
-					canPlaySound = false;
-				}
-				return cache.delete('/notifSound');
-			}
-		}
-	);
+    const transaction = notifSoundDB.transaction(["beyond_notif_sounds_os"],"readwrite");
+    const objectStore = transaction.objectStore("beyond_notif_sounds_os");
+    const req = objectStore.put({soundFile: snd, url: document.URL});
+    setNotifSound(snd);
 }
 
 var notifs = [];
@@ -2793,3 +2820,4 @@ ReactDOM.render(
 	<Outercontainer socket={socket}/>,
 	document.getElementById('main')
 );
+initializeNotifSounds();
